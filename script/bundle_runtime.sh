@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${1:-$ROOT/dist/XDownloader.app}"
+APP="${1:-$ROOT/dist/SYDownload.app}"
 RESOURCES="$APP/Contents/Resources"
 PYTHON_VERSION="${PYTHON_VERSION:-3.12}"
 
@@ -24,7 +24,7 @@ if [[ ! -d "$APP/Contents" ]]; then
   exit 2
 fi
 
-WORK="$ROOT/.build/xdownloader-bundle"
+WORK="$ROOT/.build/sydownload-bundle"
 SOURCES="$WORK/sources"
 PYTHON_BUILD_ROOT="$WORK/python-managed"
 PYTHON_ROOT="$RESOURCES/python"

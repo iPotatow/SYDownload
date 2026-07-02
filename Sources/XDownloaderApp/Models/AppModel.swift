@@ -143,8 +143,8 @@ final class AppModel: ObservableObject {
     @Published var input = ""
     @Published var outputDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
         .first?
-        .appendingPathComponent("XDownloader")
-        .path ?? "~/Downloads/XDownloader"
+        .appendingPathComponent("SYDownload")
+        .path ?? "~/Downloads/SYDownload"
     @Published var status = "粘贴链接后即可开始"
     @Published var detectedPlatform: DownloadPlatform = .unknown
     @Published var isWorking = false
@@ -165,7 +165,9 @@ final class AppModel: ObservableObject {
     @Published var douyinSettingsPath = ""
 
     private let bridge = BridgeClient()
-    private let historyKey = "XDownloader.history.v1"
+    private let historyKey = "SYDownload.history.v1"
+    private let legacyHistoryKey = "XDownloader.history.v1"
+    private let legacyBundleIdentifier = "com.xdownloader.spike"
 
     init() {
         loadHistory()
@@ -503,10 +505,19 @@ final class AppModel: ObservableObject {
     }
 
     private func loadHistory() {
-        guard let data = UserDefaults.standard.data(forKey: historyKey),
+        if let data = UserDefaults.standard.data(forKey: historyKey),
+           let decoded = try? JSONDecoder().decode([HistoryItem].self, from: data) {
+            history = decoded
+            return
+        }
+
+        guard let legacyDefaults = UserDefaults(suiteName: legacyBundleIdentifier),
+              let data = legacyDefaults.data(forKey: legacyHistoryKey),
               let decoded = try? JSONDecoder().decode([HistoryItem].self, from: data)
         else { return }
+
         history = decoded
+        persistHistory()
     }
 }
 #endif

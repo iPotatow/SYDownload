@@ -326,8 +326,8 @@ struct SettingsView: View {
 
             settingCard("数据目录") {
                 VStack(alignment: .leading, spacing: 10) {
-                    pathRow("应用数据", "~/Library/Application Support/XDownloader/")
-                    pathRow("缓存", "~/Library/Caches/XDownloader/")
+                    pathRow("应用数据", "~/Library/Application Support/SYDownload/")
+                    pathRow("缓存", "~/Library/Caches/SYDownload/")
                     pathRow("下载文件", model.outputDirectory)
                 }
             }

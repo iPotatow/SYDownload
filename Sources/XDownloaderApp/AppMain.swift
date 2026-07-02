@@ -3,11 +3,11 @@ import SwiftUI
 import AppKit
 
 @main
-struct XDownloaderApp: App {
+struct SYDownloadApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup("XDownloader", id: "main") {
+        WindowGroup("SYDownload", id: "main") {
             ContentView()
                 .environmentObject(model)
                 .onAppear {
@@ -29,10 +29,10 @@ import Foundation
 import XDownloaderCore
 
 @main
-enum XDownloaderLinuxProbe {
+enum SYDownloadLinuxProbe {
     static func main() {
         let probe = PlatformDetector.detect("https://v.douyin.com/demo").rawValue
-        print("XDownloader macOS UI requires SwiftUI/AppKit. Core probe OK: \(probe)")
+        print("SYDownload macOS UI requires SwiftUI/AppKit. Core probe OK: \(probe)")
     }
 }
 #endif
