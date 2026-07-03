@@ -18,11 +18,26 @@ swift build -c "$CONFIGURATION" --product SYDownload
 BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
 BIN="$BIN_DIR/SYDownload"
 APP="$ROOT/dist/SYDownload.app"
+RESOURCE="$ROOT/Sources/SYDownloadApp/Resources/SYDownloadIcon.png"
+RESOURCE_BUNDLE="$BIN_DIR/SYDownload_SYDownloadApp.bundle"
+
+if [[ ! -f "$RESOURCE" ]]; then
+  echo "Missing app icon resource: $RESOURCE" >&2
+  exit 3
+fi
+if [[ ! -d "$RESOURCE_BUNDLE" ]]; then
+  echo "Missing SwiftPM resource bundle: $RESOURCE_BUNDLE" >&2
+  exit 3
+fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/bridge"
 cp "$BIN" "$APP/Contents/MacOS/SYDownload"
 chmod +x "$APP/Contents/MacOS/SYDownload"
+# Keep the SwiftPM resource bundle in the standard signed app resources area.
+# AppMark resolves it explicitly instead of using Bundle.module at runtime.
+cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
+cp "$RESOURCE" "$APP/Contents/Resources/SYDownloadIcon.png"
 cp "$ROOT/Bridge/engine_bridge.py" "$APP/Contents/Resources/bridge/engine_bridge.py"
 printf '%s\n' "$APP_VERSION" > "$APP/Contents/Resources/bundle-version.txt"
 
@@ -41,6 +56,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <key>CFBundleDisplayName</key><string>SYDownload</string>
 <key>CFBundleVersion</key><string>${APP_VERSION}</string>
 <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
+<key>CFBundleIconFile</key><string>SYDownloadIcon.png</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
@@ -48,9 +64,9 @@ PLIST
 
 /usr/bin/plutil -lint "$APP/Contents/Info.plist"
 
-if /usr/bin/find "$APP/Contents" -type l -print | /usr/bin/grep -q .; then
+if /usr/bin/find "$APP" -type l -print | /usr/bin/grep -q .; then
   echo "Refusing to sign app bundle with symbolic links:"
-  /usr/bin/find "$APP/Contents" -type l -print
+  /usr/bin/find "$APP" -type l -print
   exit 4
 fi
 
@@ -64,7 +80,7 @@ if [[ "$ADHOC_SIGN" == "1" ]]; then
         /usr/bin/codesign --force --sign - "$candidate"
       fi
     fi
-  done < <(/usr/bin/find "$APP/Contents" -type f -print0)
+  done < <(/usr/bin/find "$APP" -type f -print0)
 
   /usr/bin/codesign --force --deep --sign - "$APP"
   /usr/bin/codesign --verify --deep --strict "$APP"

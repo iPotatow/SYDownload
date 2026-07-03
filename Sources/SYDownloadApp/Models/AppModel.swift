@@ -1,12 +1,13 @@
 #if canImport(SwiftUI)
 import Foundation
 import SwiftUI
-import XDownloaderCore
+import SYDownloadCore
 
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case download
     case tasks
     case history
+    case photos
     case settings
 
     var id: String { rawValue }
@@ -166,8 +167,6 @@ final class AppModel: ObservableObject {
 
     private let bridge = BridgeClient()
     private let historyKey = "SYDownload.history.v1"
-    private let legacyHistoryKey = "XDownloader.history.v1"
-    private let legacyBundleIdentifier = "com.xdownloader.spike"
 
     init() {
         loadHistory()
@@ -511,13 +510,7 @@ final class AppModel: ObservableObject {
             return
         }
 
-        guard let legacyDefaults = UserDefaults(suiteName: legacyBundleIdentifier),
-              let data = legacyDefaults.data(forKey: legacyHistoryKey),
-              let decoded = try? JSONDecoder().decode([HistoryItem].self, from: data)
-        else { return }
-
-        history = decoded
-        persistHistory()
+        history = []
     }
 }
 #endif

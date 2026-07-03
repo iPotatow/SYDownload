@@ -1,6 +1,6 @@
 #if canImport(SwiftUI)
 import Foundation
-import XDownloaderCore
+import SYDownloadCore
 
 struct BridgeClient: Sendable {
     enum BridgeError: LocalizedError, Sendable {

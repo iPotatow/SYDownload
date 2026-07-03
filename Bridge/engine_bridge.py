@@ -190,13 +190,6 @@ def app_support_dir() -> Path:
         if override
         else Path.home() / "Library" / "Application Support" / "SYDownload"
     )
-    if not override and not target.exists():
-        legacy = Path.home() / "Library" / "Application Support" / "XDownloader"
-        if legacy.is_dir():
-            try:
-                shutil.copytree(legacy, target)
-            except OSError:
-                pass
     target.mkdir(parents=True, exist_ok=True)
     return target
 

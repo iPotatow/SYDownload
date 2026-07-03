@@ -15,7 +15,8 @@ struct SYDownloadApp: App {
                     NSApplication.shared.activate(ignoringOtherApps: true)
                 }
         }
-        .defaultSize(width: 1100, height: 720)
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 960, height: 680)
         .windowResizability(.contentMinSize)
 
         Settings {
@@ -26,7 +27,7 @@ struct SYDownloadApp: App {
 }
 #else
 import Foundation
-import XDownloaderCore
+import SYDownloadCore
 
 @main
 enum SYDownloadLinuxProbe {

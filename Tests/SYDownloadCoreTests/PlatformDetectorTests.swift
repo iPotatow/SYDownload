@@ -1,5 +1,5 @@
 import Testing
-@testable import XDownloaderCore
+@testable import SYDownloadCore
 
 @Test func detectsXHS() {
     #expect(PlatformDetector.detect("https://www.xiaohongshu.com/explore/abc") == .xiaohongshu)

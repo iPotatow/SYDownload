@@ -5,18 +5,19 @@ let package = Package(
     name: "SYDownload",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "SYDownloadCore", targets: ["XDownloaderCore"]),
-        .executable(name: "SYDownload", targets: ["XDownloaderApp"]),
+        .library(name: "SYDownloadCore", targets: ["SYDownloadCore"]),
+        .executable(name: "SYDownload", targets: ["SYDownloadApp"]),
     ],
     targets: [
-        .target(name: "XDownloaderCore"),
+        .target(name: "SYDownloadCore"),
         .executableTarget(
-            name: "XDownloaderApp",
-            dependencies: ["XDownloaderCore"]
+            name: "SYDownloadApp",
+            dependencies: ["SYDownloadCore"],
+            resources: [.process("Resources")]
         ),
         .testTarget(
-            name: "XDownloaderCoreTests",
-            dependencies: ["XDownloaderCore"]
+            name: "SYDownloadCoreTests",
+            dependencies: ["SYDownloadCore"]
         ),
     ]
 )
