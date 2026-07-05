@@ -4,52 +4,43 @@ import AppKit
 
 struct TasksView: View {
     @ObservedObject var model: AppModel
+    @State private var searchText = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-                HStack(alignment: .top) {
-                    PageHeader(eyebrow: "DOWNLOAD QUEUE", title: "下载任务", subtitle: taskSummary, systemImage: "tray.full")
-                    Spacer(minLength: 12)
+                HStack(alignment: .top, spacing: DesignSystem.spaceL) {
+                    PageHeader(
+                        title: "任务",
+                        subtitle: "管理下载任务，查看进度和状态。"
+                    )
+
+                    Spacer(minLength: DesignSystem.spaceL)
+
                     Button("清空已完成", systemImage: "checkmark.circle", action: model.clearCompletedTasks)
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderless)
                         .disabled(completedCount == 0)
                 }
 
-                MetricStrip(items: [
-                    ("全部", "\(model.tasks.count)", "", "tray", DesignSystem.accent),
-                    ("进行中", "\(activeCount)", "", "arrow.down.circle", DesignSystem.accent),
-                    ("已完成", "\(completedCount)", "", "checkmark.circle", DesignSystem.success),
-                    ("需处理", "\(failedCount)", "", "exclamationmark.triangle", DesignSystem.destructive)
-                ])
+                toolbar
+                Divider()
 
-                HStack {
-                    Text("队列")
-                        .font(DesignSystem.sectionTitleFont)
-                    Text("\(model.filteredTasks.count) 项")
-                        .font(DesignSystem.supportingFont)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("任务筛选", selection: $model.taskFilter) {
-                        ForEach(TaskFilter.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(width: 110)
-                }
-
-                if model.filteredTasks.isEmpty {
+                if displayedTasks.isEmpty {
                     EmptyLibraryView(
                         systemImage: "tray",
-                        title: model.tasks.isEmpty ? "还没有下载任务" : "这个分类暂时为空",
-                        message: model.tasks.isEmpty ? "粘贴链接并开始下载，任务会按状态显示在这里。" : "切换筛选条件，或开始一个新的下载。",
+                        title: model.tasks.isEmpty ? "还没有下载任务" : "没有匹配的任务",
+                        message: model.tasks.isEmpty ? "粘贴链接并开始下载，任务会显示在这里。" : "调整筛选条件或搜索关键词。",
                         actionTitle: "新建下载"
-                    ) { model.selection = .download }
-                    .frame(maxWidth: .infinity, minHeight: 300)
+                    ) {
+                        model.selection = .download
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 320)
                 } else {
                     LazyVStack(spacing: 0) {
-                        ForEach(model.filteredTasks) { task in TaskRow(model: model, task: task) }
+                        ForEach(displayedTasks) { task in
+                            TaskRow(model: model, task: task)
+                        }
                     }
-                    .padding(.horizontal, DesignSystem.spaceS)
                 }
             }
             .padding(.horizontal, DesignSystem.contentPadding)
@@ -61,12 +52,95 @@ struct TasksView: View {
         .tint(DesignSystem.accent)
     }
 
-    private var taskSummary: String {
-        model.tasks.isEmpty ? "进行中的下载和完成状态会集中显示在这里。" : "当前显示 \(model.filteredTasks.count) 个任务，共 \(model.tasks.count) 个。"
+    private var toolbar: some View {
+        HStack(spacing: DesignSystem.spaceM) {
+            HStack(spacing: 0) {
+                ForEach(TaskFilter.allCases) { filter in
+                    Button {
+                        model.taskFilter = filter
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(filterTitle(filter))
+                            Text("\(count(for: filter))")
+                                .monospacedDigit()
+                                .foregroundStyle(model.taskFilter == filter ? DesignSystem.accent : Color.secondary)
+                        }
+                        .font(DesignSystem.supportingFont.weight(model.taskFilter == filter ? .semibold : .medium))
+                        .padding(.horizontal, DesignSystem.spaceM)
+                        .frame(height: 32)
+                        .background(
+                            model.taskFilter == filter ? DesignSystem.accentTint : Color.clear,
+                            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(2)
+            .background(
+                DesignSystem.rowBackground,
+                in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+            )
+
+            Spacer(minLength: DesignSystem.spaceM)
+
+            HStack(spacing: DesignSystem.spaceS) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("搜索任务…", text: $searchText)
+                    .textFieldStyle(.plain)
+            }
+            .padding(.horizontal, DesignSystem.spaceM)
+            .frame(width: 190, height: 32)
+            .background(
+                DesignSystem.warmSurface,
+                in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+                    .strokeBorder(DesignSystem.hairline)
+            }
+        }
     }
-    private var activeCount: Int { model.tasks.filter { $0.state == .queued || $0.state == .downloading }.count }
-    private var completedCount: Int { model.tasks.filter { $0.state == .completed }.count }
-    private var failedCount: Int { model.tasks.filter { $0.state == .failed }.count }
+
+    private var displayedTasks: [DownloadTaskItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return model.filteredTasks }
+        return model.filteredTasks.filter {
+            $0.title.localizedCaseInsensitiveContains(query)
+                || $0.sourceURL.localizedCaseInsensitiveContains(query)
+                || $0.platform.displayName.localizedCaseInsensitiveContains(query)
+                || $0.detail.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    private func count(for filter: TaskFilter) -> Int {
+        switch filter {
+        case .all: return model.tasks.count
+        case .active: return activeCount
+        case .completed: return completedCount
+        case .failed: return failedCount
+        }
+    }
+
+    private func filterTitle(_ filter: TaskFilter) -> String {
+        switch filter {
+        case .failed: return "需处理"
+        default: return filter.rawValue
+        }
+    }
+
+    private var activeCount: Int {
+        model.tasks.filter { $0.state == .queued || $0.state == .downloading }.count
+    }
+
+    private var completedCount: Int {
+        model.tasks.filter { $0.state == .completed }.count
+    }
+
+    private var failedCount: Int {
+        model.tasks.filter { $0.state == .failed }.count
+    }
 }
 
 private struct TaskRow: View {
@@ -76,35 +150,60 @@ private struct TaskRow: View {
     var body: some View {
         InsetRow {
             HStack(spacing: DesignSystem.spaceM) {
-                PlatformThumbnail(platform: task.platform, size: 44)
+                PlatformThumbnail(platform: task.platform, size: 46)
+
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: DesignSystem.spaceS) {
-                        Text(task.title).font(.headline.weight(.semibold)).lineLimit(1)
+                        Text(task.title)
+                            .font(.headline.weight(.semibold))
+                            .lineLimit(1)
                         StatusPill(state: task.state)
                     }
+
                     Text("\(task.platform.displayName) · \(task.detail)")
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        .font(DesignSystem.supportingFont)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
                     if task.state == .downloading || task.state == .queued {
-                        ProgressView().progressViewStyle(.linear).tint(DesignSystem.accent).frame(maxWidth: 460)
+                        ProgressView()
+                            .progressViewStyle(.linear)
+                            .tint(DesignSystem.accent)
+                            .frame(maxWidth: 460)
                     } else if let progress = task.progress {
-                        ProgressView(value: progress).progressViewStyle(.linear).tint(DesignSystem.success).frame(maxWidth: 460)
+                        ProgressView(value: progress)
+                            .progressViewStyle(.linear)
+                            .tint(DesignSystem.success)
+                            .frame(maxWidth: 460)
                     }
-                    Text(task.sourceURL).font(.caption.monospaced()).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
                 }
-                Spacer(minLength: 8)
+
+                Spacer(minLength: DesignSystem.spaceM)
+
                 if task.state == .completed {
-                    Button("打开文件夹", systemImage: "folder", action: openFolder).buttonStyle(.borderless)
+                    Button("打开文件夹", systemImage: "folder", action: openFolder)
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .help("打开文件夹")
                 }
+
                 if task.state != .downloading {
                     Button("移除任务", systemImage: "xmark", action: removeTask)
-                        .labelStyle(.iconOnly).buttonStyle(.borderless).help("移除任务")
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .help("移除任务")
                 }
             }
         }
     }
 
-    private func openFolder() { NSWorkspace.shared.open(URL(fileURLWithPath: model.outputDirectory)) }
-    private func removeTask() { model.removeTask(task.id) }
+    private func openFolder() {
+        NSWorkspace.shared.open(URL(fileURLWithPath: model.outputDirectory))
+    }
+
+    private func removeTask() {
+        model.removeTask(task.id)
+    }
 }
 
 struct EmptyLibraryView: View {
@@ -116,14 +215,21 @@ struct EmptyLibraryView: View {
 
     var body: some View {
         VStack(spacing: DesignSystem.spaceM) {
-            IconBadge(systemImage: systemImage, tint: .secondary, size: 52)
-            Text(title).font(.title3.weight(.semibold))
-            Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 360)
-            Button(actionTitle, systemImage: "arrow.right", action: action).buttonStyle(.borderedProminent)
+            Image(systemName: systemImage)
+                .font(.system(size: 34, weight: .regular))
+                .foregroundStyle(.tertiary)
+            Text(title)
+                .font(.title3.weight(.semibold))
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+            Button(actionTitle, systemImage: "arrow.right", action: action)
+                .buttonStyle(.borderedProminent)
         }
         .padding(DesignSystem.space2XL)
         .frame(maxWidth: .infinity)
-        .background(DesignSystem.rowBackground, in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
     }
 }
 #endif

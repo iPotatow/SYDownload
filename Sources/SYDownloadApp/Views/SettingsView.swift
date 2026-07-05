@@ -43,17 +43,12 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
             PageHeader(
-                eyebrow: "WORKSPACE PREFERENCES",
                 title: "设置",
-                subtitle: "调整保存位置、下载内容和引擎行为。",
-                systemImage: "slider.horizontal.3"
+                subtitle: "调整保存位置、下载内容和引擎行为。"
             )
 
-            HStack(alignment: .top, spacing: DesignSystem.spaceL) {
-                settingsNavigation.frame(width: 154)
-                settingsContent
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            settingsTabs
+            settingsContent
         }
         .padding(.horizontal, DesignSystem.contentPadding)
         .padding(.top, DesignSystem.pageTitlebarClearance + DesignSystem.pageHeaderTop)
@@ -61,49 +56,73 @@ struct SettingsView: View {
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .tint(DesignSystem.accent)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: tab)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: tab)
         .task {
             await model.loadEngineSettings()
         }
     }
 
-    private var settingsNavigation: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
-            Text("设置分类")
-                .font(DesignSystem.metadataFont.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, DesignSystem.spaceS)
-                .padding(.bottom, DesignSystem.spaceS)
+    private var settingsTabs: some View {
+        HStack(spacing: 0) {
             ForEach(SettingsTab.allCases) { item in
                 Button {
                     tab = item
                 } label: {
                     HStack(spacing: DesignSystem.spaceS) {
                         Image(systemName: item.systemImage)
-                            .frame(width: DesignSystem.sidebarNavigationIconSize)
                         Text(item.rawValue)
-                        Spacer(minLength: 0)
                     }
+                    .font(DesignSystem.uiFont.weight(tab == item ? .semibold : .medium))
+                    .foregroundStyle(tab == item ? DesignSystem.accent : Color.secondary)
+                    .padding(.horizontal, DesignSystem.spaceM)
+                    .frame(height: 36)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        tab == item ? DesignSystem.accentTint : Color.clear,
+                        in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                    )
                 }
-                .buttonStyle(SettingsNavigationButtonStyle(selected: tab == item))
+                .buttonStyle(.plain)
                 .accessibilityAddTraits(tab == item ? .isSelected : [])
                 .help(item.description)
             }
-            Spacer(minLength: 0)
-            Label("设置会直接写入引擎配置", systemImage: "lock.shield")
-                .font(DesignSystem.metadataFont)
-                .foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, DesignSystem.spaceS)
         }
-        .padding(DesignSystem.spaceS)
-        .background(DesignSystem.rowBackground, in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
+        .padding(3)
+        .background(
+            DesignSystem.rowBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+                .strokeBorder(DesignSystem.hairline)
+        }
     }
 
     private var settingsContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-                settingsContext
+            VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
+                HStack(alignment: .firstTextBaseline, spacing: DesignSystem.spaceM) {
+                    Text(tab.description)
+                        .font(DesignSystem.supportingFont)
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: DesignSystem.spaceM)
+
+                    if model.settingsLoading {
+                        HStack(spacing: DesignSystem.spaceS) {
+                            ProgressView().controlSize(.small)
+                            Text("正在同步配置")
+                        }
+                        .font(DesignSystem.supportingFont)
+                        .foregroundStyle(.secondary)
+                    } else if !model.settingsStatus.isEmpty {
+                        Label(model.settingsStatus, systemImage: "checkmark.circle")
+                            .font(DesignSystem.supportingFont)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
                 Group {
                     switch tab {
                     case .general: generalSettings
@@ -112,18 +131,6 @@ struct SettingsView: View {
                     case .advanced: advancedSettings
                     }
                 }
-                if model.settingsLoading {
-                    HStack(spacing: DesignSystem.spaceS) {
-                        ProgressView().controlSize(.small)
-                        Text("正在同步原始项目配置…")
-                    }
-                    .font(DesignSystem.supportingFont)
-                    .foregroundStyle(.secondary)
-                } else if !model.settingsStatus.isEmpty {
-                    Label(model.settingsStatus, systemImage: "info.circle")
-                        .font(DesignSystem.supportingFont)
-                        .foregroundStyle(.secondary)
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, DesignSystem.space2XL)
@@ -131,47 +138,12 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var settingsContext: some View {
-        HStack(spacing: 13) {
-            IconBadge(systemImage: tab.systemImage, tint: DesignSystem.accent, size: 42)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(tab.rawValue)
-                    .font(.headline.weight(.semibold))
-                Text(tab.description)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 12)
-            if model.settingsLoading {
-                HStack(spacing: 7) {
-                    ProgressView().controlSize(.small)
-                    Text("正在同步配置")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            } else if !model.settingsStatus.isEmpty {
-                Label(model.settingsStatus, systemImage: "checkmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
-        .padding(DesignSystem.panelPadding)
-        .background(
-            DesignSystem.rowBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
-                .strokeBorder(DesignSystem.hairline)
-        }
-    }
-
     private var generalSettings: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            settingCard("保存位置") {
-                HStack(spacing: 10) {
-                    TextField("下载目录", text: $model.outputDirectory).textFieldStyle(.roundedBorder)
+        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
+            settingSection("保存位置") {
+                HStack(spacing: DesignSystem.spaceS) {
+                    TextField("下载目录", text: $model.outputDirectory)
+                        .textFieldStyle(.roundedBorder)
                     Button("更改") { chooseFolder() }
                 }
                 Text("下载时会同步到小红书的 work_path 与抖音的 root。")
@@ -179,33 +151,44 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            settingCard("行为") {
-                VStack(alignment: .leading, spacing: 12) {
+            settingSection("行为") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
                     Toggle("下载完成后显示通知", isOn: $completionNotification)
                     Toggle("下载完成后自动打开目录", isOn: $autoOpenDownloadFolder)
                 }
                 .toggleStyle(.switch)
             }
 
-            settingCard("偏好") {
-                VStack(spacing: 12) {
+            settingSection("偏好") {
+                VStack(spacing: DesignSystem.spaceM) {
                     LabeledContent("同时下载任务数") {
                         Picker("", selection: $concurrentDownloads) {
-                            ForEach(1...5, id: \.self) { count in Text("\(count)").tag(count) }
+                            ForEach(1...5, id: \.self) { count in
+                                Text("\(count)").tag(count)
+                            }
                         }
-                        .labelsHidden().frame(width: 90)
+                        .labelsHidden()
+                        .frame(width: 90)
                     }
+
                     LabeledContent("应用外观") {
                         Picker("", selection: $preferredAppearance) {
-                            ForEach(["跟随系统", "浅色", "深色"], id: \.self) { value in Text(value).tag(value) }
+                            ForEach(["跟随系统", "浅色", "深色"], id: \.self) { value in
+                                Text(value).tag(value)
+                            }
                         }
-                        .labelsHidden().frame(width: 130)
+                        .labelsHidden()
+                        .frame(width: 130)
                     }
+
                     LabeledContent("语言") {
                         Picker("", selection: $preferredLanguage) {
-                            ForEach(["简体中文", "English"], id: \.self) { value in Text(value).tag(value) }
+                            ForEach(["简体中文", "English"], id: \.self) { value in
+                                Text(value).tag(value)
+                            }
                         }
-                        .labelsHidden().frame(width: 130)
+                        .labelsHidden()
+                        .frame(width: 130)
                     }
                 }
             }
@@ -213,9 +196,9 @@ struct SettingsView: View {
     }
 
     private var xhsSettings: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            settingCard("下载内容") {
-                VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
+            settingSection("下载内容") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
                     Toggle("下载图片", isOn: $model.xhsSettings.imageDownload)
                     Toggle("下载视频", isOn: $model.xhsSettings.videoDownload)
                     Toggle("下载动图", isOn: $model.xhsSettings.liveDownload)
@@ -223,24 +206,28 @@ struct SettingsView: View {
                 .toggleStyle(.checkbox)
             }
 
-            settingCard("格式") {
-                VStack(spacing: 12) {
+            settingSection("格式") {
+                VStack(spacing: DesignSystem.spaceM) {
                     LabeledContent("图片格式") {
                         Picker("", selection: $model.xhsSettings.imageFormat) {
                             ForEach(["JPEG", "PNG", "WEBP", "HEIC", "AUTO"], id: \.self) { value in
                                 Text(value).tag(value)
                             }
                         }
-                        .labelsHidden().frame(width: 160)
+                        .labelsHidden()
+                        .frame(width: 160)
                     }
+
                     LabeledContent("视频偏好") {
                         Picker("", selection: $model.xhsSettings.videoPreference) {
                             Text("分辨率优先").tag("resolution")
                             Text("码率优先").tag("bitrate")
                             Text("文件大小优先").tag("size")
                         }
-                        .labelsHidden().frame(width: 160)
+                        .labelsHidden()
+                        .frame(width: 160)
                     }
+
                     LabeledContent("作品信息格式") {
                         Picker("", selection: $model.xhsSettings.noteFormat) {
                             Text("不保存").tag("")
@@ -248,13 +235,14 @@ struct SettingsView: View {
                             Text("Markdown").tag("md")
                             Text("全部").tag("all")
                         }
-                        .labelsHidden().frame(width: 160)
+                        .labelsHidden()
+                        .frame(width: 160)
                     }
                 }
             }
 
-            settingCard("文件管理") {
-                VStack(alignment: .leading, spacing: 12) {
+            settingSection("文件管理") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
                     LabeledContent("文件夹名称") {
                         TextField("Download", text: $model.xhsSettings.folderName)
                             .textFieldStyle(.roundedBorder)
@@ -275,8 +263,8 @@ struct SettingsView: View {
                 .toggleStyle(.checkbox)
             }
 
-            settingCard("Cookie") {
-                VStack(alignment: .leading, spacing: 8) {
+            settingSection("Cookie") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                     Text("小红书网页版 Cookie")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -291,9 +279,9 @@ struct SettingsView: View {
     }
 
     private var douyinSettings: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            settingCard("下载内容") {
-                VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
+            settingSection("下载内容") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
                     Toggle("下载音乐", isOn: $model.douyinSettings.music)
                     Toggle("下载动态封面", isOn: $model.douyinSettings.dynamicCover)
                     Toggle("下载静态封面", isOn: $model.douyinSettings.staticCover)
@@ -302,8 +290,8 @@ struct SettingsView: View {
                 .toggleStyle(.checkbox)
             }
 
-            settingCard("文件管理") {
-                VStack(alignment: .leading, spacing: 12) {
+            settingSection("文件管理") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
                     LabeledContent("文件夹名称") {
                         TextField("Download", text: $model.douyinSettings.folderName)
                             .textFieldStyle(.roundedBorder)
@@ -354,15 +342,15 @@ struct SettingsView: View {
                 }
             }
 
-            settingCard("Cookie") {
-                VStack(alignment: .leading, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 8) {
+            settingSection("Cookie") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                    VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                         Text("国内链接 Cookie（douyin.com）")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 90)
                     }
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                         Text("国际链接 Cookie（tiktok.com）")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -378,9 +366,9 @@ struct SettingsView: View {
     }
 
     private var advancedSettings: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            settingCard("抖音高级功能") {
-                VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
+            settingSection("抖音高级功能") {
+                VStack(spacing: DesignSystem.spaceM) {
                     LabeledContent("FFmpeg 路径") {
                         TextField("留空使用上游默认行为", text: $model.douyinSettings.ffmpeg)
                             .textFieldStyle(.roundedBorder)
@@ -401,8 +389,8 @@ struct SettingsView: View {
                 }
             }
 
-            settingCard("原始配置文件") {
-                VStack(alignment: .leading, spacing: 14) {
+            settingSection("原始配置文件") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
                     configRow(title: "小红书 settings.json", path: model.xhsSettingsPath)
                     Divider()
                     configRow(title: "抖音 settings.json", path: model.douyinSettingsPath)
@@ -412,12 +400,12 @@ struct SettingsView: View {
                 }
             }
 
-            settingCard("恢复默认配置") {
-                VStack(alignment: .leading, spacing: 10) {
+            settingSection("恢复默认配置") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                     Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    HStack(spacing: 10) {
+                    HStack(spacing: DesignSystem.spaceS) {
                         Button("恢复小红书默认设置", role: .destructive) {
                             Task { await model.resetEngineSettings("xiaohongshu") }
                         }
@@ -428,8 +416,8 @@ struct SettingsView: View {
                 }
             }
 
-            settingCard("数据目录") {
-                VStack(alignment: .leading, spacing: 10) {
+            settingSection("数据目录") {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                     pathRow("应用数据", "~/Library/Application Support/SYDownload/")
                     pathRow("缓存", "~/Library/Caches/SYDownload/")
                     pathRow("下载文件", model.outputDirectory)
@@ -438,29 +426,35 @@ struct SettingsView: View {
         }
     }
 
-    private func settingCard<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        SurfaceCard(padding: 20) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(title)
-                    .font(.headline.weight(.semibold))
-                content()
-            }
+    private func settingSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
+            Text(title)
+                .font(.headline.weight(.semibold))
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, DesignSystem.spaceL)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(DesignSystem.hairline)
+                .frame(height: 1)
         }
     }
 
     private func saveBar(title: String, action: @escaping () -> Void) -> some View {
-        SurfaceCard(padding: 16) {
-            HStack(spacing: 12) {
-                IconBadge(systemImage: "square.and.arrow.down", tint: .secondary, size: 34)
-                Text("保存时只合并当前页面管理的字段，不会覆盖隐藏配置。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 12)
-                Button(title, action: action)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.settingsLoading)
-            }
+        HStack(spacing: DesignSystem.spaceM) {
+            Text("保存时只合并当前页面管理的字段，不会覆盖隐藏配置。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: DesignSystem.spaceM)
+            Button(title, action: action)
+                .buttonStyle(.borderedProminent)
+                .disabled(model.settingsLoading)
         }
+        .padding(.vertical, DesignSystem.spaceS)
     }
 
     private func plainTextEditor(text: Binding<String>, minHeight: CGFloat) -> some View {
@@ -481,12 +475,13 @@ struct SettingsView: View {
 
     private func configRow(title: String, path: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(title).font(.system(size: 13, weight: .medium))
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
             Text(path.isEmpty ? "尚未生成" : path)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(path.isEmpty ? .secondary : .primary)
                 .textSelection(.enabled)
-            HStack(spacing: 8) {
+            HStack(spacing: DesignSystem.spaceS) {
                 Button("打开") { openConfig(path) }
                     .disabled(path.isEmpty)
                 Button("在 Finder 中显示") { revealConfig(path) }
@@ -497,8 +492,12 @@ struct SettingsView: View {
 
     private func pathRow(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: 12, design: .monospaced))
+                .textSelection(.enabled)
         }
     }
 
@@ -510,7 +509,9 @@ struct SettingsView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
-        if panel.runModal() == .OK, let url = panel.url { model.outputDirectory = url.path }
+        if panel.runModal() == .OK, let url = panel.url {
+            model.outputDirectory = url.path
+        }
     }
 
     private func openConfig(_ path: String) {
@@ -521,27 +522,6 @@ struct SettingsView: View {
     private func revealConfig(_ path: String) {
         guard !path.isEmpty else { return }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
-    }
-}
-
-private struct SettingsNavigationButtonStyle: ButtonStyle {
-    let selected: Bool
-    @Environment(\.isEnabled) private var isEnabled
-    @State private var hovered = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(DesignSystem.uiFont.weight(selected ? .semibold : .medium))
-            .foregroundStyle(selected ? DesignSystem.accent : Color.primary)
-            .padding(.horizontal, DesignSystem.spaceS)
-            .frame(height: 34)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                selected ? DesignSystem.sidebarAccent : (configuration.isPressed || hovered ? DesignSystem.sidebarHover : .clear),
-                in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-            )
-            .opacity(isEnabled ? 1 : 0.5)
-            .onHover { hovered = $0 }
     }
 }
 #endif
