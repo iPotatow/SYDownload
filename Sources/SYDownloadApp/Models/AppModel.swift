@@ -97,13 +97,6 @@ struct HistoryItem: Identifiable, Codable {
     }
 }
 
-struct ParsedPreview: Equatable {
-    var platform: DownloadPlatform
-    var title: String
-    var author: String
-    var summary: String
-}
-
 struct XHSSettingsForm {
     var imageDownload = true
     var videoDownload = true
@@ -156,7 +149,6 @@ final class AppModel: ObservableObject {
     @Published var isWorking = false
     @Published var isParsing = false
     @Published var lastDetails: [String: String] = [:]
-    @Published var preview: ParsedPreview?
     @Published private(set) var validatedInput = ""
     @Published var tasks: [DownloadTaskItem] = []
     @Published var history: [HistoryItem] = []
@@ -212,20 +204,18 @@ final class AppModel: ObservableObject {
 
     func detectLocally() {
         let normalizedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        if preview != nil && normalizedInput != validatedInput {
-            preview = nil
+        if !validatedInput.isEmpty && normalizedInput != validatedInput {
             lastDetails = [:]
             validatedInput = ""
         }
         let newPlatform = PlatformDetector.detect(input)
         if newPlatform != detectedPlatform {
-            preview = nil
             lastDetails = [:]
             validatedInput = ""
         }
         detectedPlatform = newPlatform
 
-        if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if normalizedInput.isEmpty {
             status = "粘贴链接后即可开始"
             statusIsError = false
         } else if newPlatform == .unknown {
@@ -240,7 +230,6 @@ final class AppModel: ObservableObject {
     func clearInput() {
         input = ""
         detectedPlatform = .unknown
-        preview = nil
         lastDetails = [:]
         validatedInput = ""
         status = "粘贴链接后即可开始"
@@ -262,21 +251,9 @@ final class AppModel: ObservableObject {
             status = response.message
             statusIsError = !response.ok
             lastDetails = response.details ?? [:]
-            if response.ok {
-                preview = ParsedPreview(
-                    platform: response.platform ?? detectedPlatform,
-                    title: "\((response.platform ?? detectedPlatform).displayName)引擎检查通过",
-                    author: "链接已就绪",
-                    summary: "已完成平台识别与下载引擎检查，可直接开始下载。"
-                )
-                validatedInput = sourceURL
-            } else {
-                preview = nil
-                validatedInput = ""
-            }
+            validatedInput = response.ok ? sourceURL : ""
         } catch {
             guard input.trimmingCharacters(in: .whitespacesAndNewlines) == sourceURL else { return }
-            preview = nil
             validatedInput = ""
             status = error.localizedDescription
             statusIsError = true
@@ -292,9 +269,9 @@ final class AppModel: ObservableObject {
         let destination = outputDirectory
 
         isWorking = true
-        if preview == nil {
+        if validatedInput != requestedInput {
             await validateEngine()
-            guard preview != nil,
+            guard validatedInput == requestedInput,
                   input.trimmingCharacters(in: .whitespacesAndNewlines) == requestedInput,
                   detectedPlatform == requestedPlatform else {
                 isWorking = false
@@ -304,7 +281,7 @@ final class AppModel: ObservableObject {
 
         let platform = requestedPlatform
         let sourceURL = requestedInput
-        let title = preview?.title ?? "\(platform.displayName)下载任务"
+        let title = "\(platform.displayName)下载任务"
         let taskID = UUID()
         let item = DownloadTaskItem(
             id: taskID,
@@ -471,7 +448,6 @@ final class AppModel: ObservableObject {
         guard !isWorking else { return }
         input = task.sourceURL
         detectedPlatform = task.platform
-        preview = nil
         validatedInput = ""
         selection = .download
         status = "已载入失败任务，可重新检查后下载"
@@ -486,9 +462,9 @@ final class AppModel: ObservableObject {
         input = item.sourceURL
         outputDirectory = item.outputDirectory
         detectedPlatform = item.platform
-        preview = nil
+        validatedInput = ""
         selection = .download
-        status = "已载入历史链接，可重新解析"
+        status = "已载入历史链接，可重新检查"
     }
 
     private func saveEngineSettings(engine: String, values: [String: Any]) async {

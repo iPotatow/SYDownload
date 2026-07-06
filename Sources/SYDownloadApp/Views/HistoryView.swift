@@ -15,11 +15,11 @@ struct HistoryView: View {
 
             HStack(alignment: .firstTextBaseline, spacing: DesignSystem.spaceS) {
                 Text("共 \(model.filteredHistory.count) 条记录")
-                    .font(DesignSystem.uiFont.weight(.semibold))
+                    .font(.callout.weight(.semibold))
                     .monospacedDigit()
                 Spacer()
                 Text("按完成时间排序")
-                    .font(DesignSystem.supportingFont)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
@@ -70,7 +70,6 @@ struct HistoryView: View {
         .padding(.bottom, DesignSystem.spaceL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .searchable(text: $model.historySearch, prompt: "搜索标题、平台或链接")
         .onDeleteCommand(perform: removeSelectedHistory)
         .tint(DesignSystem.accent)
     }
@@ -106,19 +105,19 @@ private struct HistoryRow: View {
         HStack(spacing: DesignSystem.spaceM) {
             PlatformThumbnail(platform: item.platform, size: 42)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text("\(item.platform.displayName) · \(item.title)")
                     .font(.headline.weight(.semibold))
                     .lineLimit(1)
 
                 Text(item.sourceURL)
-                    .font(DesignSystem.supportingFont.monospaced())
+                    .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Text(item.completedAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(DesignSystem.metadataFont)
+                    .font(.caption)
                     .foregroundStyle(.tertiary)
             }
 
@@ -152,7 +151,6 @@ private struct HistoryRow: View {
                     .labelStyle(.iconOnly)
             }
             .menuStyle(.borderlessButton)
-            .frame(width: 30)
         }
         .padding(.vertical, DesignSystem.spaceXS)
     }

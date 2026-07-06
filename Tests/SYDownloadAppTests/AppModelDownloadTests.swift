@@ -95,19 +95,17 @@ final class AppModelDownloadTests: XCTestCase {
         XCTAssertEqual(requests.filter { $0.command == "download" }.count, 1)
     }
 
-    func testChangingInputOnSamePlatformInvalidatesPreview() async {
+    func testChangingInputOnSamePlatformInvalidatesValidation() async {
         let recorder = RequestRecorder()
         let (model, defaults, suiteName) = makeModel(recorder: recorder)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         model.input = "https://www.xiaohongshu.com/explore/old"
         await model.validateEngine()
-        XCTAssertNotNil(model.preview)
         XCTAssertEqual(model.validatedInput, "https://www.xiaohongshu.com/explore/old")
 
         model.input = "https://www.xiaohongshu.com/explore/new"
         model.detectLocally()
-        XCTAssertNil(model.preview)
         XCTAssertEqual(model.validatedInput, "")
     }
 
@@ -177,7 +175,7 @@ final class AppModelDownloadTests: XCTestCase {
 
         XCTAssertEqual(model.status, "当前输入仍然有效")
         XCTAssertFalse(model.statusIsError)
-        XCTAssertNil(model.preview)
+        XCTAssertEqual(model.validatedInput, "")
     }
 }
 
