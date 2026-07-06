@@ -1,6 +1,7 @@
 #if canImport(SwiftUI)
 import SwiftUI
 import AppKit
+import Combine
 
 private enum SettingsTab: String, CaseIterable, Identifiable {
     case general = "通用"
@@ -32,13 +33,15 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     @State private var tab: SettingsTab = .general
-    @AppStorage("completionNotification") private var completionNotification = true
-    @AppStorage("autoOpenDownloadFolder") private var autoOpenDownloadFolder = false
-    @AppStorage("concurrentDownloads") private var concurrentDownloads = 3
     @AppStorage("preferredAppearance") private var preferredAppearance = "跟随系统"
-    @AppStorage("preferredLanguage") private var preferredLanguage = "简体中文"
+    @State private var resetTarget: String?
+    @State private var observingEngineSettingsChanges = false
+    @SceneStorage("SYDownload.settings.xhsDirty") private var xhsSettingsDirty = false
+    @SceneStorage("SYDownload.settings.douyinDirty") private var douyinSettingsDirty = false
+    private let fieldWidth: CGFloat = 240
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
@@ -48,17 +51,58 @@ struct SettingsView: View {
             )
 
             settingsTabs
+            statusBanner
             settingsContent
+            saveBarForCurrentTab
         }
         .padding(.horizontal, DesignSystem.contentPadding)
-        .padding(.top, DesignSystem.pageTitlebarClearance + DesignSystem.pageHeaderTop)
+        .padding(.top, DesignSystem.contentPadding)
         .padding(.bottom, DesignSystem.spaceL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .tint(DesignSystem.accent)
+        .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: tab)
         .task {
+            let isInitialLoad = !model.hasLoadedEngineSettings
+            observingEngineSettingsChanges = false
             await model.loadEngineSettings()
+            if isInitialLoad && model.hasLoadedEngineSettings {
+                xhsSettingsDirty = false
+                douyinSettingsDirty = false
+            }
+            observingEngineSettingsChanges = true
+        }
+        .onReceive(model.$xhsSettings.dropFirst()) { _ in
+            guard observingEngineSettingsChanges, !model.settingsLoading else { return }
+            xhsSettingsDirty = true
+        }
+        .onReceive(model.$douyinSettings.dropFirst()) { _ in
+            guard observingEngineSettingsChanges, !model.settingsLoading else { return }
+            douyinSettingsDirty = true
+        }
+        .alert("恢复默认配置？", isPresented: Binding(
+            get: { resetTarget != nil },
+            set: { if !$0 { resetTarget = nil } }
+        )) {
+            Button("取消", role: .cancel) { resetTarget = nil }
+            Button("恢复默认", role: .destructive) {
+                let target = resetTarget
+                self.resetTarget = nil
+                if let target {
+                    Task {
+                        await model.resetEngineSettings(target)
+                        guard !model.settingsStatusIsError else { return }
+                        if target == "xiaohongshu" {
+                            xhsSettingsDirty = false
+                        } else if target == "douyin" {
+                            douyinSettingsDirty = false
+                        }
+                    }
+                }
+            }
+        } message: {
+            Text("这会覆盖当前引擎中已保存的对应设置，并重新读取内置默认值。")
         }
     }
 
@@ -94,383 +138,358 @@ struct SettingsView: View {
         )
         .overlay {
             RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-                .strokeBorder(DesignSystem.hairline)
+                .strokeBorder(DesignSystem.hairline, lineWidth: colorSchemeContrast == .increased ? 2 : 1)
         }
     }
 
     private var settingsContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
-                HStack(alignment: .firstTextBaseline, spacing: DesignSystem.spaceM) {
-                    Text(tab.description)
-                        .font(DesignSystem.supportingFont)
-                        .foregroundStyle(.secondary)
-
-                    Spacer(minLength: DesignSystem.spaceM)
-
-                    if model.settingsLoading {
-                        HStack(spacing: DesignSystem.spaceS) {
-                            ProgressView().controlSize(.small)
-                            Text("正在同步配置")
-                        }
-                        .font(DesignSystem.supportingFont)
-                        .foregroundStyle(.secondary)
-                    } else if !model.settingsStatus.isEmpty {
-                        Label(model.settingsStatus, systemImage: "checkmark.circle")
-                            .font(DesignSystem.supportingFont)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Group {
-                    switch tab {
-                    case .general: generalSettings
-                    case .xhs: xhsSettings
-                    case .douyin: douyinSettings
-                    case .advanced: advancedSettings
-                    }
-                }
+        Form {
+            switch tab {
+            case .general: generalSettings
+            case .xhs: xhsSettings
+            case .douyin: douyinSettings
+            case .advanced: advancedSettings
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, DesignSystem.space2XL)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .formStyle(.grouped)
+        .disabled(model.settingsLoading)
+        .opacity(model.settingsLoading ? 0.68 : 1)
     }
 
-    private var generalSettings: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
-            settingSection("保存位置") {
-                HStack(spacing: DesignSystem.spaceS) {
-                    TextField("下载目录", text: $model.outputDirectory)
-                        .textFieldStyle(.roundedBorder)
-                    Button("更改") { chooseFolder() }
+    @ViewBuilder
+    private var statusBanner: some View {
+        HStack(alignment: .firstTextBaseline, spacing: DesignSystem.spaceS) {
+            Text(tab.description)
+                .font(DesignSystem.supportingFont)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: DesignSystem.spaceM)
+            if model.settingsLoading {
+                ProgressView().controlSize(.small)
+                Text("正在同步配置")
+            } else if !model.settingsStatus.isEmpty {
+                Label(model.settingsStatus, systemImage: model.settingsStatusIsError ? "exclamationmark.triangle" : "checkmark.circle")
+                    .foregroundStyle(model.settingsStatusIsError ? DesignSystem.destructive : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if model.settingsStatusIsError {
+                    Button("重新读取") {
+                        Task {
+                            observingEngineSettingsChanges = false
+                            await model.loadEngineSettings(force: true)
+                            if model.hasLoadedEngineSettings && !model.settingsStatusIsError {
+                                xhsSettingsDirty = false
+                                douyinSettingsDirty = false
+                            }
+                            observingEngineSettingsChanges = true
+                        }
+                    }
+                    .buttonStyle(.bordered)
                 }
-                Text("下载时会同步到小红书的 work_path 与抖音的 root。")
+            }
+        }
+        .font(DesignSystem.supportingFont)
+    }
+
+    @ViewBuilder
+    private var generalSettings: some View {
+        Section("保存位置") {
+            HStack(spacing: DesignSystem.spaceS) {
+                TextField("下载目录", text: $model.outputDirectory)
+                    .textFieldStyle(.roundedBorder)
+                Button("更改") { chooseFolder() }
+            }
+            Text("下载时会同步到小红书的 work_path 与抖音的 root。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
+        Section("偏好") {
+            LabeledContent("应用外观") {
+                Picker("", selection: $preferredAppearance) {
+                    ForEach(["跟随系统", "浅色", "深色"], id: \.self) { value in
+                        Text(value).tag(value)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: fieldWidth)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var xhsSettings: some View {
+        Section("下载内容") {
+            Toggle("下载图片", isOn: $model.xhsSettings.imageDownload)
+            Toggle("下载视频", isOn: $model.xhsSettings.videoDownload)
+            Toggle("下载动图", isOn: $model.xhsSettings.liveDownload)
+        }
+
+        Section("格式") {
+            LabeledContent("图片格式") {
+                Picker("", selection: $model.xhsSettings.imageFormat) {
+                    ForEach(["JPEG", "PNG", "WEBP", "HEIC", "AUTO"], id: \.self) { value in
+                        Text(value).tag(value)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: fieldWidth)
+            }
+            LabeledContent("视频偏好") {
+                Picker("", selection: $model.xhsSettings.videoPreference) {
+                    Text("分辨率优先").tag("resolution")
+                    Text("码率优先").tag("bitrate")
+                    Text("文件大小优先").tag("size")
+                }
+                .labelsHidden()
+                .frame(width: fieldWidth)
+            }
+            LabeledContent("作品信息格式") {
+                Picker("", selection: $model.xhsSettings.noteFormat) {
+                    Text("不保存").tag("")
+                    Text("TXT").tag("txt")
+                    Text("Markdown").tag("md")
+                    Text("全部").tag("all")
+                }
+                .labelsHidden()
+                .frame(width: fieldWidth)
+            }
+        }
+
+        Section("文件管理") {
+            LabeledContent("文件夹名称") {
+                TextField("", text: $model.xhsSettings.folderName)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("文件命名格式") {
+                TextField("发布时间 作者昵称 作品标题", text: $model.xhsSettings.nameFormat)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            Divider()
+            Toggle("每个作品使用独立文件夹", isOn: $model.xhsSettings.folderMode)
+                .toggleStyle(.switch)
+            Toggle("按作者归档", isOn: $model.xhsSettings.authorArchive)
+                .toggleStyle(.switch)
+            Toggle("记录下载历史", isOn: $model.xhsSettings.downloadRecord)
+                .toggleStyle(.switch)
+            Toggle("将文件修改时间写为作品发布时间", isOn: $model.xhsSettings.writeMtime)
+                .toggleStyle(.switch)
+            Toggle("记录作品数据", isOn: $model.xhsSettings.recordData)
+                .toggleStyle(.switch)
+        }
+
+        Section("Cookie") {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+                Text("小红书网页版 Cookie")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100)
+                    .accessibilityLabel("小红书网页版 Cookie")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var douyinSettings: some View {
+        Section("下载内容") {
+            Toggle("下载音乐", isOn: $model.douyinSettings.music)
+            Toggle("下载动态封面", isOn: $model.douyinSettings.dynamicCover)
+            Toggle("下载静态封面", isOn: $model.douyinSettings.staticCover)
+            Toggle("优先原始画质", isOn: $model.douyinSettings.originalQuality)
+        }
+
+        Section("文件管理") {
+            LabeledContent("文件夹名称") {
+                TextField("", text: $model.douyinSettings.folderName)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("文件命名格式") {
+                TextField("create_time type nickname desc", text: $model.douyinSettings.nameFormat)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("描述最大长度") {
+                TextField("64", value: $model.douyinSettings.descLength, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("文件名最大长度") {
+                TextField("128", value: $model.douyinSettings.nameLength, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("日期格式") {
+                TextField("%Y-%m-%d %H:%M:%S", text: $model.douyinSettings.dateFormat)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("文件名分隔符") {
+                TextField("-", text: $model.douyinSettings.split)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("数据保存格式") {
+                TextField("留空为不保存", text: $model.douyinSettings.storageFormat)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("文件大小限制") {
+                HStack(spacing: 6) {
+                    TextField("0", value: $model.douyinSettings.maxSize, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .labelsHidden()
+                        .frame(width: fieldWidth)
+                    Text("0 表示不限制")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Toggle("每个作品使用独立文件夹", isOn: $model.douyinSettings.folderMode)
+                .toggleStyle(.switch)
+        }
+
+        Section("Cookie") {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+                    Text("国内链接 Cookie（douyin.com）")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 90)
+                        .accessibilityLabel("国内链接 Cookie")
+                }
+                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+                    Text("国际链接 Cookie（tiktok.com）")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    plainTextEditor(text: $model.douyinSettings.cookieTikTok, minHeight: 90)
+                        .accessibilityLabel("国际链接 Cookie")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var advancedSettings: some View {
+        Section("抖音高级功能") {
+            VStack(spacing: DesignSystem.spaceM) {
+                LabeledContent("FFmpeg 路径") {
+                    TextField("留空使用上游默认行为", text: $model.douyinSettings.ffmpeg)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: fieldWidth)
+                }
+                LabeledContent("直播画质") {
+                    TextField("留空使用默认画质", text: $model.douyinSettings.liveQualities)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: fieldWidth)
+                }
+            }
+        }
+
+        Section("原始配置文件") {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                configRow(title: "小红书 settings.json", path: model.xhsSettingsPath)
+                Divider()
+                configRow(title: "抖音 settings.json", path: model.douyinSettingsPath)
+                Text("App 只修改界面中可见的字段。代理、网络超时、重试、浏览器指纹等未展示字段会原样保留在原始 JSON 中。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
 
-            settingSection("行为") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
-                    Toggle("下载完成后显示通知", isOn: $completionNotification)
-                    Toggle("下载完成后自动打开目录", isOn: $autoOpenDownloadFolder)
+        Section("恢复默认配置") {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+                Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: DesignSystem.spaceS) {
+                    Button("恢复小红书默认设置", role: .destructive) { resetTarget = "xiaohongshu" }
+                    Button("恢复抖音默认设置", role: .destructive) { resetTarget = "douyin" }
                 }
-                .toggleStyle(.switch)
             }
+        }
 
-            settingSection("偏好") {
-                VStack(spacing: DesignSystem.spaceM) {
-                    LabeledContent("同时下载任务数") {
-                        Picker("", selection: $concurrentDownloads) {
-                            ForEach(1...5, id: \.self) { count in
-                                Text("\(count)").tag(count)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 90)
-                    }
-
-                    LabeledContent("应用外观") {
-                        Picker("", selection: $preferredAppearance) {
-                            ForEach(["跟随系统", "浅色", "深色"], id: \.self) { value in
-                                Text(value).tag(value)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 130)
-                    }
-
-                    LabeledContent("语言") {
-                        Picker("", selection: $preferredLanguage) {
-                            ForEach(["简体中文", "English"], id: \.self) { value in
-                                Text(value).tag(value)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 130)
-                    }
-                }
+        Section("数据目录") {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+                pathRow("应用数据", "~/Library/Application Support/SYDownload/")
+                pathRow("缓存", "~/Library/Caches/SYDownload/")
+                pathRow("下载文件", model.outputDirectory)
             }
         }
     }
 
-    private var xhsSettings: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
-            settingSection("下载内容") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
-                    Toggle("下载图片", isOn: $model.xhsSettings.imageDownload)
-                    Toggle("下载视频", isOn: $model.xhsSettings.videoDownload)
-                    Toggle("下载动图", isOn: $model.xhsSettings.liveDownload)
-                }
-                .toggleStyle(.checkbox)
-            }
-
-            settingSection("格式") {
-                VStack(spacing: DesignSystem.spaceM) {
-                    LabeledContent("图片格式") {
-                        Picker("", selection: $model.xhsSettings.imageFormat) {
-                            ForEach(["JPEG", "PNG", "WEBP", "HEIC", "AUTO"], id: \.self) { value in
-                                Text(value).tag(value)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 160)
-                    }
-
-                    LabeledContent("视频偏好") {
-                        Picker("", selection: $model.xhsSettings.videoPreference) {
-                            Text("分辨率优先").tag("resolution")
-                            Text("码率优先").tag("bitrate")
-                            Text("文件大小优先").tag("size")
-                        }
-                        .labelsHidden()
-                        .frame(width: 160)
-                    }
-
-                    LabeledContent("作品信息格式") {
-                        Picker("", selection: $model.xhsSettings.noteFormat) {
-                            Text("不保存").tag("")
-                            Text("TXT").tag("txt")
-                            Text("Markdown").tag("md")
-                            Text("全部").tag("all")
-                        }
-                        .labelsHidden()
-                        .frame(width: 160)
-                    }
-                }
-            }
-
-            settingSection("文件管理") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
-                    LabeledContent("文件夹名称") {
-                        TextField("Download", text: $model.xhsSettings.folderName)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 280)
-                    }
-                    LabeledContent("文件命名格式") {
-                        TextField("发布时间 作者昵称 作品标题", text: $model.xhsSettings.nameFormat)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 360)
-                    }
-                    Divider()
-                    Toggle("每个作品使用独立文件夹", isOn: $model.xhsSettings.folderMode)
-                    Toggle("按作者归档", isOn: $model.xhsSettings.authorArchive)
-                    Toggle("记录下载历史", isOn: $model.xhsSettings.downloadRecord)
-                    Toggle("将文件修改时间写为作品发布时间", isOn: $model.xhsSettings.writeMtime)
-                    Toggle("记录作品数据", isOn: $model.xhsSettings.recordData)
-                }
-                .toggleStyle(.checkbox)
-            }
-
-            settingSection("Cookie") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                    Text("小红书网页版 Cookie")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100)
-                }
-            }
-
-            saveBar(title: "保存小红书设置") {
-                Task { await model.saveXHSSettings() }
-            }
-        }
-    }
-
-    private var douyinSettings: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
-            settingSection("下载内容") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
-                    Toggle("下载音乐", isOn: $model.douyinSettings.music)
-                    Toggle("下载动态封面", isOn: $model.douyinSettings.dynamicCover)
-                    Toggle("下载静态封面", isOn: $model.douyinSettings.staticCover)
-                    Toggle("优先原始画质", isOn: $model.douyinSettings.originalQuality)
-                }
-                .toggleStyle(.checkbox)
-            }
-
-            settingSection("文件管理") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
-                    LabeledContent("文件夹名称") {
-                        TextField("Download", text: $model.douyinSettings.folderName)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 280)
-                    }
-                    LabeledContent("文件命名格式") {
-                        TextField("create_time type nickname desc", text: $model.douyinSettings.nameFormat)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 360)
-                    }
-                    LabeledContent("描述最大长度") {
-                        TextField("64", value: $model.douyinSettings.descLength, format: .number)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 110)
-                    }
-                    LabeledContent("文件名最大长度") {
-                        TextField("128", value: $model.douyinSettings.nameLength, format: .number)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 110)
-                    }
-                    LabeledContent("日期格式") {
-                        TextField("%Y-%m-%d %H:%M:%S", text: $model.douyinSettings.dateFormat)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 280)
-                    }
-                    LabeledContent("文件名分隔符") {
-                        TextField("-", text: $model.douyinSettings.split)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 110)
-                    }
-                    LabeledContent("数据保存格式") {
-                        TextField("留空为不保存", text: $model.douyinSettings.storageFormat)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 200)
-                    }
-                    LabeledContent("文件大小限制") {
-                        HStack(spacing: 6) {
-                            TextField("0", value: $model.douyinSettings.maxSize, format: .number)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 110)
-                            Text("0 表示不限制")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Toggle("每个作品使用独立文件夹", isOn: $model.douyinSettings.folderMode)
-                        .toggleStyle(.checkbox)
-                }
-            }
-
-            settingSection("Cookie") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-                    VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                        Text("国内链接 Cookie（douyin.com）")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 90)
-                    }
-                    VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                        Text("国际链接 Cookie（tiktok.com）")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        plainTextEditor(text: $model.douyinSettings.cookieTikTok, minHeight: 90)
-                    }
-                }
-            }
-
-            saveBar(title: "保存抖音设置") {
-                Task { await model.saveDouyinSettings() }
-            }
-        }
-    }
-
-    private var advancedSettings: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
-            settingSection("抖音高级功能") {
-                VStack(spacing: DesignSystem.spaceM) {
-                    LabeledContent("FFmpeg 路径") {
-                        TextField("留空使用上游默认行为", text: $model.douyinSettings.ffmpeg)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 360)
-                    }
-                    LabeledContent("直播画质") {
-                        TextField("留空使用默认画质", text: $model.douyinSettings.liveQualities)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 240)
-                    }
-                    HStack {
-                        Spacer()
-                        Button("保存高级设置") {
-                            Task { await model.saveDouyinSettings() }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-            }
-
-            settingSection("原始配置文件") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-                    configRow(title: "小红书 settings.json", path: model.xhsSettingsPath)
-                    Divider()
-                    configRow(title: "抖音 settings.json", path: model.douyinSettingsPath)
-                    Text("App 只修改界面中可见的字段。代理、网络超时、重试、浏览器指纹等未展示字段会原样保留在原始 JSON 中。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            settingSection("恢复默认配置") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                    Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: DesignSystem.spaceS) {
-                        Button("恢复小红书默认设置", role: .destructive) {
-                            Task { await model.resetEngineSettings("xiaohongshu") }
-                        }
-                        Button("恢复抖音默认设置", role: .destructive) {
-                            Task { await model.resetEngineSettings("douyin") }
-                        }
-                    }
-                }
-            }
-
-            settingSection("数据目录") {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                    pathRow("应用数据", "~/Library/Application Support/SYDownload/")
-                    pathRow("缓存", "~/Library/Caches/SYDownload/")
-                    pathRow("下载文件", model.outputDirectory)
-                }
-            }
-        }
-    }
-
-    private func settingSection<Content: View>(
-        _ title: String,
-        @ViewBuilder content: () -> Content
+    private func saveBar(
+        title: String,
+        isDirty: Bool,
+        action: @escaping () -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
-            Text(title)
-                .font(.headline.weight(.semibold))
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, DesignSystem.spaceL)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(DesignSystem.hairline)
-                .frame(height: 1)
-        }
-    }
-
-    private func saveBar(title: String, action: @escaping () -> Void) -> some View {
         HStack(spacing: DesignSystem.spaceM) {
-            Text("保存时只合并当前页面管理的字段，不会覆盖隐藏配置。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 3) {
+                Label(
+                    isDirty ? "有未保存更改" : "当前配置已保存",
+                    systemImage: isDirty ? "circle.fill" : "checkmark.circle"
+                )
+                .font(.caption.weight(.medium))
+                .foregroundStyle(isDirty ? DesignSystem.accent : .secondary)
+
+                Text("保存时只合并当前页面管理的字段，不会覆盖隐藏配置。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Spacer(minLength: DesignSystem.spaceM)
             Button(title, action: action)
                 .buttonStyle(.borderedProminent)
-                .disabled(model.settingsLoading)
+                .disabled(model.settingsLoading || !isDirty)
         }
         .padding(.vertical, DesignSystem.spaceS)
+    }
+
+    @ViewBuilder
+    private var saveBarForCurrentTab: some View {
+        switch tab {
+        case .general:
+            EmptyView()
+        case .xhs:
+            saveBar(title: "保存小红书设置", isDirty: xhsSettingsDirty, action: saveXHSSettings)
+        case .douyin:
+            saveBar(title: "保存抖音设置", isDirty: douyinSettingsDirty, action: saveDouyinSettings)
+        case .advanced:
+            saveBar(title: "保存高级设置", isDirty: douyinSettingsDirty, action: saveDouyinSettings)
+        }
+    }
+
+    private func saveXHSSettings() {
+        Task {
+            await model.saveXHSSettings()
+            if !model.settingsStatusIsError {
+                xhsSettingsDirty = false
+            }
+        }
+    }
+
+    private func saveDouyinSettings() {
+        Task {
+            await model.saveDouyinSettings()
+            if !model.settingsStatusIsError {
+                douyinSettingsDirty = false
+            }
+        }
     }
 
     private func plainTextEditor(text: Binding<String>, minHeight: CGFloat) -> some View {
         TextEditor(text: text)
             .font(.system(size: 12, design: .monospaced))
-            .scrollContentBackground(.hidden)
-            .padding(8)
             .frame(minHeight: minHeight)
-            .background(
-                DesignSystem.warmSurface,
-                in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-                    .stroke(DesignSystem.hairline, lineWidth: 1)
-            }
     }
 
     private func configRow(title: String, path: String) -> some View {

@@ -18,12 +18,32 @@ struct SYDownloadApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 960, height: 680)
         .windowResizability(.contentMinSize)
-
-        Settings {
-            SettingsView(model: model)
-                .frame(width: 720, height: 560)
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("新建下载") {
+                    NotificationCenter.default.post(name: .syDownloadNewDownload, object: nil)
+                }
+                .keyboardShortcut("n", modifiers: [.command])
+            }
+            CommandGroup(replacing: .appInfo) {
+                Button("关于 SYDownload") {
+                    NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
+                }
+            }
+            CommandGroup(replacing: .appSettings) {
+                Button("设置…") {
+                    NotificationCenter.default.post(name: .syDownloadShowSettings, object: nil)
+                }
+                .keyboardShortcut(",", modifiers: [.command])
+            }
         }
     }
+}
+
+extension Notification.Name {
+    static let syDownloadNewDownload = Notification.Name("SYDownload.newDownload")
+    static let syDownloadShowAbout = Notification.Name("SYDownload.showAbout")
+    static let syDownloadShowSettings = Notification.Name("SYDownload.showSettings")
 }
 #else
 import Foundation

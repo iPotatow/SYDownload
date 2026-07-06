@@ -2,6 +2,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import ImageIO
 
 struct PhotosView: View {
     @State private var folderURL: URL?
@@ -12,15 +13,23 @@ struct PhotosView: View {
     @State private var isDropTargeted = false
     @State private var isScanning = false
     @State private var isDeleting = false
+    @State private var statusIsError = false
     @State private var statusMessage = "拖入一个文件夹，或点击选择文件夹开始整理。"
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
             header
             workspace
+            if !statusMessage.isEmpty && !isScanning {
+                Label(statusMessage, systemImage: statusIsError ? "exclamationmark.circle" : "info.circle")
+                    .font(DesignSystem.supportingFont)
+                    .foregroundStyle(statusIsError ? DesignSystem.destructive : .secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityElement(children: .combine)
+            }
         }
         .padding(.horizontal, DesignSystem.contentPadding)
-        .padding(.top, DesignSystem.pageTitlebarClearance + DesignSystem.pageHeaderTop)
+        .padding(.top, DesignSystem.contentPadding)
         .padding(.bottom, DesignSystem.space3XL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -36,6 +45,17 @@ struct PhotosView: View {
                 }
             case .failure(let error):
                 statusMessage = error.localizedDescription
+                statusIsError = true
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if folderURL != nil {
+                    Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
+                        .disabled(isScanning || isDeleting)
+                }
+                Button("选择文件夹", systemImage: "folder", action: chooseFolder)
+                    .disabled(isScanning || isDeleting)
             }
         }
         .alert("删除所选日期的照片？", isPresented: $showsDeleteConfirmation) {
@@ -50,23 +70,10 @@ struct PhotosView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: DesignSystem.spaceL) {
-            PageHeader(
-                title: "照片整理",
-                subtitle: "按文件名中的日期分组，预览后再选择需要处理的日期。"
-            )
-
-            Spacer(minLength: DesignSystem.spaceL)
-
-            if folderURL != nil {
-                Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
-                    .buttonStyle(.borderless)
-                    .disabled(isScanning || isDeleting)
-                Button("选择文件夹", systemImage: "folder", action: chooseFolder)
-                    .buttonStyle(.bordered)
-                    .disabled(isScanning || isDeleting)
-            }
-        }
+        PageHeader(
+            title: "照片整理",
+            subtitle: "按文件名中的日期分组，预览后再选择需要处理的日期。"
+        )
     }
 
     @ViewBuilder
@@ -123,6 +130,7 @@ struct PhotosView: View {
         .dropDestination(for: URL.self) { urls, _ in
             guard let folder = urls.first(where: isDirectory) else {
                 statusMessage = "请拖入文件夹，而不是单个文件。"
+                statusIsError = true
                 return false
             }
             openFolder(folder)
@@ -172,7 +180,7 @@ struct PhotosView: View {
                     }
                     .padding(.bottom, selectedDates.isEmpty ? DesignSystem.spaceS : 76)
                 }
-                .overlay(alignment: .bottom) {
+                .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !selectedDates.isEmpty {
                         deleteBar
                     }
@@ -379,6 +387,7 @@ struct PhotosView: View {
         folderURL = url
         selectedDates.removeAll()
         isScanning = true
+        statusIsError = statusPrefix?.contains("失败") == true
         statusMessage = "正在扫描 \(url.lastPathComponent)…"
 
         Task {
@@ -403,6 +412,7 @@ struct PhotosView: View {
             case .failure(let message):
                 scanResult = .empty
                 statusMessage = message
+                statusIsError = true
             }
         }
     }
@@ -422,6 +432,7 @@ struct PhotosView: View {
 
             isDeleting = false
             let failedText = result.failedPaths.isEmpty ? "" : " \(result.failedPaths.count) 张删除失败。"
+            statusIsError = !result.failedPaths.isEmpty
             let prefix = "已移到废纸篓 \(result.deletedCount) 张照片。\(failedText)"
 
             if let folderURL {
@@ -438,7 +449,7 @@ private struct LocalPhotoThumbnail: View {
 
     var body: some View {
         Group {
-            if let image = NSImage(contentsOf: url) {
+            if let image = thumbnailImage {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
@@ -458,6 +469,20 @@ private struct LocalPhotoThumbnail: View {
         }
         .help(url.lastPathComponent)
         .accessibilityLabel(url.lastPathComponent)
+    }
+
+    private var thumbnailImage: NSImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cgImage = CGImageSourceCreateThumbnailAtIndex(
+                source,
+                0,
+                [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 136,
+                    kCGImageSourceCreateThumbnailWithTransform: true
+                ] as CFDictionary
+              ) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: 68, height: 68))
     }
 }
 #endif

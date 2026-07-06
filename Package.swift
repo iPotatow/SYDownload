@@ -19,5 +19,9 @@ let package = Package(
             name: "SYDownloadCoreTests",
             dependencies: ["SYDownloadCore"]
         ),
+        .testTarget(
+            name: "SYDownloadAppTests",
+            dependencies: ["SYDownloadApp"]
+        ),
     ]
 )

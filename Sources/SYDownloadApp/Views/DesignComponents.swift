@@ -14,21 +14,17 @@ enum DesignSystem {
     static let space3XL: CGFloat = 40
     static let pageHeaderTop: CGFloat = 16
     static let titlebarClearance: CGFloat = 32
-    static let pageTitlebarClearance: CGFloat = titlebarClearance
+    static let pageTitlebarClearance: CGFloat = 0
     static let sidebarTitlebarClearance: CGFloat = titlebarClearance
 
     static let pageInset: CGFloat = 16
     static let sectionSpacing: CGFloat = 16
     static let panelPadding: CGFloat = 16
     static let sidebarWidth: CGFloat = 220
-    static let mainSurfaceInsets = EdgeInsets(
-        top: spaceS,
-        leading: spaceS,
-        bottom: spaceS,
-        trailing: spaceS
-    )
+    static let mainSurfaceInsets = EdgeInsets(top: spaceS, leading: 0, bottom: spaceS, trailing: spaceS)
     static let sidebarBrandHeight: CGFloat = 56
-    static let panelRadius: CGFloat = 14
+    static let panelRadius: CGFloat = 10
+    static let contentRadius: CGFloat = 14
     static let rowRadius: CGFloat = 8
     static let controlRadius: CGFloat = 8
     static let contentMaxWidth: CGFloat = 1_080
@@ -47,30 +43,37 @@ enum DesignSystem {
     static let supportingFont = Font.system(size: 12)
     static let metadataFont = Font.system(size: 11)
 
-    static let cyan = Color(red: 0.08, green: 0.66, blue: 0.70)
-    static let purple = Color(red: 0.43, green: 0.34, blue: 0.78)
-    static var accent: Color { cyan }
-    static var accentSecondary: Color { purple }
-    static var accentTint: Color { cyan.opacity(0.11) }
+    static let blue = Color(red: 0.039, green: 0.518, blue: 1.0)
+    static var accent: Color { blue }
+    static var accentSecondary: Color { blue }
+    static var accentTint: Color { semantic(light: "#0A84FF", dark: "#0A84FF", lightOpacity: 0.12, darkOpacity: 0.22) }
     static var warmSurface: Color { Color.primary.opacity(0.035) }
     static var raisedSurface: Color { Color.primary.opacity(0.06) }
     static var hairline: Color { Color(nsColor: .separatorColor).opacity(0.52) }
     static var shadow: Color { Color.black.opacity(0.05) }
 
-    static var sidebarBackground: Color { Color(nsColor: .underPageBackgroundColor) }
-    static var mainSurfaceBackground: Color { Color(nsColor: .controlBackgroundColor) }
-    static var panelBackground: Color { Color(nsColor: .windowBackgroundColor).opacity(0.88) }
+    static var sidebarBackground: Color { semantic(light: "#EAEAEE", dark: "#2C2C2E") }
+    static var mainSurfaceBackground: Color { semantic(light: "#FFFFFF", dark: "#1C1C1E") }
+    static var panelBackground: Color { semantic(light: "#FFFFFF", dark: "#2C2C2E") }
     static var rowBackground: Color { Color.primary.opacity(0.035) }
-    static var sidebarAccent: Color { cyan.opacity(0.18) }
-    static var sidebarAccentForeground: Color { cyan }
-    static var primaryForeground: Color { cyan }
+    static var sidebarAccent: Color { accentTint }
+    static var sidebarAccentForeground: Color { blue }
+    static var primaryForeground: Color { blue }
     static var sidebarHover: Color { Color.primary.opacity(0.055) }
-    static var primaryHover: Color { cyan.opacity(0.16) }
+    static var primaryHover: Color { semantic(light: "#0A84FF", dark: "#0A84FF", lightOpacity: 0.16, darkOpacity: 0.22) }
     static var focusRing: Color { Color(nsColor: .keyboardFocusIndicatorColor) }
     static var pressedOverlay: Color { Color(nsColor: .controlHighlightColor) }
     static var success: Color { Color(nsColor: .systemGreen) }
     static var warning: Color { Color(nsColor: .systemOrange) }
     static var destructive: Color { Color(nsColor: .systemRed) }
+
+    private static func semantic(light: String, dark: String, lightOpacity: CGFloat = 1, darkOpacity: CGFloat = 1) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let color = NSColor(hex: isDark ? dark : light)
+            return color.withAlphaComponent(isDark ? darkOpacity : lightOpacity)
+        } ?? NSColor(hex: light))
+    }
 
     static var pageMaxWidth: CGFloat { contentMaxWidth }
     static var contentPadding: CGFloat { pageInset }
@@ -80,7 +83,7 @@ enum DesignSystem {
 extension DownloadPlatform {
     var designColor: Color {
         switch self {
-        case .xiaohongshu: return DesignSystem.accentSecondary
+        case .xiaohongshu: return DesignSystem.accent
         case .douyin, .tiktok: return DesignSystem.accent
         case .unknown: return .secondary
         }
@@ -409,6 +412,8 @@ struct SidebarButtonStyle: ButtonStyle {
     let isFocused: Bool
     @State private var isHovered = false
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -424,10 +429,11 @@ struct SidebarButtonStyle: ButtonStyle {
             .overlay {
                 if isFocused {
                     RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                        .stroke(DesignSystem.focusRing, lineWidth: 3)
+                        .stroke(DesignSystem.focusRing, lineWidth: contrast == .increased ? 3 : 2)
                 }
             }
             .opacity(isEnabled ? 1 : 0.5)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
             .onHover { isHovered = $0 }
     }
 
@@ -435,6 +441,19 @@ struct SidebarButtonStyle: ButtonStyle {
         if selected { return DesignSystem.sidebarAccent }
         if configuration.isPressed || isHovered { return DesignSystem.sidebarHover }
         return .clear
+    }
+}
+
+private extension NSColor {
+    convenience init(hex: String) {
+        let value = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        let number = UInt64(value, radix: 16) ?? 0
+        self.init(
+            calibratedRed: CGFloat((number >> 16) & 0xff) / 255,
+            green: CGFloat((number >> 8) & 0xff) / 255,
+            blue: CGFloat(number & 0xff) / 255,
+            alpha: 1
+        )
     }
 }
 

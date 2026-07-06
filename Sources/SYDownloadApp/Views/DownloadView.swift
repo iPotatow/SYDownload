@@ -6,7 +6,6 @@ struct DownloadView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var linkEditorFocused: Bool
-    @State private var advancedExpanded = false
 
     var body: some View {
         ScrollView {
@@ -22,7 +21,7 @@ struct DownloadView: View {
                 statusLine
             }
             .padding(.horizontal, DesignSystem.contentPadding)
-            .padding(.top, DesignSystem.pageTitlebarClearance + DesignSystem.pageHeaderTop)
+            .padding(.top, DesignSystem.contentPadding)
             .padding(.bottom, DesignSystem.space2XL)
             .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .top)
@@ -32,6 +31,15 @@ struct DownloadView: View {
             reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.32, dampingFraction: 1),
             value: model.preview
         )
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("新建下载", systemImage: "plus") {
+                    model.clearInput()
+                    linkEditorFocused = true
+                }
+                .help("新建下载")
+            }
+        }
         .tint(DesignSystem.accent)
     }
 
@@ -39,27 +47,20 @@ struct DownloadView: View {
         HStack(alignment: .top, spacing: DesignSystem.spaceL) {
             PageHeader(
                 title: "下载",
-                subtitle: "粘贴链接即可解析并开始下载，支持小红书、抖音与 TikTok。"
+                subtitle: "粘贴链接即可开始下载，支持小红书、抖音与 TikTok。"
             )
 
-            Spacer(minLength: DesignSystem.spaceL)
-
-            Label("Bridge 已连接", systemImage: "checkmark.circle.fill")
-                .font(DesignSystem.supportingFont.weight(.semibold))
-                .foregroundStyle(DesignSystem.success)
-                .padding(.horizontal, DesignSystem.spaceM)
-                .frame(height: 30)
-                .background(
-                    DesignSystem.success.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                )
+            Spacer(minLength: 0)
         }
     }
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
+            Text("下载链接")
+                .font(DesignSystem.uiFont.weight(.semibold))
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $model.input)
+                    .accessibilityLabel("下载链接")
                     .font(.body)
                     .scrollContentBackground(.hidden)
                     .padding(DesignSystem.spaceM)
@@ -108,27 +109,20 @@ struct DownloadView: View {
 
             Divider()
 
-            DisclosureGroup(isExpanded: $advancedExpanded) {
-                HStack(spacing: DesignSystem.spaceM) {
-                    Label(platformStatus, systemImage: "link")
-                        .font(DesignSystem.supportingFont)
-                        .foregroundStyle(.secondary)
-
-                    Spacer(minLength: DesignSystem.spaceS)
-
-                    Button("检查链接", systemImage: "checkmark.circle", action: validate)
-                        .buttonStyle(.borderless)
-                        .disabled(
-                            model.detectedPlatform == .unknown
-                                || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                || model.isParsing
-                        )
-                }
-                .padding(.top, DesignSystem.spaceS)
-            } label: {
-                Text("高级选项")
-                    .font(DesignSystem.supportingFont.weight(.medium))
+            HStack(spacing: DesignSystem.spaceM) {
+                Label(platformStatus, systemImage: "link")
+                    .font(DesignSystem.supportingFont)
                     .foregroundStyle(.secondary)
+
+                Spacer(minLength: DesignSystem.spaceS)
+
+                Button("检查链接", systemImage: "checkmark.circle", action: validate)
+                    .buttonStyle(.borderless)
+                    .disabled(
+                        model.detectedPlatform == .unknown
+                            || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || model.isParsing
+                    )
             }
 
             HStack {
@@ -141,6 +135,7 @@ struct DownloadView: View {
                         model.detectedPlatform == .unknown
                             || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             || model.isWorking
+                            || model.isParsing
                     )
             }
         }
@@ -168,7 +163,7 @@ struct DownloadView: View {
             Text(model.status)
                 .font(DesignSystem.supportingFont)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: DesignSystem.spaceS)
 
@@ -183,11 +178,13 @@ struct DownloadView: View {
     }
 
     private var statusSymbol: String {
+        if model.statusIsError { return "exclamationmark.triangle.fill" }
         if model.detectedPlatform == .unknown { return "info.circle" }
         return model.preview == nil ? "link" : "checkmark.circle.fill"
     }
 
     private var statusColor: Color {
+        if model.statusIsError { return DesignSystem.destructive }
         if model.detectedPlatform == .unknown { return .secondary }
         return model.preview == nil ? DesignSystem.accent : DesignSystem.success
     }
@@ -206,7 +203,7 @@ private struct PreviewCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-            Text("解析结果")
+            Text("检查结果")
                 .font(DesignSystem.sectionTitleFont)
 
             InsetRow {
