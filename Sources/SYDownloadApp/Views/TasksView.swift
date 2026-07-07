@@ -11,7 +11,7 @@ struct TasksView: View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
             PageHeader(
                 title: "任务",
-                subtitle: "管理下载任务，查看进度和状态。"
+                subtitle: "最多 3 个任务并行下载，可查看实时写入进度、取消任务和处理失败。"
             )
 
             filterBar
@@ -77,12 +77,16 @@ struct TasksView: View {
                 openFolder(task)
             }
         }
-        if task.state == .failed {
+        if task.state == .failed || task.state == .cancelled {
             Button("重试", systemImage: "arrow.clockwise") {
                 model.retryTask(task)
             }
         }
-        if task.state != .downloading {
+        if task.state == .queued || task.state == .downloading {
+            Button("取消任务", systemImage: "xmark.circle", role: .destructive) {
+                model.cancelTask(task.id)
+            }
+        } else {
             Divider()
             Button("移除任务", systemImage: "trash", role: .destructive) {
                 model.removeTask(task.id)
@@ -133,7 +137,7 @@ struct TasksView: View {
     }
 
     private var failedCount: Int {
-        model.tasks.filter { $0.state == .failed }.count
+        model.tasks.filter { $0.state == .failed || $0.state == .cancelled }.count
     }
 
     private func openFolder(_ task: DownloadTaskItem) {
@@ -143,7 +147,8 @@ struct TasksView: View {
     private func removeSelectedTask() {
         guard let selectedTaskID,
               let task = model.tasks.first(where: { $0.id == selectedTaskID }),
-              task.state != .downloading else { return }
+              task.state != .downloading,
+              task.state != .queued else { return }
         model.removeTask(selectedTaskID)
         self.selectedTaskID = nil
     }
@@ -170,8 +175,25 @@ private struct TaskRow: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if task.state == .downloading || task.state == .queued {
-                    ProgressView()
+                if task.state == .downloading {
+                    HStack(spacing: DesignSystem.spaceS) {
+                        if let progress = task.progress {
+                            ProgressView(value: progress)
+                                .progressViewStyle(.linear)
+                                .tint(DesignSystem.accent)
+                            Text("\(Int(progress * 100))%")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(width: 38, alignment: .trailing)
+                        } else {
+                            ProgressView()
+                                .progressViewStyle(.linear)
+                                .tint(DesignSystem.accent)
+                        }
+                    }
+                    .frame(maxWidth: 460)
+                } else if task.state == .queued {
+                    ProgressView(value: 0)
                         .progressViewStyle(.linear)
                         .tint(DesignSystem.accent)
                         .frame(maxWidth: 460)
@@ -185,9 +207,14 @@ private struct TaskRow: View {
                     NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
                 }
                 .buttonStyle(.borderless)
-            } else if task.state == .failed {
+            } else if task.state == .failed || task.state == .cancelled {
                 Button("重试", systemImage: "arrow.clockwise") {
                     model.retryTask(task)
+                }
+                .buttonStyle(.bordered)
+            } else {
+                Button("取消", systemImage: "xmark") {
+                    model.cancelTask(task.id)
                 }
                 .buttonStyle(.bordered)
             }

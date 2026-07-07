@@ -39,6 +39,7 @@ chmod +x "$APP/Contents/MacOS/SYDownload"
 cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
 cp "$RESOURCE" "$APP/Contents/Resources/SYDownloadIcon.png"
 cp "$ROOT/Bridge/engine_bridge.py" "$APP/Contents/Resources/bridge/engine_bridge.py"
+cp "$ROOT/Bridge/download_runtime.py" "$APP/Contents/Resources/bridge/download_runtime.py"
 printf '%s\n' "$APP_VERSION" > "$APP/Contents/Resources/bundle-version.txt"
 
 if [[ "$BUNDLE_RUNTIME" == "1" ]]; then

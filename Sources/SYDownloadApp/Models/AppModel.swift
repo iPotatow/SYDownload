@@ -27,6 +27,7 @@ enum DownloadTaskState: String, Codable {
     case downloading
     case completed
     case failed
+    case cancelled
 
     var label: String {
         switch self {
@@ -34,6 +35,39 @@ enum DownloadTaskState: String, Codable {
         case .downloading: return "下载中"
         case .completed: return "已完成"
         case .failed: return "失败"
+        case .cancelled: return "已取消"
+        }
+    }
+}
+
+enum DownloadFailureKind: String, Codable, Sendable {
+    case unsupported
+    case validation
+    case timeout
+    case cancelled
+    case network
+    case auth
+    case rateLimited = "rate_limited"
+    case notFound = "not_found"
+    case disk
+    case verification
+    case engine
+    case unknown
+
+    var label: String {
+        switch self {
+        case .unsupported: return "平台不支持"
+        case .validation: return "链接检查失败"
+        case .timeout: return "任务超时"
+        case .cancelled: return "已取消"
+        case .network: return "网络错误"
+        case .auth: return "Cookie/登录状态异常"
+        case .rateLimited: return "平台风控/限流"
+        case .notFound: return "作品不可用"
+        case .disk: return "磁盘写入错误"
+        case .verification: return "文件校验失败"
+        case .engine: return "下载引擎错误"
+        case .unknown: return "未知错误"
         }
     }
 }
@@ -48,6 +82,9 @@ struct DownloadTaskItem: Identifiable {
     var detail: String
     var createdAt: Date
     var outputDirectory: String
+    var failureKind: DownloadFailureKind?
+    var bytesWritten: Int64
+    var fileCount: Int
 
     init(
         id: UUID = UUID(),
@@ -58,7 +95,10 @@ struct DownloadTaskItem: Identifiable {
         progress: Double? = nil,
         detail: String = "等待下载…",
         createdAt: Date = .now,
-        outputDirectory: String = ""
+        outputDirectory: String = "",
+        failureKind: DownloadFailureKind? = nil,
+        bytesWritten: Int64 = 0,
+        fileCount: Int = 0
     ) {
         self.id = id
         self.title = title
@@ -69,6 +109,9 @@ struct DownloadTaskItem: Identifiable {
         self.detail = detail
         self.createdAt = createdAt
         self.outputDirectory = outputDirectory
+        self.failureKind = failureKind
+        self.bytesWritten = bytesWritten
+        self.fileCount = fileCount
     }
 }
 
@@ -131,20 +174,32 @@ struct DouyinSettingsForm {
     var cookie = ""
 }
 
-private struct LinkValidationResult {
+private struct LinkValidationResult: Sendable {
     let link: DetectedDownloadLink
     let ok: Bool
     let message: String
 }
 
-private struct PreparedDownload {
+private struct PreparedDownload: Sendable {
     let taskID: UUID
     let validation: LinkValidationResult
+    let batchIndex: Int
+}
+
+private struct DownloadExecutionResult: Sendable {
+    let prepared: PreparedDownload
+    let response: BridgeResponse?
+    let failureKind: DownloadFailureKind?
+    let failureMessage: String?
 }
 
 @MainActor
 final class AppModel: ObservableObject {
     typealias BridgeSender = @Sendable (BridgeRequest) async throws -> BridgeResponse
+    typealias BridgeStreamingSender = @Sendable (
+        BridgeRequest,
+        @escaping @Sendable (BridgeProgressEvent) -> Void
+    ) async throws -> BridgeResponse
 
     @Published var selection: AppSection? = .download
     @Published var input = ""
@@ -175,16 +230,23 @@ final class AppModel: ObservableObject {
 
     private let defaults: UserDefaults
     private let sendBridge: BridgeSender
+    private let sendBridgeStreaming: BridgeStreamingSender
     private let historyKey = "SYDownload.history.v1"
+    private let maxConcurrentDownloads = 3
+    private let downloadTimeoutSeconds: Double = 15 * 60
 
     init(
         userDefaults: UserDefaults = .standard,
+        bridgeStreamingSend: @escaping BridgeStreamingSender = { request, onProgress in
+            try await BridgeClient().sendStreaming(request, onProgress: onProgress)
+        },
         bridgeSend: @escaping BridgeSender = { request in
             try await BridgeClient().send(request)
         }
     ) {
         defaults = userDefaults
         sendBridge = bridgeSend
+        sendBridgeStreaming = bridgeStreamingSend
         outputDirectory = userDefaults.string(forKey: "SYDownload.outputDirectory")
             ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
                 .first?.appendingPathComponent("SYDownload").path
@@ -197,7 +259,7 @@ final class AppModel: ObservableObject {
         case .all: return tasks
         case .active: return tasks.filter { $0.state == .queued || $0.state == .downloading }
         case .completed: return tasks.filter { $0.state == .completed }
-        case .failed: return tasks.filter { $0.state == .failed }
+        case .failed: return tasks.filter { $0.state == .failed || $0.state == .cancelled }
         }
     }
 
@@ -344,11 +406,14 @@ final class AppModel: ObservableObject {
             return
         }
 
-        let prepared = validations.map {
-            PreparedDownload(taskID: UUID(), validation: $0)
+        let prepared = validations.enumerated().map { index, validation in
+            PreparedDownload(taskID: UUID(), validation: validation, batchIndex: index)
         }
         let newTasks = prepared.map { preparedItem in
             let validation = preparedItem.validation
+            let failureKind: DownloadFailureKind? = validation.ok
+                ? nil
+                : (validation.link.platform == .unknown ? .unsupported : .validation)
             return DownloadTaskItem(
                 id: preparedItem.taskID,
                 title: taskTitle(for: validation.link),
@@ -357,7 +422,8 @@ final class AppModel: ObservableObject {
                 state: validation.ok ? .queued : .failed,
                 progress: nil,
                 detail: validation.ok ? "等待下载…" : validation.message,
-                outputDirectory: destination
+                outputDirectory: destination,
+                failureKind: failureKind
             )
         }
 
@@ -365,74 +431,106 @@ final class AppModel: ObservableObject {
         selection = .tasks
 
         let downloadable = prepared.filter { $0.validation.ok }
-        var successCount = 0
-        var failedCount = prepared.count - downloadable.count
-        var completedDownloadCount = 0
-        var newHistory: [HistoryItem] = []
-        var lastFailureMessage = validations.first(where: { !$0.ok })?.message
-
         if downloadable.isEmpty {
             status = "没有可下载的链接"
             statusIsError = true
             return
         }
 
-        for preparedItem in downloadable {
-            completedDownloadCount += 1
-            let link = preparedItem.validation.link
-            let title = taskTitle(for: link)
+        status = downloadable.count == 1
+            ? "正在下载…"
+            : "正在下载 \(downloadable.count) 个任务（最多 \(maxConcurrentDownloads) 个并行）…"
+        statusIsError = false
 
-            updateTask(preparedItem.taskID) { task in
-                task.state = .downloading
-                task.detail = "正在调用 \(link.platform.displayName) 下载引擎…"
-            }
+        let limiter = AsyncSemaphore(value: maxConcurrentDownloads)
+        let streamingSender = sendBridgeStreaming
+        let timeoutSeconds = downloadTimeoutSeconds
+        var results: [DownloadExecutionResult] = []
 
-            if downloadable.count == 1 {
-                status = "正在下载…"
-            } else {
-                status = "正在下载 \(completedDownloadCount)/\(downloadable.count)…"
-            }
-            statusIsError = false
-
-            do {
-                let response = try await sendBridge(.init(
-                    command: "download",
-                    url: link.url,
-                    outputDirectory: destination
-                ))
-                lastDetails = response.details ?? [:]
-                updateTask(preparedItem.taskID) { task in
-                    task.state = response.ok ? .completed : .failed
-                    task.progress = response.ok ? 1.0 : nil
-                    task.detail = response.ok ? "下载完成" : response.message
-                }
-
-                if response.ok {
-                    successCount += 1
-                    newHistory.append(
-                        HistoryItem(
-                            title: title,
-                            platform: link.platform,
-                            sourceURL: link.url,
-                            outputDirectory: destination
+        await withTaskGroup(of: DownloadExecutionResult.self) { group in
+            for preparedItem in downloadable {
+                group.addTask { [weak self, streamingSender] in
+                    await limiter.acquire()
+                    guard let self else {
+                        await limiter.release()
+                        return DownloadExecutionResult(
+                            prepared: preparedItem,
+                            response: nil,
+                            failureKind: .unknown,
+                            failureMessage: "下载任务已失去应用上下文。"
                         )
+                    }
+
+                    let shouldStart = await self.markTaskStarted(
+                        preparedItem.taskID,
+                        platform: preparedItem.validation.link.platform
                     )
-                } else {
-                    failedCount += 1
-                    lastFailureMessage = response.message
+                    guard shouldStart else {
+                        await limiter.release()
+                        return DownloadExecutionResult(
+                            prepared: preparedItem,
+                            response: nil,
+                            failureKind: .cancelled,
+                            failureMessage: "下载任务已取消。"
+                        )
+                    }
+
+                    let request = BridgeRequest(
+                        id: preparedItem.taskID,
+                        command: "download",
+                        url: preparedItem.validation.link.url,
+                        outputDirectory: destination,
+                        timeoutSeconds: timeoutSeconds
+                    )
+                    do {
+                        let response = try await streamingSender(request) { event in
+                            Task { @MainActor [weak self] in
+                                self?.applyProgress(event, to: preparedItem.taskID)
+                            }
+                        }
+                        await limiter.release()
+                        return DownloadExecutionResult(
+                            prepared: preparedItem,
+                            response: response,
+                            failureKind: nil,
+                            failureMessage: nil
+                        )
+                    } catch {
+                        await limiter.release()
+                        let failure = classifyDownloadError(error)
+                        return DownloadExecutionResult(
+                            prepared: preparedItem,
+                            response: nil,
+                            failureKind: failure.kind,
+                            failureMessage: failure.message
+                        )
+                    }
                 }
-            } catch {
-                failedCount += 1
-                lastFailureMessage = error.localizedDescription
-                updateTask(preparedItem.taskID) { task in
-                    task.state = .failed
-                    task.progress = nil
-                    task.detail = error.localizedDescription
-                }
+            }
+
+            for await result in group {
+                results.append(result)
+                applyDownloadResult(result)
             }
         }
 
-        if !newHistory.isEmpty {
+        let successfulResults = results
+            .filter { result in
+                guard result.response?.ok == true else { return false }
+                return tasks.first(where: { $0.id == result.prepared.taskID })?.state == .completed
+            }
+            .sorted { $0.prepared.batchIndex < $1.prepared.batchIndex }
+
+        if !successfulResults.isEmpty {
+            let newHistory = successfulResults.map { result in
+                let link = result.prepared.validation.link
+                return HistoryItem(
+                    title: taskTitle(for: link),
+                    platform: link.platform,
+                    sourceURL: link.url,
+                    outputDirectory: destination
+                )
+            }
             history.insert(contentsOf: newHistory, at: 0)
             if history.count > 100 {
                 history.removeLast(history.count - 100)
@@ -440,12 +538,36 @@ final class AppModel: ObservableObject {
             persistHistory()
         }
 
-        if prepared.count == 1 {
-            status = successCount == 1 ? "下载完成" : (lastFailureMessage ?? "下载失败")
-        } else {
-            status = "批量下载完成：\(successCount) 成功，\(failedCount) 失败"
+        let batchTasks = prepared.compactMap { preparedItem in
+            tasks.first(where: { $0.id == preparedItem.taskID })
         }
-        statusIsError = failedCount > 0
+        let successCount = batchTasks.filter { $0.state == .completed }.count
+        let failedCount = batchTasks.filter { $0.state == .failed }.count
+        let cancelledCount = batchTasks.filter { $0.state == .cancelled }.count
+
+        if prepared.count == 1, let onlyTask = batchTasks.first {
+            switch onlyTask.state {
+            case .completed:
+                status = "下载完成"
+                statusIsError = false
+            case .cancelled:
+                status = "下载已取消"
+                statusIsError = false
+            case .failed:
+                status = onlyTask.detail
+                statusIsError = true
+            case .queued, .downloading:
+                status = onlyTask.detail
+                statusIsError = false
+            }
+        } else {
+            var summary = "批量下载完成：\(successCount) 成功，\(failedCount) 失败"
+            if cancelledCount > 0 {
+                summary += "，\(cancelledCount) 取消"
+            }
+            status = summary
+            statusIsError = failedCount > 0
+        }
     }
 
     func loadEngineSettings(force: Bool = false) async {
@@ -540,6 +662,19 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func cancelTask(_ id: UUID) {
+        guard let index = tasks.firstIndex(where: { $0.id == id }),
+              tasks[index].state == .queued || tasks[index].state == .downloading
+        else { return }
+        tasks[index].state = .cancelled
+        tasks[index].progress = nil
+        tasks[index].failureKind = .cancelled
+        tasks[index].detail = "已取消"
+        Task {
+            await BridgeClient.cancel(requestID: id)
+        }
+    }
+
     func clearCompletedTasks() {
         tasks.removeAll { $0.state == .completed }
     }
@@ -569,6 +704,95 @@ final class AppModel: ObservableObject {
         detectLocally()
         selection = .download
         status = "已载入历史链接，可重新检查"
+    }
+
+    private func markTaskStarted(_ id: UUID, platform: DownloadPlatform) -> Bool {
+        guard let index = tasks.firstIndex(where: { $0.id == id }),
+              tasks[index].state == .queued
+        else { return false }
+        tasks[index].state = .downloading
+        tasks[index].progress = nil
+        tasks[index].failureKind = nil
+        tasks[index].bytesWritten = 0
+        tasks[index].fileCount = 0
+        tasks[index].detail = "正在调用 \(platform.displayName) 下载引擎…"
+        return true
+    }
+
+    private func applyProgress(_ event: BridgeProgressEvent, to id: UUID) {
+        guard let index = tasks.firstIndex(where: { $0.id == id }),
+              tasks[index].state == .downloading
+        else { return }
+
+        if let progress = event.progress {
+            tasks[index].progress = min(max(progress, 0), 0.99)
+        }
+        if let bytesWritten = event.bytesWritten {
+            tasks[index].bytesWritten = max(0, bytesWritten)
+        }
+        if let fileCount = event.fileCount {
+            tasks[index].fileCount = max(0, fileCount)
+        }
+
+        var parts = [event.message]
+        if tasks[index].bytesWritten > 0 {
+            parts.append(
+                "已写入 " + ByteCountFormatter.string(
+                    fromByteCount: tasks[index].bytesWritten,
+                    countStyle: .file
+                )
+            )
+        }
+        if tasks[index].fileCount > 0 {
+            parts.append("\(tasks[index].fileCount) 个文件")
+        }
+        tasks[index].detail = parts.joined(separator: " · ")
+    }
+
+    private func applyDownloadResult(_ result: DownloadExecutionResult) {
+        guard let index = tasks.firstIndex(where: { $0.id == result.prepared.taskID }) else { return }
+        if tasks[index].state == .cancelled { return }
+
+        if let response = result.response {
+            lastDetails = response.details ?? [:]
+            if response.ok {
+                tasks[index].state = .completed
+                tasks[index].progress = 1.0
+                tasks[index].failureKind = nil
+                if let bytes = Int64(response.details?["verified_bytes"] ?? "") {
+                    tasks[index].bytesWritten = max(tasks[index].bytesWritten, bytes)
+                }
+                if let files = Int(response.details?["verified_files"] ?? "") {
+                    tasks[index].fileCount = max(tasks[index].fileCount, files)
+                }
+                switch response.details?["verification"] {
+                case "existing":
+                    tasks[index].detail = "文件已存在，校验通过"
+                case "written":
+                    let count = tasks[index].fileCount
+                    tasks[index].detail = count > 0
+                        ? "下载完成，已验证 \(count) 个文件"
+                        : "下载完成，文件校验通过"
+                default:
+                    tasks[index].detail = "下载完成"
+                }
+            } else {
+                let kind = DownloadFailureKind(
+                    rawValue: response.details?["error_kind"] ?? ""
+                ) ?? inferFailureKind(response.message)
+                tasks[index].state = kind == .cancelled ? .cancelled : .failed
+                tasks[index].progress = nil
+                tasks[index].failureKind = kind
+                tasks[index].detail = "\(kind.label)：\(response.message)"
+            }
+            return
+        }
+
+        let kind = result.failureKind ?? .unknown
+        tasks[index].state = kind == .cancelled ? .cancelled : .failed
+        tasks[index].progress = nil
+        tasks[index].failureKind = kind
+        tasks[index].detail = "\(kind.label)：\(result.failureMessage ?? kind.label)"
     }
 
     private var detectionSummary: String {
@@ -748,5 +972,37 @@ final class AppModel: ObservableObject {
 
         history = []
     }
+}
+
+private func classifyDownloadError(_ error: Error) -> (kind: DownloadFailureKind, message: String) {
+    if let bridgeError = error as? BridgeClient.BridgeError {
+        switch bridgeError {
+        case .timedOut:
+            return (.timeout, bridgeError.localizedDescription)
+        case .cancelled:
+            return (.cancelled, bridgeError.localizedDescription)
+        case .processFailed(let message):
+            return (inferFailureKind(message), message)
+        case .bridgeNotFound, .pythonNotFound, .malformedResponse:
+            return (.engine, bridgeError.localizedDescription)
+        }
+    }
+    if error is CancellationError {
+        return (.cancelled, "下载任务已取消。")
+    }
+    return (inferFailureKind(error.localizedDescription), error.localizedDescription)
+}
+
+private func inferFailureKind(_ message: String) -> DownloadFailureKind {
+    let value = message.lowercased()
+    if value.contains("取消") || value.contains("cancel") { return .cancelled }
+    if value.contains("超时") || value.contains("timeout") || value.contains("timed out") { return .timeout }
+    if value.contains("429") || value.contains("风控") || value.contains("频繁") || value.contains("rate limit") { return .rateLimited }
+    if value.contains("cookie") || value.contains("403") || value.contains("401") || value.contains("登录") { return .auth }
+    if value.contains("404") || value.contains("不存在") || value.contains("已删除") || value.contains("not found") { return .notFound }
+    if value.contains("磁盘") || value.contains("空间不足") || value.contains("permission denied") || value.contains("no space") { return .disk }
+    if value.contains("校验") || value.contains("未检测到新增") || value.contains("verification") { return .verification }
+    if value.contains("网络") || value.contains("connection") || value.contains("network") || value.contains("ssl") || value.contains("proxy") { return .network }
+    return .engine
 }
 #endif

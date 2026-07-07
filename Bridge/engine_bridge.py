@@ -17,6 +17,20 @@ import sys
 import traceback
 from typing import Any
 
+BRIDGE_DIR = Path(__file__).resolve().parent
+if str(BRIDGE_DIR) not in sys.path:
+    sys.path.insert(0, str(BRIDGE_DIR))
+
+from download_runtime import (  # noqa: E402
+    ProgressReporter,
+    classify_error,
+    flatten_identifiers,
+    monitor_progress,
+    run_streaming_subprocess,
+    snapshot_artifacts,
+    verify_output,
+)
+
 sys.dont_write_bytecode = True
 
 ENGINE_NAMES = {
@@ -494,7 +508,16 @@ def validate(req: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def run_xhs(engine: Path, url: str, output: Path) -> tuple[bool, str]:
+def run_xhs(
+    engine: Path,
+    url: str,
+    output: Path,
+    request_id: str | None,
+    timeout_seconds: float,
+) -> tuple[bool, str, str, dict[str, Any]]:
+    baseline = snapshot_artifacts(output)
+    reporter = ProgressReporter(request_id, output, baseline)
+    reporter.emit("正在启动小红书下载引擎…", force=True)
     cmd = [
         sys.executable,
         str(engine / "main.py"),
@@ -508,68 +531,128 @@ def run_xhs(engine: Path, url: str, output: Path) -> tuple[bool, str]:
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["PYTHONNOUSERSITE"] = "1"
-    proc = subprocess.run(
+    returncode, log, timed_out = run_streaming_subprocess(
         cmd,
         cwd=engine,
-        capture_output=True,
-        text=True,
         env=env,
+        reporter=reporter,
+        timeout_seconds=timeout_seconds,
     )
-    text = (proc.stdout + "\n" + proc.stderr).strip()
-    return proc.returncode == 0, text[-5000:]
+    if timed_out:
+        return False, "小红书下载任务超过允许时间。", "timeout", {
+            "verification": "timeout",
+            "verified_files": 0,
+            "verified_bytes": 0,
+        }
+    if returncode != 0:
+        message = log[-5000:] or f"小红书下载引擎退出码：{returncode}"
+        return False, message, classify_error(message), {
+            "verification": "engine_failed",
+            "verified_files": 0,
+            "verified_bytes": 0,
+        }
+
+    verified, message, details = verify_output(baseline, output, log=log)
+    if not verified:
+        return False, message, "verification", details
+    reporter.emit("下载文件已完成校验。", progress=1.0, force=True)
+    return True, log[-5000:] or message, "", details
 
 
 async def run_douk_in_process(
     engine: Path,
     url: str,
     output: Path,
-) -> tuple[bool, str]:
-    """Compatibility adapter around DouK's current internal single-work flow."""
+    request_id: str | None,
+    timeout_seconds: float,
+) -> tuple[bool, str, str, dict[str, Any]]:
+    baseline = snapshot_artifacts(output)
+    reporter = ProgressReporter(request_id, output, baseline)
+    reporter.emit("正在解析抖音作品…", force=True)
     sys.path.insert(0, str(engine))
     old_cwd = Path.cwd()
     os.chdir(engine)
+    monitor_task: asyncio.Task[None] | None = None
+    identifiers: list[str] = []
     try:
-        from src.application import TikTokDownloader  # type: ignore
-        from src.application.main_monitor import ClipboardMonitor  # type: ignore
-        from src.config import Parameter  # type: ignore
+        async with asyncio.timeout(timeout_seconds):
+            from src.application import TikTokDownloader  # type: ignore
+            from src.application.main_monitor import ClipboardMonitor  # type: ignore
+            from src.config import Parameter  # type: ignore
 
-        async with TikTokDownloader() as app:
-            app.check_config()
-            settings_data = app.settings.read()
-            settings_data["root"] = str(output)
-            app.parameter = Parameter(
-                app.settings,
-                app.cookie,
-                logger=app.logger,
-                console=app.console,
-                **settings_data,
-                recorder=app.recorder,
-            )
-            app.parameter.set_headers_cookie()
+            async with TikTokDownloader() as app:
+                app.check_config()
+                settings_data = app.settings.read()
+                settings_data["root"] = str(output)
+                app.parameter = Parameter(
+                    app.settings,
+                    app.cookie,
+                    logger=app.logger,
+                    console=app.console,
+                    **settings_data,
+                    recorder=app.recorder,
+                )
+                app.parameter.set_headers_cookie()
 
-            worker = ClipboardMonitor(app.parameter, app.database)
-            ids = await worker.links.run(url)
-            if not any(ids):
-                return False, "DouK 未能从链接提取作品 ID。"
+                worker = ClipboardMonitor(app.parameter, app.database)
+                ids = await worker.links.run(url)
+                identifiers = flatten_identifiers(ids)
+                if not identifiers:
+                    return False, "DouK 未能从链接提取作品 ID。", "not_found", {
+                        "verification": "not_started",
+                        "verified_files": 0,
+                        "verified_bytes": 0,
+                    }
 
-            root, params, logger = worker.record.run(app.parameter, blank=True)
-            async with logger(root, console=worker.console, **params) as record:
-                await worker._handle_detail(ids, False, record)
-            app.close()
-            return True, f"DouK 已处理作品 ID：{ids}"
+                reporter.emit("已解析作品，正在下载…", force=True)
+                monitor_task = asyncio.create_task(monitor_progress(reporter))
+                root, params, logger = worker.record.run(app.parameter, blank=True)
+                async with logger(root, console=worker.console, **params) as record:
+                    await worker._handle_detail(ids, False, record)
+                app.close()
+    except TimeoutError:
+        return False, "抖音下载任务超过允许时间。", "timeout", {
+            "verification": "timeout",
+            "verified_files": 0,
+            "verified_bytes": 0,
+        }
     finally:
+        if monitor_task is not None:
+            monitor_task.cancel()
+            try:
+                await monitor_task
+            except asyncio.CancelledError:
+                pass
         os.chdir(old_cwd)
         try:
             sys.path.remove(str(engine))
         except ValueError:
             pass
 
+    log = f"DouK 已处理作品 ID：{identifiers}"
+    verified, message, details = verify_output(
+        baseline,
+        output,
+        log=log,
+        identifiers=identifiers,
+    )
+    if not verified:
+        return False, message, "verification", details
+    reporter.emit("下载文件已完成校验。", progress=1.0, force=True)
+    return True, log, "", details
+
 
 def download(req: dict[str, Any]) -> dict[str, Any]:
     url = req.get("url") or ""
     platform = detect_platform(url)
     if platform == "unknown":
-        return response(req.get("id"), False, platform, "无法识别链接平台。")
+        return response(
+            req.get("id"),
+            False,
+            platform,
+            "无法识别链接平台。",
+            error_kind="unsupported",
+        )
 
     engine = resolve_engine(platform)
     if engine is None:
@@ -578,13 +661,29 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
             False,
             platform,
             "对应下载引擎不存在或未能完成初始化。",
+            error_kind="engine",
         )
 
     output_raw = req.get("outputDirectory") or str(
         Path.home() / "Downloads" / "SYDownload"
     )
     output = Path(output_raw).expanduser()
-    output.mkdir(parents=True, exist_ok=True)
+    try:
+        output.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return response(
+            req.get("id"),
+            False,
+            platform,
+            f"无法创建下载目录：{exc}",
+            error_kind="disk",
+        )
+
+    try:
+        timeout_seconds = float(req.get("timeoutSeconds") or 900)
+    except (TypeError, ValueError):
+        timeout_seconds = 900.0
+    timeout_seconds = min(max(timeout_seconds, 5.0), 24 * 60 * 60.0)
 
     name = ENGINE_NAMES[platform]
     path_key = "work_path" if platform == "xiaohongshu" else "root"
@@ -592,27 +691,49 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
 
     try:
         if platform == "xiaohongshu":
-            ok, log = run_xhs(engine, url, output)
+            ok, log, error_kind, verification = run_xhs(
+                engine,
+                url,
+                output,
+                req.get("id"),
+                timeout_seconds,
+            )
         else:
-            ok, log = asyncio.run(run_douk_in_process(engine, url, output))
+            ok, log, error_kind, verification = asyncio.run(
+                run_douk_in_process(
+                    engine,
+                    url,
+                    output,
+                    req.get("id"),
+                    timeout_seconds,
+                )
+            )
         capture_engine_settings(name, engine)
+        details: dict[str, Any] = {
+            "engine": engine,
+            "settings": stable_settings_path(name),
+            "output": output,
+            "log": log,
+            **verification,
+        }
+        if error_kind:
+            details["error_kind"] = error_kind
         return response(
             req.get("id"),
             ok,
             platform,
-            "下载调用完成。" if ok else "下载引擎返回失败。",
-            engine=engine,
-            settings=stable_settings_path(name),
-            output=output,
-            log=log,
+            "下载完成并已验证文件。" if ok else log or "下载引擎返回失败。",
+            **details,
         )
     except Exception as exc:
         capture_engine_settings(name, engine)
+        message = f"引擎调用异常：{exc}"
         return response(
             req.get("id"),
             False,
             platform,
-            f"引擎调用异常：{exc}",
+            message,
+            error_kind=classify_error(message),
             traceback=traceback.format_exc()[-5000:],
         )
 

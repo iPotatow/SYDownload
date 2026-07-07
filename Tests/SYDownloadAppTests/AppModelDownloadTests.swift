@@ -58,7 +58,12 @@ final class AppModelDownloadTests: XCTestCase {
     ) -> (AppModel, UserDefaults, String) {
         let suiteName = "SYDownload.AppModelDownloadTests.\(name).\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
-        let model = AppModel(userDefaults: defaults) { request in
+        let model = AppModel(
+            userDefaults: defaults,
+            bridgeStreamingSend: { request, _ in
+                try await recorder.handle(request)
+            }
+        ) { request in
             try await recorder.handle(request)
         }
         return (model, defaults, suiteName)
@@ -204,7 +209,8 @@ final class AppModelDownloadTests: XCTestCase {
         let validations = await recorder.requests(for: "validate")
         let downloads = await recorder.requests(for: "download")
         XCTAssertEqual(validations.map(\.url), [xhs, douyin])
-        XCTAssertEqual(downloads.map(\.url), [xhs, douyin])
+        XCTAssertEqual(Set(downloads.compactMap(\.url)), Set([xhs, douyin]))
+        XCTAssertEqual(downloads.count, 2)
         XCTAssertEqual(model.tasks.map(\.sourceURL), [xhs, douyin, unsupported, tiktok])
         XCTAssertEqual(model.tasks.count, 4)
         XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == unsupported })?.state, .failed)

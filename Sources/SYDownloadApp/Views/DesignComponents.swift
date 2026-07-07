@@ -273,6 +273,7 @@ struct StatusPill: View {
         case .downloading: return "arrow.down.circle.fill"
         case .completed: return "checkmark.circle.fill"
         case .failed: return "exclamationmark.triangle.fill"
+        case .cancelled: return "xmark.circle.fill"
         }
     }
 
@@ -282,6 +283,7 @@ struct StatusPill: View {
         case .downloading: return DesignSystem.accent
         case .completed: return DesignSystem.success
         case .failed: return DesignSystem.destructive
+        case .cancelled: return .secondary
         }
     }
 }
