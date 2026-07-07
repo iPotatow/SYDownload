@@ -10,7 +10,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 CONFIGURATION="${CONFIGURATION:-release}"
-APP_VERSION="${APP_VERSION:-0.2.0}"
+APP_VERSION="${APP_VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
 ADHOC_SIGN="${ADHOC_SIGN:-1}"
 BUNDLE_RUNTIME="${BUNDLE_RUNTIME:-1}"
 
@@ -18,26 +18,22 @@ swift build -c "$CONFIGURATION" --product SYDownload
 BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
 BIN="$BIN_DIR/SYDownload"
 APP="$ROOT/dist/SYDownload.app"
-RESOURCE="$ROOT/Sources/SYDownloadApp/Resources/SYDownloadIcon.png"
-RESOURCE_BUNDLE="$BIN_DIR/SYDownload_SYDownloadApp.bundle"
+RESOURCE_DIR="$ROOT/Sources/SYDownloadApp/Resources"
 
-if [[ ! -f "$RESOURCE" ]]; then
-  echo "Missing app icon resource: $RESOURCE" >&2
-  exit 3
-fi
-if [[ ! -d "$RESOURCE_BUNDLE" ]]; then
-  echo "Missing SwiftPM resource bundle: $RESOURCE_BUNDLE" >&2
-  exit 3
-fi
+for resource in SYDownloadIcon.png XiaohongshuPlatformIcon.jpg DouyinPlatformIcon.jpg; do
+  if [[ ! -f "$RESOURCE_DIR/$resource" ]]; then
+    echo "Missing app resource: $RESOURCE_DIR/$resource" >&2
+    exit 3
+  fi
+done
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/bridge"
 cp "$BIN" "$APP/Contents/MacOS/SYDownload"
 chmod +x "$APP/Contents/MacOS/SYDownload"
-# Keep the SwiftPM resource bundle in the standard signed app resources area.
-# AppMark resolves it explicitly instead of using Bundle.module at runtime.
-cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
-cp "$RESOURCE" "$APP/Contents/Resources/SYDownloadIcon.png"
+cp "$RESOURCE_DIR/SYDownloadIcon.png" "$APP/Contents/Resources/SYDownloadIcon.png"
+cp "$RESOURCE_DIR/XiaohongshuPlatformIcon.jpg" "$APP/Contents/Resources/XiaohongshuPlatformIcon.jpg"
+cp "$RESOURCE_DIR/DouyinPlatformIcon.jpg" "$APP/Contents/Resources/DouyinPlatformIcon.jpg"
 cp "$ROOT/Bridge/engine_bridge.py" "$APP/Contents/Resources/bridge/engine_bridge.py"
 cp "$ROOT/Bridge/download_runtime.py" "$APP/Contents/Resources/bridge/download_runtime.py"
 printf '%s\n' "$APP_VERSION" > "$APP/Contents/Resources/bundle-version.txt"

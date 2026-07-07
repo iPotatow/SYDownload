@@ -6,7 +6,7 @@ struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var version: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.3.0"
     }
 
     var body: some View {

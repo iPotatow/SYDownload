@@ -1,32 +1,59 @@
-name: Build macOS App
+name: Release SYDownload
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
     paths:
-      - Package.swift
-      - Sources/**
-      - Tests/**
-      - Bridge/**
-      - script/**
-      - .github/workflows/build-macos-app.yml
+      - VERSION
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Create or update the v<VERSION> GitHub Release"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: sydownload-macos-${{ github.ref }}
+  group: sydownload-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Tests
+  build:
+    name: Package SYDownload
     runs-on: macos-latest
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout
+      - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must use semantic versioning, for example 0.3.0. Got: $VERSION" >&2
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "$TAG" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match VERSION ($TAG)." >&2
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Toolchain
         run: |
@@ -41,15 +68,6 @@ jobs:
       - name: Python bridge tests
         run: python3 -m unittest discover -s Bridge/tests -p 'test_*.py'
 
-  build:
-    name: Build Apple Silicon
-    needs: test
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
@@ -58,17 +76,13 @@ jobs:
             script/bundle_runtime.sh
             .github/workflows/build-macos-app.yml
 
-      - name: Toolchain
-        run: |
-          uname -m
-          swift --version
-          uv --version
-          xcodebuild -version
+      - name: Install DMG tooling
+        run: brew install create-dmg
 
       - name: Build self-contained app
         env:
           CONFIGURATION: release
-          APP_VERSION: 0.2.${{ github.run_number }}
+          APP_VERSION: ${{ steps.version.outputs.version }}
           ADHOC_SIGN: 1
           BUNDLE_RUNTIME: 1
           PYTHON_VERSION: "3.12"
@@ -82,21 +96,25 @@ jobs:
         env:
           SYDOWNLOAD_APP_SUPPORT: ${{ runner.temp }}/SYDownload-AppSupport
           SYDOWNLOAD_CACHE: ${{ runner.temp }}/SYDownload-Cache
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           APP="dist/SYDownload.app"
           PYTHON="$APP/Contents/Resources/python/bin/python3"
           BRIDGE="$APP/Contents/Resources/bridge/engine_bridge.py"
-          RESOURCE_BUNDLE="$APP/Contents/Resources/SYDownload_SYDownloadApp.bundle"
 
           file "$APP/Contents/MacOS/SYDownload"
           "$PYTHON" --version
           plutil -lint "$APP/Contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "$VERSION"
           codesign --verify --deep --strict --verbose=2 "$APP"
 
           test -x "$PYTHON"
           test -f "$APP/Contents/Resources/bridge/download_runtime.py"
-          test -f "$RESOURCE_BUNDLE/SYDownloadIcon.png"
           test -f "$APP/Contents/Resources/SYDownloadIcon.png"
+          test -f "$APP/Contents/Resources/XiaohongshuPlatformIcon.jpg"
+          test -f "$APP/Contents/Resources/DouyinPlatformIcon.jpg"
+          test ! -e "$APP/SYDownload_SYDownloadApp.bundle"
+          test ! -e "$APP/Contents/Resources/SYDownload_SYDownloadApp.bundle"
           test -f "$APP/Contents/Resources/engines/XHS-Downloader/main.py"
           test -f "$APP/Contents/Resources/engines/TikTokDownloader/main.py"
           test -f "$APP/Contents/Resources/engine-manifest.json"
@@ -111,7 +129,7 @@ jobs:
           echo "$VALIDATE" | grep -q '"ok": true'
           test -f "$SYDOWNLOAD_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
 
-      - name: Launch smoke test
+      - name: Installed-app launch smoke test
         run: |
           APP="$PWD/dist/SYDownload.app"
           /usr/bin/open -n "$APP"
@@ -130,23 +148,104 @@ jobs:
             exit 1
           fi
 
-          sleep 2
+          sleep 5
           if ! /bin/kill -0 "$PID" 2>/dev/null; then
-            echo "SYDownload crashed during startup smoke test."
+            echo "SYDownload crashed during installed-app startup smoke test."
             exit 1
           fi
 
           /bin/kill "$PID" || true
 
-      - name: Archive app
+      - name: Package ZIP, DMG, and checksums
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
         run: |
-          cd dist
-          ditto -c -k --sequesterRsrc --keepParent SYDownload.app SYDownload-macOS-AppleSilicon.zip
+          set -euo pipefail
 
-      - name: Upload artifact
+          APP="$PWD/dist/SYDownload.app"
+          RELEASE_DIR="$RUNNER_TEMP/release"
+          CI_ARTIFACT_DIR="$RUNNER_TEMP/ci-artifact"
+
+          test -d "$APP"
+          rm -rf "$RELEASE_DIR" "$CI_ARTIFACT_DIR"
+          mkdir -p "$RELEASE_DIR" "$CI_ARTIFACT_DIR"
+
+          # Release ZIP: exactly one archive layer containing SYDownload.app.
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP" \
+            "$RELEASE_DIR/SYDownload.zip"
+
+          # GatePass-style DMG with Applications drop target and quarantine helper.
+          script/build_dmg.sh "$APP" "$VERSION" "$RELEASE_DIR"
+
+          (
+            cd "$RELEASE_DIR"
+            shasum -a 256 SYDownload.zip "SYDownload-$VERSION.dmg" > SHA256SUMS
+          )
+
+          # actions/upload-artifact is itself downloaded as a ZIP. Keep the
+          # release ZIP out of this directory so the Actions artifact is not
+          # a ZIP containing another ZIP.
+          ditto "$APP" "$CI_ARTIFACT_DIR/SYDownload.app"
+          cp "$RELEASE_DIR/SYDownload-$VERSION.dmg" "$CI_ARTIFACT_DIR/"
+
+      - name: Verify release packages
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RELEASE_DIR="$RUNNER_TEMP/release"
+          ZIP="$RELEASE_DIR/SYDownload.zip"
+          DMG="$RELEASE_DIR/SYDownload-$VERSION.dmg"
+          ZIP_EXTRACT="$RUNNER_TEMP/zip-verify"
+          DMG_MOUNT="$RUNNER_TEMP/dmg-mount"
+
+          test -s "$ZIP"
+          test -s "$DMG"
+          test -s "$RELEASE_DIR/SHA256SUMS"
+
+          rm -rf "$ZIP_EXTRACT" "$DMG_MOUNT"
+          mkdir -p "$ZIP_EXTRACT" "$DMG_MOUNT"
+          ditto -xk "$ZIP" "$ZIP_EXTRACT"
+          test -d "$ZIP_EXTRACT/SYDownload.app"
+          test ! -f "$ZIP_EXTRACT/SYDownload.zip"
+          codesign --verify --deep --strict "$ZIP_EXTRACT/SYDownload.app"
+
+          hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$DMG_MOUNT"
+          trap 'hdiutil detach "$DMG_MOUNT" >/dev/null 2>&1 || true' EXIT
+          test -d "$DMG_MOUNT/SYDownload.app"
+          test -L "$DMG_MOUNT/Applications"
+          test -f "$DMG_MOUNT/解除隔离.command"
+          codesign --verify --deep --strict "$DMG_MOUNT/SYDownload.app"
+          hdiutil detach "$DMG_MOUNT"
+          trap - EXIT
+
+          (
+            cd "$RELEASE_DIR"
+            shasum -a 256 -c SHA256SUMS
+          )
+
+      - name: Upload CI package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: SYDownload-macOS-AppleSilicon
-          path: dist/SYDownload-macOS-AppleSilicon.zip
+          name: SYDownload-${{ steps.version.outputs.version }}
+          path: ${{ runner.temp }}/ci-artifact
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push' || inputs.publish_release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: SYDownload ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ runner.temp }}/release/SYDownload.zip
+            ${{ runner.temp }}/release/SYDownload-${{ steps.version.outputs.version }}.dmg
+            ${{ runner.temp }}/release/SHA256SUMS
