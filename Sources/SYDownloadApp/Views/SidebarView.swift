@@ -15,12 +15,14 @@ struct SidebarView: View {
                 sidebarButton(.history, title: "历史记录", systemImage: "clock.arrow.circlepath")
 
                 Divider()
+                    .overlay(DesignSystem.divider)
                     .padding(.horizontal, DesignSystem.spaceM)
                     .padding(.vertical, DesignSystem.spaceS)
 
                 sidebarButton(.photos, title: "照片整理", systemImage: "photo.on.rectangle.angled")
 
                 Divider()
+                    .overlay(DesignSystem.divider)
                     .padding(.horizontal, DesignSystem.spaceM)
                     .padding(.vertical, DesignSystem.spaceS)
 
@@ -31,16 +33,17 @@ struct SidebarView: View {
             Spacer(minLength: DesignSystem.spaceXL)
         }
         .padding(.top, DesignSystem.sidebarTitlebarClearance)
-        .padding(.horizontal, DesignSystem.spaceS)
-        .padding(.bottom, DesignSystem.spaceS)
+        .padding(.horizontal, DesignSystem.sidebarPadding)
+        .padding(.bottom, DesignSystem.sidebarPadding)
     }
 
     private var brand: some View {
         HStack(spacing: DesignSystem.spaceS) {
-            AppMark(size: 40)
+            AppMark(size: DesignSystem.sidebarBrandLogoSize)
 
             Text("SYDownload")
-                .font(.system(size: 15, weight: .semibold))
+                .syTypography(DesignSystem.typographyBrand)
+                .foregroundStyle(DesignSystem.textPrimary)
 
             Spacer(minLength: 0)
         }
@@ -61,12 +64,13 @@ struct SidebarView: View {
         } label: {
             HStack(spacing: DesignSystem.spaceS) {
                 Image(systemName: systemImage)
-                    .font(.system(size: DesignSystem.sidebarNavigationIconSize, weight: .semibold))
+                    .font(.system(size: DesignSystem.sidebarNavigationIconSize, weight: .medium))
                     .frame(width: DesignSystem.sidebarNavigationIconSize)
-                    .foregroundStyle(selected ? DesignSystem.sidebarAccentForeground : Color.secondary)
+                    .foregroundStyle(selected ? DesignSystem.accent : DesignSystem.textSecondary)
 
                 Text(title)
-                    .foregroundStyle(selected ? DesignSystem.sidebarAccentForeground : Color.primary)
+                    .syTypography(DesignSystem.typographyControl)
+                    .foregroundStyle(DesignSystem.textPrimary)
 
                 Spacer(minLength: 0)
             }

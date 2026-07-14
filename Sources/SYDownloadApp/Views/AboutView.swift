@@ -14,9 +14,8 @@ struct AboutView: View {
             header
 
             Text("自动识别分享链接，并调用内置下载引擎。轻量、直接，内容始终写入你选择的文件夹。")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .lineSpacing(DesignSystem.spaceXS)
+                .syTypography(DesignSystem.typographyBody)
+                .foregroundStyle(DesignSystem.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             capabilityRow
@@ -25,6 +24,7 @@ struct AboutView: View {
                 Button("打开 GitHub 仓库", systemImage: "arrow.up.right", action: openRepository)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .font(DesignSystem.uiFont)
 
                 HStack(spacing: DesignSystem.spaceL) {
                     linkButton("问题反馈", symbol: "bubble.left.and.exclamationmark.bubble.right", url: "https://github.com/iPotatow/SYdownload/issues")
@@ -35,14 +35,16 @@ struct AboutView: View {
             Spacer(minLength: 0)
 
             Divider()
+                .overlay(DesignSystem.divider)
 
             HStack {
                 Text("基于 XHS-Downloader 和 TikTokDownloader 构建")
+                    .syTypography(DesignSystem.typographyCaption)
                 Spacer()
                 Text("GPL-3.0")
+                    .syTypography(DesignSystem.typographyCaption)
             }
-            .font(.caption)
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(DesignSystem.textTertiary)
         }
         .padding(DesignSystem.spaceXL)
         .frame(width: 500)
@@ -57,16 +59,17 @@ struct AboutView: View {
             AppMark(size: 56)
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text("SYDownload")
-                    .font(.title2.weight(.semibold))
+                    .syTypography(DesignSystem.typographySectionTitle)
+                    .foregroundStyle(DesignSystem.textPrimary)
                 Text("小红书与抖音下载工具 · v\(version)")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+                    .syTypography(DesignSystem.typographyBody)
+                    .foregroundStyle(DesignSystem.textSecondary)
             }
             Spacer(minLength: DesignSystem.spaceL)
             Button("关闭", systemImage: "xmark", action: dismiss.callAsFunction)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.textSecondary)
                 .help("关闭")
         }
     }
@@ -88,17 +91,18 @@ struct AboutView: View {
             IconBadge(systemImage: systemImage, tint: tint, size: 36)
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text(title)
-                    .font(.callout.weight(.semibold))
+                    .syTypography(DesignSystem.typographyControl)
+                    .foregroundStyle(DesignSystem.textPrimary)
                 Text(message)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .syTypography(DesignSystem.typographyBody)
+                    .foregroundStyle(DesignSystem.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(DesignSystem.spaceM)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            DesignSystem.rowBackground,
+            DesignSystem.controlBackground,
             in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
         )
     }
@@ -108,7 +112,8 @@ struct AboutView: View {
             open(url)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.primary)
+        .font(DesignSystem.uiFont)
+        .foregroundStyle(DesignSystem.textPrimary)
     }
 
     private func openRepository() {

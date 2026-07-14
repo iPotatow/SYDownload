@@ -7,41 +7,33 @@ struct DownloadView: View {
     @FocusState private var linkEditorFocused: Bool
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
-                header
-                composer
-                statusLine
+        PageContainer(title: "下载") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                    composer
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, DesignSystem.spaceL)
             }
-            .padding(.horizontal, DesignSystem.contentPadding)
-            .padding(.top, DesignSystem.contentPadding)
-            .padding(.bottom, DesignSystem.space2XL)
-            .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
         }
         .onChange(of: model.input) { _, _ in model.detectLocally() }
-        .tint(DesignSystem.accent)
-    }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: DesignSystem.spaceL) {
-            PageHeader(
-                title: "下载",
-                subtitle: "可一次粘贴多个链接或分享文本，支持小红书与抖音。"
-            )
-
-            Spacer(minLength: 0)
+        .onReceive(NotificationCenter.default.publisher(for: .syDownloadFocusDownloadInput)) { _ in
+            linkEditorFocused = true
         }
+        .tint(DesignSystem.accent)
     }
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
             Text("下载链接")
-                .font(.headline)
+                .syTypography(DesignSystem.typographySectionTitle)
+                .foregroundStyle(DesignSystem.textPrimary)
 
             TextField("粘贴一个或多个链接 / 完整分享文本…", text: $model.input, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
+                .font(DesignSystem.bodyFont)
                 .lineLimit(8...12)
+                .frame(height: DesignSystem.downloadComposerHeight, alignment: .topLeading)
                 .focused($linkEditorFocused)
                 .accessibilityLabel("下载链接")
 
@@ -60,48 +52,54 @@ struct DownloadView: View {
                 if !model.input.isEmpty {
                     Button("清空", systemImage: "xmark", action: model.clearInput)
                         .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
+                        .font(DesignSystem.uiFont)
+                        .frame(height: DesignSystem.controlHeightCompact)
+                        .foregroundStyle(DesignSystem.textSecondary)
                 }
             }
 
-            Divider()
-
             HStack(spacing: DesignSystem.spaceM) {
-                Label(platformStatus, systemImage: "link")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                if shouldShowStatus {
+                    statusIndicator
+                }
 
-                Spacer(minLength: DesignSystem.spaceS)
+                Spacer(minLength: DesignSystem.spaceM)
 
                 Button("检查链接", systemImage: "checkmark.circle", action: validate)
-                    .buttonStyle(.borderless)
-                    .disabled(
-                        !model.hasSupportedLinks
-                            || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            || model.isWorking
-                            || model.isParsing
-                    )
-            }
+                    .buttonStyle(.bordered)
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
+                    .disabled(actionsDisabled)
 
-            HStack {
-                Spacer()
                 Button(downloadButtonTitle, systemImage: "arrow.down", action: download)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightLarge)
                     .keyboardShortcut(.return, modifiers: [.command])
-                    .disabled(
-                        !model.hasSupportedLinks
-                            || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            || model.isWorking
-                            || model.isParsing
-                    )
+                    .disabled(actionsDisabled)
             }
         }
     }
 
+    private var shouldShowStatus: Bool {
+        !model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || model.isParsing
+            || model.isWorking
+            || !model.validatedInput.isEmpty
+            || model.statusIsError
+    }
+
+    private var actionsDisabled: Bool {
+        !model.hasSupportedLinks
+            || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || model.isWorking
+            || model.isParsing
+    }
+
     private var platformStatus: String {
         if model.detectedLinks.isEmpty {
-            return model.input.isEmpty ? "等待识别平台" : "暂未识别到链接"
+            return "暂未识别到链接"
         }
         if model.supportedLinkCount == 0 {
             return "识别到 \(model.detectedLinks.count) 个链接，但没有支持的平台"
@@ -117,13 +115,26 @@ struct DownloadView: View {
         return result
     }
 
+    private var visibleStatus: String {
+        if model.isParsing {
+            return "正在检查链接…"
+        }
+        if model.isWorking {
+            return model.status
+        }
+        if model.statusIsError || !model.validatedInput.isEmpty {
+            return model.status
+        }
+        return platformStatus
+    }
+
     private var downloadButtonTitle: String {
         model.supportedLinkCount > 1
             ? "开始下载 \(model.supportedLinkCount) 项"
             : "开始下载"
     }
 
-    private var statusLine: some View {
+    private var statusIndicator: some View {
         HStack(spacing: DesignSystem.spaceS) {
             if model.isParsing || model.isWorking {
                 ProgressView()
@@ -133,33 +144,30 @@ struct DownloadView: View {
                     .foregroundStyle(statusColor)
             }
 
-            Text(model.status)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Text(visibleStatus)
+                .syTypography(DesignSystem.typographyBody)
+                .foregroundStyle(model.statusIsError ? DesignSystem.semanticDanger : DesignSystem.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: DesignSystem.spaceS)
-
-            if let engine = model.lastDetails["engine"] {
+            if let engine = model.lastDetails["engine"], !model.isParsing {
                 Text(URL(fileURLWithPath: engine).lastPathComponent)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.tertiary)
+                    .font(DesignSystem.metadataFont.monospaced())
+                    .foregroundStyle(DesignSystem.textTertiary)
             }
         }
-        .padding(.horizontal, DesignSystem.spaceXS)
         .accessibilityElement(children: .combine)
     }
 
     private var statusSymbol: String {
         if model.statusIsError { return "exclamationmark.triangle.fill" }
-        if !model.hasSupportedLinks { return "info.circle" }
-        return model.validatedInput.isEmpty ? "link" : "checkmark.circle.fill"
+        if !model.validatedInput.isEmpty { return "checkmark.circle.fill" }
+        return "link"
     }
 
     private var statusColor: Color {
-        if model.statusIsError { return DesignSystem.destructive }
-        if !model.hasSupportedLinks { return .secondary }
-        return model.validatedInput.isEmpty ? DesignSystem.accent : DesignSystem.success
+        if model.statusIsError { return DesignSystem.semanticDanger }
+        if !model.validatedInput.isEmpty { return DesignSystem.semanticSuccess }
+        return DesignSystem.accent
     }
 
     private func validate() {

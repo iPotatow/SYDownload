@@ -1,17 +1,24 @@
-name: Release SYDownload
+name: SYDownload CI / Release
 
 on:
   push:
     branches:
       - main
     paths:
+      - Sources/**
+      - Tests/**
+      - Bridge/**
+      - script/**
+      - Package.swift
+      - Package.resolved
       - VERSION
+      - .github/workflows/build-macos-app.yml
     tags:
       - "v*"
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "Create or update the v<VERSION> GitHub Release"
+        description: "Create the v<VERSION> GitHub Release if it does not exist"
         required: true
         default: false
         type: boolean
@@ -20,12 +27,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: sydownload-release-${{ github.ref }}
+  group: sydownload-ci-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Package SYDownload
+    name: Build and package SYDownload
     runs-on: macos-latest
     timeout-minutes: 30
 
@@ -35,14 +42,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve release version
+      - name: Resolve version
         id: version
         shell: bash
         run: |
+          set -euo pipefail
           VERSION="$(tr -d '[:space:]' < VERSION)"
 
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "VERSION must use semantic versioning, for example 0.3.0. Got: $VERSION" >&2
+            echo "VERSION must use semantic versioning, for example 0.3.3. Got: $VERSION" >&2
             exit 1
           fi
 
@@ -54,6 +62,43 @@ jobs:
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Determine release intent
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHOULD_PUBLISH=false
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_TYPE" == "tag" ]]; then
+            SHOULD_PUBLISH=true
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "${{ inputs.publish_release }}" == "true" ]]; then
+            SHOULD_PUBLISH=true
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_TYPE" == "branch" && "$GITHUB_REF_NAME" == "main" ]]; then
+            if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              SHOULD_PUBLISH=true
+            fi
+          fi
+
+          if [[ "$SHOULD_PUBLISH" == "true" ]]; then
+            if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+              TAG_COMMIT="$(git rev-list -n 1 "$TAG")"
+              if [[ "$TAG_COMMIT" != "$GITHUB_SHA" ]]; then
+                echo "Tag $TAG already points to $TAG_COMMIT instead of $GITHUB_SHA." >&2
+                exit 1
+              fi
+            fi
+
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "Release $TAG already exists; SYDownload releases are immutable." >&2
+              exit 1
+            fi
+          fi
+
+          echo "should_publish=$SHOULD_PUBLISH" >> "$GITHUB_OUTPUT"
 
       - name: Toolchain
         run: |
@@ -96,6 +141,7 @@ jobs:
         env:
           SYDOWNLOAD_APP_SUPPORT: ${{ runner.temp }}/SYDownload-AppSupport
           SYDOWNLOAD_CACHE: ${{ runner.temp }}/SYDownload-Cache
+          PYTHONDONTWRITEBYTECODE: "1"
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           APP="dist/SYDownload.app"
@@ -120,16 +166,18 @@ jobs:
           test -f "$APP/Contents/Resources/engine-manifest.json"
           test -z "$(find "$APP" -type l -print -quit)"
 
-          PING="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000001","command":"ping"}' | "$PYTHON" "$BRIDGE" --once)"
+          PING="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000001","command":"ping"}' | "$PYTHON" -B "$BRIDGE" --once)"
           echo "$PING"
           echo "$PING" | grep -q '"ok": true'
 
-          VALIDATE="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000002","command":"validate","url":"https://xhslink.com/ci-smoke-test"}' | "$PYTHON" "$BRIDGE" --once)"
+          VALIDATE="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000002","command":"validate","url":"https://xhslink.com/ci-smoke-test"}' | "$PYTHON" -B "$BRIDGE" --once)"
           echo "$VALIDATE"
           echo "$VALIDATE" | grep -q '"ok": true'
           test -f "$SYDOWNLOAD_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
 
       - name: Installed-app launch smoke test
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
         run: |
           APP="$PWD/dist/SYDownload.app"
           /usr/bin/open -n "$APP"
@@ -156,6 +204,14 @@ jobs:
 
           /bin/kill "$PID" || true
 
+      - name: Reseal app after smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$PWD/dist/SYDownload.app"
+          /usr/bin/codesign --force --deep --sign - "$APP"
+          /usr/bin/codesign --verify --deep --strict --verbose=4 "$APP"
+
       - name: Package ZIP, DMG, and checksums
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -168,15 +224,14 @@ jobs:
           CI_ARTIFACT_DIR="$RUNNER_TEMP/ci-artifact"
 
           test -d "$APP"
+          /usr/bin/codesign --verify --deep --strict --verbose=4 "$APP"
           rm -rf "$RELEASE_DIR" "$CI_ARTIFACT_DIR"
           mkdir -p "$RELEASE_DIR" "$CI_ARTIFACT_DIR"
 
-          # Release ZIP: exactly one archive layer containing SYDownload.app.
           ditto -c -k --sequesterRsrc --keepParent \
             "$APP" \
             "$RELEASE_DIR/SYDownload.zip"
 
-          # GatePass-style DMG with Applications drop target and quarantine helper.
           script/build_dmg.sh "$APP" "$VERSION" "$RELEASE_DIR"
 
           (
@@ -184,9 +239,6 @@ jobs:
             shasum -a 256 SYDownload.zip "SYDownload-$VERSION.dmg" > SHA256SUMS
           )
 
-          # actions/upload-artifact is itself downloaded as a ZIP. Keep the
-          # release ZIP out of this directory so the Actions artifact is not
-          # a ZIP containing another ZIP.
           ditto "$APP" "$CI_ARTIFACT_DIR/SYDownload.app"
           cp "$RELEASE_DIR/SYDownload-$VERSION.dmg" "$CI_ARTIFACT_DIR/"
 
@@ -212,14 +264,14 @@ jobs:
           ditto -xk "$ZIP" "$ZIP_EXTRACT"
           test -d "$ZIP_EXTRACT/SYDownload.app"
           test ! -f "$ZIP_EXTRACT/SYDownload.zip"
-          codesign --verify --deep --strict "$ZIP_EXTRACT/SYDownload.app"
+          codesign --verify --deep --strict --verbose=4 "$ZIP_EXTRACT/SYDownload.app"
 
           hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$DMG_MOUNT"
           trap 'hdiutil detach "$DMG_MOUNT" >/dev/null 2>&1 || true' EXIT
           test -d "$DMG_MOUNT/SYDownload.app"
           test -L "$DMG_MOUNT/Applications"
-          test -f "$DMG_MOUNT/解除隔离.command"
-          codesign --verify --deep --strict "$DMG_MOUNT/SYDownload.app"
+          test -x "$DMG_MOUNT/Install.command"
+          codesign --verify --deep --strict --verbose=4 "$DMG_MOUNT/SYDownload.app"
           hdiutil detach "$DMG_MOUNT"
           trap - EXIT
 
@@ -236,16 +288,32 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish GitHub Release
-        if: github.event_name == 'push' || inputs.publish_release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+      - name: Create release tag
+        if: steps.release.outputs.should_publish == 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            exit 0
+          fi
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+
+      - name: Publish immutable GitHub Release
+        if: steps.release.outputs.should_publish == 'true'
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: SYDownload ${{ steps.version.outputs.version }}
           generate_release_notes: true
           fail_on_unmatched_files: true
+          overwrite_files: false
           files: |
             ${{ runner.temp }}/release/SYDownload.zip
             ${{ runner.temp }}/release/SYDownload-${{ steps.version.outputs.version }}.dmg
             ${{ runner.temp }}/release/SHA256SUMS
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

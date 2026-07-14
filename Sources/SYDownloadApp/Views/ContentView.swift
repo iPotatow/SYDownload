@@ -5,7 +5,6 @@ struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @FocusState private var focusedSection: AppSection?
     @State private var showsAbout = false
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @AppStorage("preferredAppearance") private var preferredAppearance = "跟随系统"
 
     var body: some View {
@@ -38,23 +37,24 @@ struct ContentView: View {
                 .clipShape(
                     RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
                 )
-                .overlay {
-                    if colorSchemeContrast == .increased {
-                        RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
-                            .stroke(DesignSystem.hairline, lineWidth: 1)
-                    }
-                }
+                .syContentSurfaceShadow()
                 .padding(DesignSystem.mainSurfaceInsets)
-                .clipped()
         }
-        .frame(minWidth: 960, minHeight: 680, alignment: .topLeading)
-        .background(DesignSystem.sidebarBackground)
+        .frame(
+            minWidth: DesignSystem.windowWidth,
+            minHeight: DesignSystem.windowHeight,
+            alignment: .topLeading
+        )
+        .background(DesignSystem.windowBackground)
         .ignoresSafeArea(.container, edges: .top)
         .tint(DesignSystem.accent)
         .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadNewDownload)) { _ in
             model.selection = .download
             focusedSection = .download
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadShowAbout)) { _ in
             showsAbout = true
