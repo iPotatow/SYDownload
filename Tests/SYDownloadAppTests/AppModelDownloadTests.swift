@@ -74,7 +74,7 @@ final class AppModelDownloadTests: XCTestCase {
         command: String,
         count: Int
     ) async {
-        for _ in 0..<100 {
+        for _ in 0..<200 {
             if await recorder.requests(for: command).count >= count { return }
             try? await Task.sleep(for: .milliseconds(5))
         }
@@ -93,7 +93,6 @@ final class AppModelDownloadTests: XCTestCase {
         let first = Task { await model.runDownload() }
         await waitForRequestCount(recorder, command: "download", count: 1)
 
-        // The first download is still in flight, so a repeated click must be ignored.
         let second = Task { await model.runDownload() }
         await second.value
         await downloadGate.open()
@@ -101,6 +100,7 @@ final class AppModelDownloadTests: XCTestCase {
 
         let requests = await recorder.requests
         XCTAssertEqual(requests.filter { $0.command == "validate" }.count, 1)
+        XCTAssertEqual(requests.filter { $0.command == "settings_update" }.count, 1)
         XCTAssertEqual(requests.filter { $0.command == "download" }.count, 1)
     }
 
@@ -118,28 +118,36 @@ final class AppModelDownloadTests: XCTestCase {
         XCTAssertEqual(model.validatedInput, "")
     }
 
-    func testInputChangedWhileValidationAwaitsDoesNotDownloadNewURL() async {
+    func testInputChangedWhileBatchPreflightAwaitsKeepsOriginalBatch() async {
         let recorder = RequestRecorder()
         let gate = TestGate()
         await recorder.setValidateGate(gate)
         let (model, defaults, suiteName) = makeModel(recorder: recorder)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        model.input = "https://www.xiaohongshu.com/explore/old"
+        let original = "https://www.xiaohongshu.com/explore/old"
+        model.input = original
         model.detectLocally()
         let run = Task { await model.runDownload() }
         await waitForRequestCount(recorder, command: "validate", count: 1)
+
+        XCTAssertEqual(model.tasks.count, 1)
+        XCTAssertEqual(model.tasks.first?.sourceURL, original)
+        XCTAssertEqual(model.tasks.first?.state, .queued)
 
         model.input = "https://www.xiaohongshu.com/explore/new"
         await gate.open()
         await run.value
 
-        let downloads = await recorder.requests(for: "download").count
-        XCTAssertEqual(downloads, 0)
-        XCTAssertTrue(model.tasks.isEmpty)
+        let downloads = await recorder.requests(for: "download")
+        XCTAssertEqual(downloads.map(\.url), [original])
+        XCTAssertEqual(model.tasks.count, 1)
+        XCTAssertEqual(model.tasks.first?.sourceURL, original)
+        XCTAssertEqual(model.tasks.first?.state, .completed)
+        XCTAssertEqual(model.validatedInput, "")
     }
 
-    func testOutputDirectoryIsSnapshottedBeforeValidationAndUsedInHistory() async {
+    func testOutputDirectoryUsesSelectedFolderAsEngineFolderAndHistoryTarget() async throws {
         let recorder = RequestRecorder()
         let gate = TestGate()
         await recorder.setValidateGate(gate)
@@ -157,9 +165,17 @@ final class AppModelDownloadTests: XCTestCase {
         await gate.open()
         await run.value
 
-        let download = await recorder.requests(for: "download").first
-        XCTAssertEqual(download?.outputDirectory, originalDirectory)
+        let downloads = await recorder.requests(for: "download")
+        let download = downloads.first
+        XCTAssertEqual(download?.outputDirectory, "/tmp")
         XCTAssertEqual(model.history.first?.outputDirectory, originalDirectory)
+
+        let settingsRequests = await recorder.requests(for: "settings_update")
+        let settingsRequest = try XCTUnwrap(settingsRequests.first)
+        let settingsJSON = try XCTUnwrap(settingsRequest.settingsJSON)
+        let data = try XCTUnwrap(settingsJSON.data(using: .utf8))
+        let values = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: String])
+        XCTAssertEqual(values["folder_name"], "SYDownload-original")
     }
 
     func testStaleValidationErrorDoesNotOverwriteCurrentStatus() async {
@@ -209,6 +225,7 @@ final class AppModelDownloadTests: XCTestCase {
         let validations = await recorder.requests(for: "validate")
         let downloads = await recorder.requests(for: "download")
         XCTAssertEqual(validations.map(\.url), [xhs, douyin])
+        XCTAssertEqual(validations.count, 2)
         XCTAssertEqual(Set(downloads.compactMap(\.url)), Set([xhs, douyin]))
         XCTAssertEqual(downloads.count, 2)
         XCTAssertEqual(model.tasks.map(\.sourceURL), [xhs, douyin, unsupported, tiktok])
@@ -219,7 +236,7 @@ final class AppModelDownloadTests: XCTestCase {
         XCTAssertEqual(model.status, "批量下载完成：2 成功，2 失败")
     }
 
-    func testValidationFailureDoesNotBlockOtherLinks() async {
+    func testValidationFailureDoesNotBlockOtherPlatform() async {
         let recorder = RequestRecorder()
         let (model, defaults, suiteName) = makeModel(recorder: recorder)
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -237,6 +254,37 @@ final class AppModelDownloadTests: XCTestCase {
         XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == accepted })?.state, .completed)
         XCTAssertEqual(model.history.map(\.sourceURL), [accepted])
         XCTAssertEqual(model.status, "批量下载完成：1 成功，1 失败")
+    }
+
+    func testLargeSamePlatformBatchCreatesTasksBeforeSinglePreflightCompletes() async {
+        let recorder = RequestRecorder()
+        let gate = TestGate()
+        await recorder.setValidateGate(gate)
+        let (model, defaults, suiteName) = makeModel(recorder: recorder)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let links = (0..<100).map { "https://xhslink.com/batch-\($0)" }
+        model.input = links.joined(separator: "\n")
+
+        let run = Task { await model.runDownload() }
+        await waitForRequestCount(recorder, command: "validate", count: 1)
+
+        XCTAssertEqual(model.tasks.count, 100)
+        XCTAssertEqual(model.selection, .tasks)
+        XCTAssertEqual(model.tasks.filter { $0.state == .queued }.count, 100)
+        let validationsWhileWaiting = await recorder.requests(for: "validate")
+        XCTAssertEqual(validationsWhileWaiting.count, 1)
+
+        await gate.open()
+        await run.value
+
+        let validations = await recorder.requests(for: "validate")
+        let settingsUpdates = await recorder.requests(for: "settings_update")
+        let downloads = await recorder.requests(for: "download")
+        XCTAssertEqual(validations.count, 1)
+        XCTAssertEqual(settingsUpdates.count, 1)
+        XCTAssertEqual(downloads.count, 100)
+        XCTAssertEqual(model.tasks.filter { $0.state == .completed }.count, 100)
     }
 }
 

@@ -30,10 +30,16 @@ struct DownloadView: View {
                 .foregroundStyle(DesignSystem.textPrimary)
 
             TextField("粘贴一个或多个链接 / 完整分享文本…", text: $model.input, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
                 .font(DesignSystem.bodyFont)
                 .lineLimit(8...12)
+                .padding(.horizontal, DesignSystem.controlHorizontalPadding)
+                .padding(.vertical, DesignSystem.spaceS)
                 .frame(height: DesignSystem.downloadComposerHeight, alignment: .topLeading)
+                .syInputSurface(
+                    isFocused: linkEditorFocused,
+                    isError: inputShowsError
+                )
                 .focused($linkEditorFocused)
                 .accessibilityLabel("下载链接")
 
@@ -58,9 +64,16 @@ struct DownloadView: View {
                 }
             }
 
+            Divider()
+                .overlay(DesignSystem.divider)
+
             HStack(spacing: DesignSystem.spaceM) {
                 if shouldShowStatus {
                     statusIndicator
+                } else {
+                    Text("支持小红书与抖音链接，可一次粘贴多个。")
+                        .syTypography(DesignSystem.typographyCaption)
+                        .foregroundStyle(DesignSystem.textTertiary)
                 }
 
                 Spacer(minLength: DesignSystem.spaceM)
@@ -80,6 +93,13 @@ struct DownloadView: View {
                     .disabled(actionsDisabled)
             }
         }
+    }
+
+    private var inputShowsError: Bool {
+        !model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && model.statusIsError
+            && !model.isParsing
+            && !model.isWorking
     }
 
     private var shouldShowStatus: Bool {
@@ -129,7 +149,8 @@ struct DownloadView: View {
     }
 
     private var downloadButtonTitle: String {
-        model.supportedLinkCount > 1
+        if model.isWorking { return "正在下载…" }
+        return model.supportedLinkCount > 1
             ? "开始下载 \(model.supportedLinkCount) 项"
             : "开始下载"
     }

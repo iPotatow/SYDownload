@@ -8,6 +8,8 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case xhs = "小红书"
     case douyin = "抖音"
     case advanced = "高级"
+    case update = "更新"
+    case about = "关于"
 
     var id: String { rawValue }
 
@@ -17,7 +19,245 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .xhs: return "book.pages"
         case .douyin: return "music.note"
         case .advanced: return "wrench.and.screwdriver"
+        case .update: return "arrow.triangle.2.circlepath"
+        case .about: return "info.circle"
         }
+    }
+}
+
+private enum SettingsFocusField: Hashable {
+    case xhsCookie
+    case douyinCookie
+}
+
+private struct SettingsChoice<Value: Hashable>: Identifiable {
+    let id: String
+    let value: Value
+    let title: String
+
+    init(_ id: String, value: Value, title: String) {
+        self.id = id
+        self.value = value
+        self.title = title
+    }
+}
+
+private struct SettingsPopupSelector<Value: Hashable>: View {
+    let title: String
+    @Binding var selection: Value
+    let choices: [SettingsChoice<Value>]
+
+    private var selectedTitle: String {
+        choices.first(where: { $0.value == selection })?.title ?? "未选择"
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(choices) { choice in
+                Button {
+                    selection = choice.value
+                } label: {
+                    if choice.value == selection {
+                        Label(choice.title, systemImage: "checkmark")
+                    } else {
+                        Text(choice.title)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: DesignSystem.spaceS) {
+                Text(selectedTitle)
+                    .syTypography(DesignSystem.typographyBody)
+                    .foregroundStyle(DesignSystem.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: DesignSystem.spaceS)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(DesignSystem.supportingFont)
+                    .foregroundStyle(DesignSystem.textSecondary)
+            }
+            .padding(.horizontal, DesignSystem.controlHorizontalPadding)
+            .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            .background(
+                DesignSystem.controlBackground,
+                in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                    .strokeBorder(DesignSystem.border, lineWidth: DesignSystem.borderWidth)
+            }
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault, alignment: .trailing)
+        .accessibilityLabel(title)
+        .accessibilityValue(selectedTitle)
+    }
+}
+
+private struct NameFormatOption: Identifiable, Hashable {
+    let rawValue: String
+    let title: String
+    var id: String { rawValue }
+}
+
+private struct NameFormatSelector: View {
+    let title: String
+    @Binding var value: String
+    let options: [NameFormatOption]
+    let fallback: [String]
+    @State private var isPresented = false
+
+    private var validValues: Set<String> { Set(options.map(\.rawValue)) }
+
+    private var selectedTokens: [String] {
+        let parsed = value.split(whereSeparator: \.isWhitespace).map(String.init)
+        var seen = Set<String>()
+        let valid = parsed.filter { validValues.contains($0) && seen.insert($0).inserted }
+        return valid.isEmpty ? fallback : valid
+    }
+
+    private var selectedSummary: String {
+        let labels = selectedTokens.compactMap { token in
+            options.first(where: { $0.rawValue == token })?.title
+        }
+        return labels.joined(separator: " · ")
+    }
+
+    var body: some View {
+        Button {
+            isPresented.toggle()
+        } label: {
+            HStack(spacing: DesignSystem.spaceS) {
+                Text(selectedSummary)
+                    .syTypography(DesignSystem.typographyBody)
+                    .foregroundStyle(DesignSystem.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: DesignSystem.spaceS)
+                Image(systemName: "chevron.down")
+                    .font(DesignSystem.supportingFont)
+                    .foregroundStyle(DesignSystem.textSecondary)
+            }
+            .padding(.horizontal, DesignSystem.controlHorizontalPadding)
+            .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            .background(
+                DesignSystem.controlBackground,
+                in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                    .strokeBorder(DesignSystem.border, lineWidth: DesignSystem.borderWidth)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault, alignment: .trailing)
+        .popover(isPresented: $isPresented) {
+            nameFormatPopover
+        }
+        .accessibilityLabel(title)
+        .accessibilityValue(selectedSummary)
+    }
+
+    private var nameFormatPopover: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+                Text(title)
+                    .syTypography(DesignSystem.typographySectionTitle)
+                    .foregroundStyle(DesignSystem.textPrimary)
+                Text("至少保留一个字段；已选字段可用右侧箭头调整文件名顺序。")
+                    .syTypography(DesignSystem.typographyCaption)
+                    .foregroundStyle(DesignSystem.textSecondary)
+            }
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(options) { option in
+                        optionRow(option)
+                    }
+                }
+            }
+            .frame(maxHeight: 360)
+        }
+        .padding(DesignSystem.spaceL)
+        .frame(width: 380)
+    }
+
+    private func optionRow(_ option: NameFormatOption) -> some View {
+        let tokens = selectedTokens
+        let selected = tokens.contains(option.rawValue)
+        let selectedIndex = tokens.firstIndex(of: option.rawValue)
+
+        return HStack(spacing: DesignSystem.spaceS) {
+            Button {
+                toggle(option.rawValue)
+            } label: {
+                HStack(spacing: DesignSystem.spaceS) {
+                    Image(systemName: selected ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(selected ? DesignSystem.accent : DesignSystem.textSecondary)
+                    Text(option.title)
+                        .syTypography(DesignSystem.typographyBody)
+                        .foregroundStyle(DesignSystem.textPrimary)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(selected && tokens.count == 1)
+
+            if let selectedIndex {
+                Button {
+                    move(option.rawValue, offset: -1)
+                } label: {
+                    Image(systemName: "chevron.up")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(DesignSystem.textSecondary)
+                .disabled(selectedIndex == 0)
+                .help("向前移动")
+
+                Button {
+                    move(option.rawValue, offset: 1)
+                } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(DesignSystem.textSecondary)
+                .disabled(selectedIndex == tokens.count - 1)
+                .help("向后移动")
+            } else {
+                Color.clear.frame(width: 28, height: 20)
+                Color.clear.frame(width: 28, height: 20)
+            }
+        }
+        .frame(minHeight: DesignSystem.settingsRowMinHeight)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(DesignSystem.divider)
+                .frame(height: DesignSystem.dividerWidth)
+        }
+    }
+
+    private func toggle(_ token: String) {
+        var tokens = selectedTokens
+        if let index = tokens.firstIndex(of: token) {
+            guard tokens.count > 1 else { return }
+            tokens.remove(at: index)
+        } else {
+            tokens.append(token)
+        }
+        value = tokens.joined(separator: " ")
+    }
+
+    private func move(_ token: String, offset: Int) {
+        var tokens = selectedTokens
+        guard let index = tokens.firstIndex(of: token) else { return }
+        let target = index + offset
+        guard tokens.indices.contains(target) else { return }
+        tokens.swapAt(index, target)
+        value = tokens.joined(separator: " ")
     }
 }
 
@@ -32,15 +272,45 @@ struct SettingsView: View {
     @State private var observingEngineSettingsChanges = false
     @SceneStorage("SYDownload.settings.xhsDirty") private var xhsSettingsDirty = false
     @SceneStorage("SYDownload.settings.douyinDirty") private var douyinSettingsDirty = false
+    @FocusState private var focusedField: SettingsFocusField?
+
+    private let xhsNameOptions = [
+        NameFormatOption(rawValue: "收藏数量", title: "收藏数量"),
+        NameFormatOption(rawValue: "评论数量", title: "评论数量"),
+        NameFormatOption(rawValue: "分享数量", title: "分享数量"),
+        NameFormatOption(rawValue: "点赞数量", title: "点赞数量"),
+        NameFormatOption(rawValue: "作品标签", title: "作品标签"),
+        NameFormatOption(rawValue: "作品ID", title: "作品 ID"),
+        NameFormatOption(rawValue: "作品标题", title: "作品标题"),
+        NameFormatOption(rawValue: "作品描述", title: "作品描述"),
+        NameFormatOption(rawValue: "作品类型", title: "作品类型"),
+        NameFormatOption(rawValue: "发布时间", title: "发布时间"),
+        NameFormatOption(rawValue: "最后更新时间", title: "最后更新时间"),
+        NameFormatOption(rawValue: "作者昵称", title: "作者昵称"),
+        NameFormatOption(rawValue: "作者ID", title: "作者 ID"),
+    ]
+
+    private let douyinNameOptions = [
+        NameFormatOption(rawValue: "id", title: "作品 ID"),
+        NameFormatOption(rawValue: "desc", title: "作品描述"),
+        NameFormatOption(rawValue: "create_time", title: "发布时间"),
+        NameFormatOption(rawValue: "nickname", title: "作者昵称"),
+        NameFormatOption(rawValue: "uid", title: "作者 ID"),
+        NameFormatOption(rawValue: "mark", title: "作者备注"),
+        NameFormatOption(rawValue: "type", title: "作品类型"),
+    ]
 
     var body: some View {
         PageContainer(title: "设置") {
             VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
                 settingsTabs
-                statusBanner
+                if showsEngineStatus {
+                    statusBanner
+                }
                 settingsContent
                 saveBarForCurrentTab
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .tint(DesignSystem.accent)
         .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)
@@ -88,18 +358,24 @@ struct SettingsView: View {
         }
     }
 
+    private var showsEngineStatus: Bool {
+        tab == .xhs || tab == .douyin || tab == .advanced
+    }
+
     private var settingsTabs: some View {
-        Picker("设置分类", selection: $tab) {
-            ForEach(SettingsTab.allCases) { item in
-                Label(item.rawValue, systemImage: item.systemImage)
-                    .tag(item)
+        CenteredControl(width: RefinementLayout.settingsTabsWidth) {
+            Picker("设置分类", selection: $tab) {
+                ForEach(SettingsTab.allCases) { item in
+                    Label(item.rawValue, systemImage: item.systemImage)
+                        .tag(item)
+                }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
+            .accessibilityLabel("设置分类")
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .font(DesignSystem.uiFont)
-        .frame(height: DesignSystem.controlHeightDefault)
-        .accessibilityLabel("设置分类")
     }
 
     @ViewBuilder
@@ -108,32 +384,31 @@ struct SettingsView: View {
             HStack(spacing: DesignSystem.spaceS) {
                 ProgressView().controlSize(.small)
                 Text("正在同步配置")
-                    .font(DesignSystem.bodyFont)
-                    .foregroundStyle(.secondary)
+                    .syTypography(DesignSystem.typographyBody)
+                    .foregroundStyle(DesignSystem.textSecondary)
+                Spacer(minLength: 0)
             }
-            .frame(minHeight: DesignSystem.controlRowMinHeight)
+            .frame(maxWidth: .infinity, minHeight: DesignSystem.controlRowMinHeight)
         } else if !model.settingsStatus.isEmpty {
             HStack(spacing: DesignSystem.spaceS) {
                 Label(
                     model.settingsStatus,
                     systemImage: model.settingsStatusIsError ? "exclamationmark.triangle" : "checkmark.circle"
                 )
-                .font(DesignSystem.bodyFont)
-                .foregroundStyle(model.settingsStatusIsError ? DesignSystem.destructive : .secondary)
+                .syTypography(DesignSystem.typographyBody)
+                .foregroundStyle(model.settingsStatusIsError ? DesignSystem.destructive : DesignSystem.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: DesignSystem.spaceM)
 
                 if model.settingsStatusIsError {
-                    Button("重新读取") {
-                        reloadSettings()
-                    }
-                    .buttonStyle(.bordered)
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
+                    Button("重新读取") { reloadSettings() }
+                        .buttonStyle(.bordered)
+                        .font(DesignSystem.uiFont)
+                        .frame(height: DesignSystem.controlHeightDefault)
                 }
             }
-            .frame(minHeight: DesignSystem.controlRowMinHeight)
+            .frame(maxWidth: .infinity, minHeight: DesignSystem.controlRowMinHeight)
         }
     }
 
@@ -141,84 +416,77 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
                 switch tab {
-                case .general:
-                    generalSettings
-                case .xhs:
-                    xhsSettings
-                case .douyin:
-                    douyinSettings
-                case .advanced:
-                    advancedSettings
+                case .general: generalSettings
+                case .xhs: xhsSettings
+                case .douyin: douyinSettings
+                case .advanced: advancedSettings
+                case .update: updateSettings
+                case .about: aboutSettings
                 }
             }
             .padding(.bottom, DesignSystem.spaceS)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .disabled(model.settingsLoading)
-        .opacity(model.settingsLoading ? DesignSystem.disabledOpacity : 1)
+        .disabled(model.settingsLoading && showsEngineStatus)
+        .opacity(model.settingsLoading && showsEngineStatus ? DesignSystem.disabledOpacity : 1)
     }
 
     @ViewBuilder
     private var generalSettings: some View {
-        SettingsSection("保存位置") {
-            SettingsRow(showsDivider: false) {
-                LabeledContent("下载目录") {
-                    HStack(spacing: DesignSystem.spaceS) {
-                        TextField("下载目录", text: $model.outputDirectory)
-                            .textFieldStyle(.roundedBorder)
-                            .labelsHidden()
-                            .frame(minWidth: DesignSystem.settingsFieldWidth)
-                            .frame(height: DesignSystem.controlHeightDefault)
-                        Button("更改") { chooseFolder() }
-                            .font(DesignSystem.uiFont)
-                            .frame(height: DesignSystem.controlHeightDefault)
-                    }
+        AlignedSettingsSection("保存位置") {
+            SettingsControlRow("下载目录", showsDivider: false) {
+                HStack(spacing: DesignSystem.spaceS) {
+                    TextField("下载目录", text: $model.outputDirectory)
+                        .textFieldStyle(.roundedBorder)
+                        .labelsHidden()
+                        .frame(width: RefinementLayout.settingsPathFieldWidth)
+                        .frame(height: DesignSystem.controlHeightDefault)
+                    Button("更改") { chooseFolder() }
+                        .font(DesignSystem.uiFont)
+                        .frame(height: DesignSystem.controlHeightDefault)
                 }
-                .font(DesignSystem.bodyFont)
             }
 
-            Text("下载时会同步到小红书的 work_path 与抖音的 root。")
-                .font(DesignSystem.metadataFont)
-                .foregroundStyle(.secondary)
+            Text("小红书与抖音都会直接保存到这个目录，不再额外创建 Download 文件夹。")
+                .syTypography(DesignSystem.typographyCaption)
+                .foregroundStyle(DesignSystem.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 .padding(.top, DesignSystem.spaceS)
         }
 
-        SettingsSection("偏好") {
-            SettingsRow(showsDivider: false) {
-                LabeledContent("应用外观") {
-                    Picker("应用外观", selection: $preferredAppearance) {
-                        ForEach(["跟随系统", "浅色", "深色"], id: \.self) { value in
-                            Text(value).tag(value)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
+        AlignedSettingsSection("偏好") {
+            SettingsControlRow("应用外观", showsDivider: false) {
+                SettingsPopupSelector(
+                    title: "应用外观",
+                    selection: $preferredAppearance,
+                    choices: [
+                        SettingsChoice("system", value: "跟随系统", title: "跟随系统"),
+                        SettingsChoice("light", value: "浅色", title: "浅色"),
+                        SettingsChoice("dark", value: "深色", title: "深色"),
+                    ]
+                )
             }
         }
+    }
 
-        SettingsSection("更新") {
-            SettingsRow {
-                LabeledContent("当前版本") {
-                    Text(updater.displayVersion)
-                        .monospacedDigit()
-                        .textSelection(.enabled)
-                }
-                .font(DesignSystem.bodyFont)
+    @ViewBuilder
+    private var updateSettings: some View {
+        AlignedSettingsSection("更新") {
+            SettingsControlRow("当前版本") {
+                Text(updater.displayVersion)
+                    .syTypography(DesignSystem.typographyBody)
+                    .monospacedDigit()
+                    .textSelection(.enabled)
             }
 
-            SettingsRow {
-                LabeledContent("更新源") {
-                    Picker("更新源", selection: $updater.updateSource) {
-                        ForEach(SYDownloadUpdateSource.allCases) { source in
-                            Text(source.displayName).tag(source)
-                        }
+            SettingsControlRow("更新源") {
+                SettingsPopupSelector(
+                    title: "更新源",
+                    selection: $updater.updateSource,
+                    choices: SYDownloadUpdateSource.allCases.map {
+                        SettingsChoice($0.rawValue, value: $0, title: $0.displayName)
                     }
-                    .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
+                )
             }
 
             SettingsRow(showsDivider: false) {
@@ -233,7 +501,7 @@ struct SettingsView: View {
                     .disabled(updater.isChecking || updater.isUpdating)
 
                     if updater.updateAvailable {
-                        Button("下载安装") {
+                        Button("更新并重启") {
                             updater.downloadUpdate()
                         }
                         .buttonStyle(.borderedProminent)
@@ -242,44 +510,18 @@ struct SettingsView: View {
                         .disabled(updater.isUpdating)
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
 
             if updater.isUpdating {
                 VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                     ProgressView(value: updater.progressBar.1)
                     Text(updater.progressBar.0)
-                        .font(DesignSystem.metadataFont)
-                        .foregroundStyle(.secondary)
+                        .syTypography(DesignSystem.typographyCaption)
+                        .foregroundStyle(DesignSystem.textSecondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, DesignSystem.spaceS)
-            }
-        }
-
-        SettingsSection("关于") {
-            SettingsRow {
-                LabeledContent("SYDownload") {
-                    Text(updater.displayVersion)
-                        .monospacedDigit()
-                }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow(showsDivider: false) {
-                HStack(spacing: DesignSystem.spaceS) {
-                    Button("关于 SYDownload") {
-                        NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
-                    }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
-
-                    Button("查看项目主页") {
-                        if let url = URL(string: "https://github.com/iPotatow/SYDownload") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
-                }
             }
         }
     }
@@ -291,7 +533,7 @@ struct SettingsView: View {
                 ProgressView().controlSize(.small)
                 Text("正在检查更新…")
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(DesignSystem.textSecondary)
         } else if let error = updater.updateError {
             Label(error, systemImage: "exclamationmark.triangle")
                 .foregroundStyle(DesignSystem.destructive)
@@ -301,82 +543,130 @@ struct SettingsView: View {
                 .foregroundStyle(DesignSystem.accent)
         } else if let release = updater.latestRelease {
             Label("已是最新版本（\(release.tagName)）", systemImage: "checkmark.circle")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.textSecondary)
         } else {
             Text("每天自动检查一次，也可以手动检查。")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.textSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private var aboutSettings: some View {
+        AlignedSettingsSection("关于 SYDownload") {
+            SettingsRow {
+                HStack(spacing: DesignSystem.spaceL) {
+                    AppMark(size: 48)
+                    VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+                        Text("SYDownload")
+                            .syTypography(DesignSystem.typographySectionTitle)
+                            .foregroundStyle(DesignSystem.textPrimary)
+                        Text("小红书与抖音下载工具 · \(updater.displayVersion)")
+                            .syTypography(DesignSystem.typographyBody)
+                            .foregroundStyle(DesignSystem.textSecondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, DesignSystem.spaceS)
+            }
+
+            SettingsRow {
+                Text("自动识别分享链接并调用内置下载引擎；媒体文件直接写入你选择的下载目录。")
+                    .syTypography(DesignSystem.typographyBody)
+                    .foregroundStyle(DesignSystem.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            SettingsRow(showsDivider: false) {
+                HStack(spacing: DesignSystem.spaceS) {
+                    Spacer(minLength: 0)
+                    Button("问题反馈") {
+                        open("https://github.com/iPotatow/SYDownload/issues")
+                    }
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
+                    Button("使用文档") {
+                        open("https://github.com/iPotatow/SYDownload#readme")
+                    }
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
+                    Button("打开 GitHub 仓库") {
+                        open("https://github.com/iPotatow/SYDownload")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+
+        AlignedSettingsSection("开源组件") {
+            SettingsControlRow("下载引擎") {
+                Text("XHS-Downloader · TikTokDownloader")
+                    .syTypography(DesignSystem.typographyBody)
+                    .foregroundStyle(DesignSystem.textSecondary)
+            }
+            SettingsControlRow("许可证", showsDivider: false) {
+                Text("GPL-3.0")
+                    .syTypography(DesignSystem.typographyBody)
+                    .foregroundStyle(DesignSystem.textSecondary)
+            }
         }
     }
 
     @ViewBuilder
     private var xhsSettings: some View {
-        SettingsSection("下载内容") {
+        AlignedSettingsSection("下载内容") {
             settingsToggleRow("下载图片", isOn: $model.xhsSettings.imageDownload)
             settingsToggleRow("下载视频", isOn: $model.xhsSettings.videoDownload)
             settingsToggleRow("下载动图", isOn: $model.xhsSettings.liveDownload, showsDivider: false)
         }
 
-        SettingsSection("格式") {
-            SettingsRow {
-                LabeledContent("图片格式") {
-                    Picker("图片格式", selection: $model.xhsSettings.imageFormat) {
-                        ForEach(["JPEG", "PNG", "WEBP", "HEIC", "AUTO"], id: \.self) { value in
-                            Text(value).tag(value)
-                        }
+        AlignedSettingsSection("格式") {
+            SettingsControlRow("图片格式") {
+                SettingsPopupSelector(
+                    title: "图片格式",
+                    selection: $model.xhsSettings.imageFormat,
+                    choices: ["JPEG", "PNG", "WEBP", "HEIC", "AUTO"].map {
+                        SettingsChoice($0, value: $0, title: $0)
                     }
-                    .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
+                )
             }
 
-            SettingsRow {
-                LabeledContent("视频偏好") {
-                    Picker("视频偏好", selection: $model.xhsSettings.videoPreference) {
-                        Text("分辨率优先").tag("resolution")
-                        Text("码率优先").tag("bitrate")
-                        Text("文件大小优先").tag("size")
-                    }
-                    .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
+            SettingsControlRow("视频偏好") {
+                SettingsPopupSelector(
+                    title: "视频偏好",
+                    selection: $model.xhsSettings.videoPreference,
+                    choices: [
+                        SettingsChoice("resolution", value: "resolution", title: "分辨率优先"),
+                        SettingsChoice("bitrate", value: "bitrate", title: "码率优先"),
+                        SettingsChoice("size", value: "size", title: "文件大小优先"),
+                    ]
+                )
             }
 
-            SettingsRow(showsDivider: false) {
-                LabeledContent("作品信息格式") {
-                    Picker("作品信息格式", selection: $model.xhsSettings.noteFormat) {
-                        Text("不保存").tag("")
-                        Text("TXT").tag("txt")
-                        Text("Markdown").tag("md")
-                        Text("全部").tag("all")
-                    }
-                    .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
+            SettingsControlRow("作品信息格式", showsDivider: false) {
+                SettingsPopupSelector(
+                    title: "作品信息格式",
+                    selection: $model.xhsSettings.noteFormat,
+                    choices: [
+                        SettingsChoice("none", value: "", title: "不保存"),
+                        SettingsChoice("txt", value: "txt", title: "TXT"),
+                        SettingsChoice("md", value: "md", title: "Markdown"),
+                        SettingsChoice("all", value: "all", title: "全部"),
+                    ]
+                )
             }
         }
 
-        SettingsSection("文件管理") {
-            SettingsRow {
-                LabeledContent("文件夹名称") {
-                    TextField("文件夹名称", text: $model.xhsSettings.folderName)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow {
-                LabeledContent("文件命名格式") {
-                    TextField("发布时间 作者昵称 作品标题", text: $model.xhsSettings.nameFormat)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
+        AlignedSettingsSection("文件管理") {
+            SettingsControlRow("文件命名格式") {
+                NameFormatSelector(
+                    title: "小红书文件命名格式",
+                    value: $model.xhsSettings.nameFormat,
+                    options: xhsNameOptions,
+                    fallback: ["发布时间", "作者昵称", "作品标题"]
+                )
             }
 
             settingsToggleRow("每个作品使用独立文件夹", isOn: $model.xhsSettings.folderMode)
@@ -386,141 +676,117 @@ struct SettingsView: View {
             settingsToggleRow("记录作品数据", isOn: $model.xhsSettings.recordData, showsDivider: false)
         }
 
-        SettingsSection("Cookie") {
+        AlignedSettingsSection("Cookie") {
             VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                 Text("小红书网页版 Cookie")
-                    .font(DesignSystem.bodyFont)
-                plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100)
+                    .syTypography(DesignSystem.typographyBody)
+                plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100, field: .xhsCookie)
                     .accessibilityLabel("小红书网页版 Cookie")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     @ViewBuilder
     private var douyinSettings: some View {
-        SettingsSection("下载内容") {
+        AlignedSettingsSection("下载内容") {
             settingsToggleRow("下载音乐", isOn: $model.douyinSettings.music)
             settingsToggleRow("下载动态封面", isOn: $model.douyinSettings.dynamicCover)
             settingsToggleRow("下载静态封面", isOn: $model.douyinSettings.staticCover)
             settingsToggleRow("优先原始画质", isOn: $model.douyinSettings.originalQuality, showsDivider: false)
         }
 
-        SettingsSection("文件管理") {
-            SettingsRow {
-                LabeledContent("文件夹名称") {
-                    TextField("文件夹名称", text: $model.douyinSettings.folderName)
+        AlignedSettingsSection("文件管理") {
+            SettingsControlRow("文件命名格式") {
+                NameFormatSelector(
+                    title: "抖音文件命名格式",
+                    value: $model.douyinSettings.nameFormat,
+                    options: douyinNameOptions,
+                    fallback: ["create_time", "type", "nickname", "desc"]
+                )
+            }
+
+            SettingsControlRow("描述最大长度") {
+                TextField("64", value: $model.douyinSettings.descLength, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            }
+
+            SettingsControlRow("文件名最大长度") {
+                TextField("128", value: $model.douyinSettings.nameLength, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            }
+
+            SettingsControlRow("日期格式") {
+                TextField("%Y-%m-%d %H:%M:%S", text: $model.douyinSettings.dateFormat)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            }
+
+            SettingsControlRow("文件名分隔符") {
+                TextField("-", text: $model.douyinSettings.split)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            }
+
+            SettingsControlRow("数据保存格式") {
+                TextField("留空为不保存", text: $model.douyinSettings.storageFormat)
+                    .textFieldStyle(.roundedBorder)
+                    .labelsHidden()
+                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            }
+
+            SettingsControlRow("文件大小限制") {
+                HStack(spacing: DesignSystem.spaceS) {
+                    TextField("0", value: $model.douyinSettings.maxSize, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
                         .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+                    Text("0 表示不限制")
+                        .syTypography(DesignSystem.typographyCaption)
+                        .foregroundStyle(DesignSystem.textSecondary)
                 }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow {
-                LabeledContent("文件命名格式") {
-                    TextField("create_time type nickname desc", text: $model.douyinSettings.nameFormat)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow {
-                LabeledContent("描述最大长度") {
-                    TextField("64", value: $model.douyinSettings.descLength, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow {
-                LabeledContent("文件名最大长度") {
-                    TextField("128", value: $model.douyinSettings.nameLength, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow {
-                LabeledContent("日期格式") {
-                    TextField("%Y-%m-%d %H:%M:%S", text: $model.douyinSettings.dateFormat)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow {
-                LabeledContent("文件名分隔符") {
-                    TextField("-", text: $model.douyinSettings.split)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow {
-                LabeledContent("数据保存格式") {
-                    TextField("留空为不保存", text: $model.douyinSettings.storageFormat)
-                        .textFieldStyle(.roundedBorder)
-                        .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                }
-                .font(DesignSystem.bodyFont)
-            }
-
-            SettingsRow {
-                LabeledContent("文件大小限制") {
-                    HStack(spacing: DesignSystem.spaceS) {
-                        TextField("0", value: $model.douyinSettings.maxSize, format: .number)
-                            .textFieldStyle(.roundedBorder)
-                            .labelsHidden()
-                            .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
-                        Text("0 表示不限制")
-                            .font(DesignSystem.metadataFont)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .font(DesignSystem.bodyFont)
             }
 
             settingsToggleRow("每个作品使用独立文件夹", isOn: $model.douyinSettings.folderMode, showsDivider: false)
         }
 
-        SettingsSection("Cookie") {
+        AlignedSettingsSection("Cookie") {
             VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                 Text("抖音网页版 Cookie（douyin.com）")
-                    .font(DesignSystem.bodyFont)
-                plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 92)
+                    .syTypography(DesignSystem.typographyBody)
+                plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 92, field: .douyinCookie)
                     .accessibilityLabel("抖音网页版 Cookie")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     @ViewBuilder
     private var advancedSettings: some View {
-        SettingsSection("原始配置文件") {
+        AlignedSettingsSection("原始配置文件") {
             configRow(title: "小红书 settings.json", path: model.xhsSettingsPath, showsDivider: true)
             configRow(title: "抖音 settings.json", path: model.douyinSettingsPath, showsDivider: false)
             Text("界面只修改可见字段；代理、网络超时、重试和浏览器指纹等其他字段会保留在原始 JSON 中。")
-                .font(DesignSystem.metadataFont)
-                .foregroundStyle(.secondary)
+                .syTypography(DesignSystem.typographyCaption)
+                .foregroundStyle(DesignSystem.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, DesignSystem.spaceS)
         }
 
-        SettingsSection("恢复默认配置") {
+        AlignedSettingsSection("恢复默认配置") {
             Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
-                .font(DesignSystem.metadataFont)
-                .foregroundStyle(.secondary)
+                .syTypography(DesignSystem.typographyCaption)
+                .foregroundStyle(DesignSystem.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: DesignSystem.spaceS) {
+                Spacer(minLength: 0)
                 Button("恢复小红书默认设置", role: .destructive) { resetTarget = "xiaohongshu" }
                     .font(DesignSystem.uiFont)
                     .frame(height: DesignSystem.controlHeightDefault)
@@ -528,10 +794,11 @@ struct SettingsView: View {
                     .font(DesignSystem.uiFont)
                     .frame(height: DesignSystem.controlHeightDefault)
             }
+            .frame(maxWidth: .infinity)
             .padding(.top, DesignSystem.spaceS)
         }
 
-        SettingsSection("数据目录") {
+        AlignedSettingsSection("数据目录") {
             pathRow("应用数据", "~/Library/Application Support/SYDownload/", showsDivider: true)
             pathRow("缓存", "~/Library/Caches/SYDownload/", showsDivider: true)
             pathRow("下载文件", model.outputDirectory, showsDivider: false)
@@ -543,10 +810,11 @@ struct SettingsView: View {
         isOn: Binding<Bool>,
         showsDivider: Bool = true
     ) -> some View {
-        SettingsRow(showsDivider: showsDivider) {
-            Toggle(title, isOn: isOn)
+        SettingsControlRow(title, showsDivider: showsDivider) {
+            Toggle("", isOn: isOn)
+                .labelsHidden()
                 .toggleStyle(.switch)
-                .font(DesignSystem.bodyFont)
+                .accessibilityLabel(title)
         }
     }
 
@@ -555,11 +823,12 @@ struct SettingsView: View {
             HStack(alignment: .center, spacing: DesignSystem.spaceM) {
                 VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                     Text(title)
-                        .font(DesignSystem.uiFont)
+                        .syTypography(DesignSystem.typographyControl)
                     Text(path.isEmpty ? "尚未生成" : path)
                         .font(DesignSystem.metadataFont.monospaced())
-                        .foregroundStyle(path.isEmpty ? .secondary : .primary)
+                        .foregroundStyle(path.isEmpty ? DesignSystem.textSecondary : DesignSystem.textPrimary)
                         .lineLimit(2)
+                        .truncationMode(.middle)
                         .textSelection(.enabled)
                 }
 
@@ -574,18 +843,19 @@ struct SettingsView: View {
                     .frame(height: DesignSystem.controlHeightCompact)
                     .disabled(path.isEmpty)
             }
+            .frame(maxWidth: .infinity)
             .padding(.vertical, DesignSystem.spaceXS)
         }
     }
 
     private func pathRow(_ label: String, _ value: String, showsDivider: Bool) -> some View {
-        SettingsRow(showsDivider: showsDivider) {
-            LabeledContent(label) {
-                Text(value)
-                    .font(DesignSystem.metadataFont.monospaced())
-                    .textSelection(.enabled)
-            }
-            .font(DesignSystem.bodyFont)
+        SettingsControlRow(label, showsDivider: showsDivider) {
+            Text(value)
+                .font(DesignSystem.metadataFont.monospaced())
+                .foregroundStyle(DesignSystem.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
         }
     }
 
@@ -600,7 +870,7 @@ struct SettingsView: View {
                 systemImage: isDirty ? "circle.fill" : "checkmark.circle"
             )
             .font(DesignSystem.groupLabelFont)
-            .foregroundStyle(isDirty ? DesignSystem.accent : .secondary)
+            .foregroundStyle(isDirty ? DesignSystem.accent : DesignSystem.textSecondary)
 
             Spacer(minLength: DesignSystem.spaceM)
 
@@ -610,6 +880,7 @@ struct SettingsView: View {
                 .frame(height: DesignSystem.controlHeightDefault)
                 .disabled(model.settingsLoading || !isDirty)
         }
+        .frame(maxWidth: .infinity)
         .padding(.top, DesignSystem.spaceS)
         .overlay(alignment: .top) {
             Rectangle()
@@ -621,7 +892,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var saveBarForCurrentTab: some View {
         switch tab {
-        case .general, .advanced:
+        case .general, .advanced, .update, .about:
             EmptyView()
         case .xhs:
             saveBar(title: "保存小红书设置", isDirty: xhsSettingsDirty, action: saveXHSSettings)
@@ -633,18 +904,14 @@ struct SettingsView: View {
     private func saveXHSSettings() {
         Task {
             await model.saveXHSSettings()
-            if !model.settingsStatusIsError {
-                xhsSettingsDirty = false
-            }
+            if !model.settingsStatusIsError { xhsSettingsDirty = false }
         }
     }
 
     private func saveDouyinSettings() {
         Task {
             await model.saveDouyinSettings()
-            if !model.settingsStatusIsError {
-                douyinSettingsDirty = false
-            }
+            if !model.settingsStatusIsError { douyinSettingsDirty = false }
         }
     }
 
@@ -660,10 +927,18 @@ struct SettingsView: View {
         }
     }
 
-    private func plainTextEditor(text: Binding<String>, minHeight: CGFloat) -> some View {
+    private func plainTextEditor(
+        text: Binding<String>,
+        minHeight: CGFloat,
+        field: SettingsFocusField
+    ) -> some View {
         TextEditor(text: text)
             .font(DesignSystem.metadataFont.monospaced())
+            .scrollContentBackground(.hidden)
+            .padding(DesignSystem.spaceS)
             .frame(minHeight: minHeight)
+            .syInputSurface(isFocused: focusedField == field)
+            .focused($focusedField, equals: field)
     }
 
     private func chooseFolder() {
@@ -687,6 +962,11 @@ struct SettingsView: View {
     private func revealConfig(_ path: String) {
         guard !path.isEmpty else { return }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    private func open(_ raw: String) {
+        guard let url = URL(string: raw) else { return }
+        NSWorkspace.shared.open(url)
     }
 }
 #endif

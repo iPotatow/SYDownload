@@ -54,6 +54,56 @@ fetch_revision "https://github.com/JoeanAmier/TikTokDownloader.git" "$DOUK_REVIS
 /usr/bin/rsync -aL --exclude='.git/' --exclude='__pycache__/' --exclude='*.pyc' \
   "$SOURCES/TikTokDownloader/" "$ENGINES_ROOT/TikTokDownloader/"
 
+# Keep engine bookkeeping and optional data exports inside the staged engine data
+# area. The user-selected download directory must contain only downloaded media.
+echo "Applying SYDownload engine data-path adapters..."
+/usr/bin/python3 - \
+  "$ENGINES_ROOT/XHS-Downloader/source/module/recorder.py" \
+  "$ENGINES_ROOT/TikTokDownloader/src/storage/manager.py" <<'PY'
+from pathlib import Path
+import sys
+
+
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected exactly one match, found {count}")
+    return text.replace(old, new, 1)
+
+
+xhs_path = Path(sys.argv[1])
+xhs = xhs_path.read_text(encoding="utf-8")
+xhs = replace_once(
+    xhs,
+    "self.file = manager.folder.joinpath(self.name)",
+    "self.file = manager.root.joinpath(self.name)",
+    "XHS ExploreData path",
+)
+xhs_path.write_text(xhs, encoding="utf-8")
+
+douk_path = Path(sys.argv[2])
+douk = douk_path.read_text(encoding="utf-8")
+douk = replace_once(
+    douk,
+    "from typing import TYPE_CHECKING\n\nfrom .csv import CSVLogger",
+    "from typing import TYPE_CHECKING\n\nfrom ..custom import VOLUME\nfrom .csv import CSVLogger",
+    "DouK VOLUME import",
+)
+douk = replace_once(
+    douk,
+    "root = parameter.root.joinpath(",
+    "root = VOLUME.joinpath(",
+    "DouK data root",
+)
+douk = replace_once(
+    douk,
+    "self.compatible(\n            parameter.root,\n            root,\n            name,\n        )",
+    "self.compatible(\n            VOLUME,\n            root,\n            name,\n        )",
+    "DouK data migration root",
+)
+douk_path.write_text(douk, encoding="utf-8")
+PY
+
 echo "Installing portable Python $PYTHON_VERSION into build staging..."
 UV_PYTHON_INSTALL_DIR="$PYTHON_BUILD_ROOT" \
   uv python install --managed-python --no-bin "$PYTHON_VERSION"

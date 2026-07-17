@@ -27,11 +27,12 @@ struct PhotosView: View {
                         systemImage: statusIsError ? "exclamationmark.circle" : "checkmark.circle"
                     )
                     .font(DesignSystem.bodyFont)
-                    .foregroundStyle(statusIsError ? DesignSystem.destructive : .secondary)
+                    .foregroundStyle(statusIsError ? DesignSystem.destructive : DesignSystem.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .combine)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .fileImporter(
             isPresented: $showsFolderImporter,
@@ -67,13 +68,13 @@ struct PhotosView: View {
     private var workspace: some View {
         if folderURL == nil && !isScanning {
             initialDropZone
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         } else if isScanning {
             scanningState
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
         } else {
             photoGroups
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -81,14 +82,14 @@ struct PhotosView: View {
         VStack(spacing: DesignSystem.spaceM) {
             Image(systemName: isDropTargeted ? "folder.fill.badge.plus" : "folder")
                 .font(.system(size: DesignSystem.controlHeightLarge, weight: .regular))
-                .foregroundStyle(isDropTargeted ? DesignSystem.accent : Color.secondary)
+                .foregroundStyle(isDropTargeted ? DesignSystem.accent : DesignSystem.textSecondary)
 
             Text("拖入照片文件夹到这里")
                 .font(DesignSystem.sectionTitleFont)
 
             Text("会读取文件夹中的图片并按文件名日期分组")
                 .font(DesignSystem.bodyFont)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.textSecondary)
 
             Button("选择文件夹…", systemImage: "folder", action: chooseFolder)
                 .buttonStyle(.borderedProminent)
@@ -97,17 +98,17 @@ struct PhotosView: View {
 
             Text("支持 JPG、PNG、HEIC 等常见图片格式")
                 .font(DesignSystem.metadataFont)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(DesignSystem.textTertiary)
         }
         .frame(maxWidth: .infinity, minHeight: 360)
         .background(
-            isDropTargeted ? DesignSystem.accent.opacity(0.06) : Color.clear,
+            isDropTargeted ? DesignSystem.selectionBackground : DesignSystem.panelBackground.opacity(0.38),
             in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
         )
         .overlay {
             RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                 .strokeBorder(
-                    isDropTargeted ? DesignSystem.accent.opacity(0.65) : DesignSystem.hairline,
+                    isDropTargeted ? DesignSystem.accent.opacity(0.70) : DesignSystem.border.opacity(0.82),
                     style: StrokeStyle(lineWidth: DesignSystem.borderWidth, dash: [8, 4])
                 )
         }
@@ -134,17 +135,22 @@ struct PhotosView: View {
             if !statusMessage.isEmpty {
                 Text(statusMessage)
                     .font(DesignSystem.bodyFont)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignSystem.textSecondary)
                     .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 360)
+        .background(
+            DesignSystem.panelBackground.opacity(0.38),
+            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+        )
     }
 
     private var photoGroups: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
             summaryBar
             Divider()
+                .overlay(DesignSystem.divider)
 
             if scanResult.totalCount == 0 {
                 EmptyLibraryView(
@@ -167,7 +173,7 @@ struct PhotosView: View {
                             ungroupedRow
                         }
                     }
-                    .padding(.bottom, selectedDates.isEmpty ? DesignSystem.spaceS : 64)
+                    .padding(.bottom, selectedDates.isEmpty ? DesignSystem.spaceS : RefinementLayout.photoDeleteBarClearance)
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !selectedDates.isEmpty {
@@ -176,6 +182,7 @@ struct PhotosView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var summaryBar: some View {
@@ -207,15 +214,15 @@ struct PhotosView: View {
             HStack(spacing: DesignSystem.spaceM) {
                 Text("\(scanResult.totalCount) 张照片")
                     .font(DesignSystem.bodyFont)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignSystem.textSecondary)
                 Text("\(scanResult.groups.count) 个日期")
                     .font(DesignSystem.bodyFont)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignSystem.textSecondary)
 
                 if !scanResult.ungrouped.isEmpty {
                     Text("\(scanResult.ungrouped.count) 张未识别日期")
                         .font(DesignSystem.bodyFont)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignSystem.textSecondary)
                 }
 
                 Spacer()
@@ -259,7 +266,7 @@ struct PhotosView: View {
                     .font(DesignSystem.uiFont)
                 Text("\(group.photos.count) 张照片")
                     .font(DesignSystem.metadataFont)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignSystem.textSecondary)
             }
             .frame(width: 104, alignment: .leading)
 
@@ -284,7 +291,7 @@ struct PhotosView: View {
     private var ungroupedRow: some View {
         HStack(spacing: DesignSystem.spaceM) {
             Image(systemName: "questionmark.circle")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DesignSystem.textSecondary)
                 .frame(width: DesignSystem.spaceL)
 
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
@@ -292,7 +299,7 @@ struct PhotosView: View {
                     .font(DesignSystem.uiFont)
                 Text("\(scanResult.ungrouped.count) 张照片 · 不参与批量删除")
                     .font(DesignSystem.metadataFont)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DesignSystem.textSecondary)
             }
             .frame(width: 160, alignment: .leading)
 
@@ -323,7 +330,7 @@ struct PhotosView: View {
                             .fill(DesignSystem.raisedSurface)
                         Text("+\(photos.count - 8)")
                             .font(DesignSystem.groupLabelFont)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignSystem.textSecondary)
                     }
                     .frame(width: DesignSystem.photoThumbnailSize, height: DesignSystem.photoThumbnailSize)
                 }
@@ -473,7 +480,7 @@ private struct LocalPhotoThumbnail: View {
                 ZStack {
                     Color.primary.opacity(0.04)
                     Image(systemName: "photo")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignSystem.textSecondary)
                 }
             }
         }
