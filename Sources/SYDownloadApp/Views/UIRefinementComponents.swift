@@ -10,6 +10,26 @@ enum RefinementLayout {
     static let settingsPathFieldWidth: CGFloat = 360
     static let taskProgressMaxWidth: CGFloat = 420
     static let photoDeleteBarClearance: CGFloat = 64
+
+    // Download
+    static let downloadStatusMinHeight: CGFloat = 56
+
+    // Task / History library rows
+    static let libraryRowHorizontalPadding: CGFloat = 12
+    static let libraryRowVerticalPadding: CGFloat = 8
+    static let taskStatusColumnWidth: CGFloat = 88
+    static let taskFileColumnWidth: CGFloat = 60
+    static let taskDateColumnWidth: CGFloat = 120
+    static let taskActionColumnWidth: CGFloat = 124
+    static let historyActionColumnWidth: CGFloat = 96
+
+    // Photo group preview: one large cover + compact supporting thumbnails.
+    static let photoDateColumnWidth: CGFloat = 104
+    static let photoUngroupedColumnWidth: CGFloat = 160
+    static let photoCoverWidth: CGFloat = 112
+    static let photoCoverHeight: CGFloat = 96
+    static let photoSecondaryThumbnailSize: CGFloat = 44
+    static let photoPreviewSpacing: CGFloat = 8
 }
 
 struct CenteredControl<Content: View>: View {

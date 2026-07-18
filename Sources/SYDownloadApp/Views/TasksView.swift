@@ -10,17 +10,10 @@ struct TasksView: View {
 
     var body: some View {
         PageContainer(title: "任务") {
-            TextField("搜索任务（标题、链接、平台）", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .font(DesignSystem.bodyFont)
-                .frame(width: DesignSystem.pageHeaderSearchWidth, height: DesignSystem.controlHeightSmall)
-                .focused($searchFocused)
-                .accessibilityLabel("搜索任务")
+            searchField
         } content: {
             VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
                 filterBar
-                Divider()
-                    .overlay(DesignSystem.divider)
 
                 if displayedTasks.isEmpty {
                     EmptyLibraryView(
@@ -41,28 +34,7 @@ struct TasksView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(selection: $selectedTaskID) {
-                        ForEach(displayedTasks) { task in
-                            TaskRow(model: model, task: task)
-                                .tag(task.id)
-                                .listRowInsets(
-                                    EdgeInsets(
-                                        top: DesignSystem.spaceXS,
-                                        leading: 0,
-                                        bottom: DesignSystem.spaceXS,
-                                        trailing: 0
-                                    )
-                                )
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
-                                .contextMenu {
-                                    taskContextMenu(task)
-                                }
-                        }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    taskTable
                 }
             }
         }
@@ -75,6 +47,24 @@ struct TasksView: View {
             searchFocused = true
         }
         .tint(DesignSystem.accent)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: DesignSystem.spaceS) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(DesignSystem.textTertiary)
+                .accessibilityHidden(true)
+
+            TextField("搜索任务（标题、链接、平台）", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(DesignSystem.bodyFont)
+                .focused($searchFocused)
+        }
+        .padding(.horizontal, DesignSystem.controlHorizontalPadding)
+        .frame(width: DesignSystem.pageHeaderSearchWidth, height: DesignSystem.controlHeightSmall)
+        .syInputSurface(isFocused: searchFocused)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("搜索任务")
     }
 
     private var filterBar: some View {
@@ -91,6 +81,71 @@ struct TasksView: View {
             .frame(height: DesignSystem.controlHeightDefault)
             .accessibilityLabel("任务状态")
         }
+    }
+
+    private var taskTable: some View {
+        VStack(spacing: 0) {
+            taskTableHeader
+
+            Rectangle()
+                .fill(DesignSystem.divider)
+                .frame(height: DesignSystem.dividerWidth)
+
+            List(selection: $selectedTaskID) {
+                ForEach(Array(displayedTasks.enumerated()), id: \.element.id) { index, task in
+                    TaskRow(
+                        model: model,
+                        task: task,
+                        isSelected: selectedTaskID == task.id,
+                        showsDivider: index < displayedTasks.count - 1
+                    )
+                    .tag(task.id)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .contextMenu {
+                        taskContextMenu(task)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+        }
+        .background(
+            DesignSystem.panelBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var taskTableHeader: some View {
+        HStack(spacing: DesignSystem.spaceM) {
+            Text("任务")
+                .syTypography(DesignSystem.typographyGroupLabel)
+                .padding(.leading, DesignSystem.controlHeightLarge + DesignSystem.spaceS)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text("状态")
+                .syTypography(DesignSystem.typographyGroupLabel)
+                .frame(width: RefinementLayout.taskStatusColumnWidth, alignment: .leading)
+
+            Text("文件数")
+                .syTypography(DesignSystem.typographyGroupLabel)
+                .frame(width: RefinementLayout.taskFileColumnWidth, alignment: .leading)
+
+            Text("创建时间")
+                .syTypography(DesignSystem.typographyGroupLabel)
+                .frame(width: RefinementLayout.taskDateColumnWidth, alignment: .leading)
+
+            Text("操作")
+                .syTypography(DesignSystem.typographyGroupLabel)
+                .frame(width: RefinementLayout.taskActionColumnWidth, alignment: .trailing)
+        }
+        .foregroundStyle(DesignSystem.textSecondary)
+        .padding(.horizontal, RefinementLayout.libraryRowHorizontalPadding)
+        .frame(height: DesignSystem.controlRowMinHeight)
     }
 
     @ViewBuilder
@@ -220,64 +275,77 @@ struct TasksView: View {
 private struct TaskRow: View {
     @ObservedObject var model: AppModel
     let task: DownloadTaskItem
+    let isSelected: Bool
+    let showsDivider: Bool
+    @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: DesignSystem.spaceM) {
-            PlatformThumbnail(platform: task.platform, size: DesignSystem.controlHeightLarge)
+            HStack(spacing: DesignSystem.spaceS) {
+                PlatformThumbnail(platform: task.platform, size: DesignSystem.controlHeightLarge)
 
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
-                HStack(spacing: DesignSystem.spaceS) {
-                    Text(task.title)
-                        .font(DesignSystem.uiFont)
+                VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+                    Text(displayTitle)
+                        .syTypography(DesignSystem.typographyControl)
+                        .foregroundStyle(DesignSystem.textPrimary)
                         .lineLimit(1)
-                    StatusPill(state: task.state)
-                }
 
-                Text(detailText)
-                    .font(DesignSystem.bodyFont)
-                    .foregroundStyle(task.state == .failed ? DesignSystem.destructive : Color.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(detailText)
+                        .syTypography(DesignSystem.typographyCaption)
+                        .foregroundStyle(task.state == .failed ? DesignSystem.destructive : DesignSystem.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
 
-                if task.state == .downloading {
-                    HStack(spacing: DesignSystem.spaceS) {
-                        if let progress = task.progress {
-                            ProgressView(value: progress)
-                                .progressViewStyle(.linear)
-                                .tint(DesignSystem.accent)
-                            Text("\(Int(progress * 100))%")
-                                .font(DesignSystem.metadataFont.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                                .frame(width: DesignSystem.controlHeightLarge, alignment: .trailing)
-                        } else {
-                            ProgressView()
-                                .progressViewStyle(.linear)
-                                .tint(DesignSystem.accent)
-                        }
-                    }
-                    .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
-                } else if task.state == .queued {
-                    ProgressView(value: 0)
-                        .progressViewStyle(.linear)
-                        .tint(DesignSystem.accent)
-                        .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
+                    progress
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: DesignSystem.spaceM)
+            StatusPill(state: task.state)
+                .frame(width: RefinementLayout.taskStatusColumnWidth, alignment: .leading)
+
+            Text(task.fileCount > 0 ? "\(task.fileCount)" : "—")
+                .syTypography(DesignSystem.typographyBody)
+                .foregroundStyle(DesignSystem.textSecondary)
+                .monospacedDigit()
+                .frame(width: RefinementLayout.taskFileColumnWidth, alignment: .leading)
+
+            Text(task.createdAt.formatted(date: .numeric, time: .shortened))
+                .syTypography(DesignSystem.typographyCaption)
+                .foregroundStyle(DesignSystem.textSecondary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .frame(width: RefinementLayout.taskDateColumnWidth, alignment: .leading)
 
             taskAction
+                .frame(width: RefinementLayout.taskActionColumnWidth, alignment: .trailing)
         }
-        .padding(DesignSystem.spaceM)
-        .frame(minHeight: DesignSystem.controlRowMinHeight)
-        .background(
-            DesignSystem.rowBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                .strokeBorder(DesignSystem.hairline, lineWidth: DesignSystem.borderWidth)
+        .padding(.horizontal, RefinementLayout.libraryRowHorizontalPadding)
+        .padding(.vertical, RefinementLayout.libraryRowVerticalPadding)
+        .background(rowBackground)
+        .overlay(alignment: .bottom) {
+            if showsDivider {
+                Rectangle()
+                    .fill(DesignSystem.divider)
+                    .frame(height: DesignSystem.dividerWidth)
+                    .padding(.leading, RefinementLayout.libraryRowHorizontalPadding + DesignSystem.controlHeightLarge + DesignSystem.spaceS)
+            }
         }
         .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
+        .animation(DesignSystem.motionFast, value: isHovered)
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return DesignSystem.selectionBackground }
+        if isHovered { return DesignSystem.controlHoverBackground }
+        return Color.clear
+    }
+
+    private var displayTitle: String {
+        let prefix = "\(task.platform.displayName) · "
+        guard task.title.hasPrefix(prefix) else { return task.title }
+        return String(task.title.dropFirst(prefix.count))
     }
 
     private var detailText: String {
@@ -285,18 +353,63 @@ private struct TaskRow: View {
            task.state == .failed || task.state == .cancelled {
             return "\(failureKind.label) · \(task.detail)"
         }
-        return "\(task.platform.displayName) · \(task.detail)"
+        return task.detail
+    }
+
+    @ViewBuilder
+    private var progress: some View {
+        if task.state == .downloading {
+            HStack(spacing: DesignSystem.spaceS) {
+                if let progress = task.progress {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .tint(DesignSystem.accent)
+                    Text("\(Int(progress * 100))%")
+                        .font(DesignSystem.metadataFont.monospacedDigit())
+                        .foregroundStyle(DesignSystem.textSecondary)
+                        .frame(width: DesignSystem.controlHeightLarge, alignment: .trailing)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                        .tint(DesignSystem.accent)
+                }
+            }
+            .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
+        } else if task.state == .queued {
+            ProgressView(value: 0)
+                .progressViewStyle(.linear)
+                .tint(DesignSystem.accent)
+                .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
+        }
     }
 
     @ViewBuilder
     private var taskAction: some View {
         if task.state == .completed {
-            Button("在 Finder 中显示", systemImage: "folder") {
-                NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
+            HStack(spacing: DesignSystem.spaceS) {
+                Button("在 Finder 中显示", systemImage: "folder") {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
+                .help("在 Finder 中显示")
+
+                Menu {
+                    Button("在 Finder 中显示", systemImage: "folder") {
+                        NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
+                    }
+                    Divider()
+                    Button("移除任务", systemImage: "trash", role: .destructive) {
+                        model.removeTask(task.id)
+                    }
+                } label: {
+                    Label("更多操作", systemImage: "ellipsis")
+                        .labelStyle(.iconOnly)
+                }
+                .menuStyle(.borderlessButton)
+                .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
             }
-            .buttonStyle(.bordered)
-            .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightDefault)
         } else if task.state == .failed || task.state == .cancelled {
             recoveryButton
         } else {
@@ -305,7 +418,7 @@ private struct TaskRow: View {
             }
             .buttonStyle(.bordered)
             .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightDefault)
+            .frame(height: DesignSystem.controlHeightSmall)
         }
     }
 
@@ -320,14 +433,14 @@ private struct TaskRow: View {
             }
             .buttonStyle(.borderedProminent)
             .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightDefault)
+            .frame(height: DesignSystem.controlHeightSmall)
         case .disk:
             Button("更改保存位置", systemImage: "folder") {
                 model.selection = .settings
             }
             .buttonStyle(.borderedProminent)
             .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightDefault)
+            .frame(height: DesignSystem.controlHeightSmall)
         case .notFound:
             Button("打开原链接", systemImage: "safari") {
                 if let url = URL(string: task.sourceURL) {
@@ -336,7 +449,7 @@ private struct TaskRow: View {
             }
             .buttonStyle(.bordered)
             .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightDefault)
+            .frame(height: DesignSystem.controlHeightSmall)
         default:
             Button("重试", systemImage: "arrow.clockwise") {
                 model.retryTask(task)
@@ -346,7 +459,7 @@ private struct TaskRow: View {
             }
             .buttonStyle(.borderedProminent)
             .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightDefault)
+            .frame(height: DesignSystem.controlHeightSmall)
         }
     }
 }
