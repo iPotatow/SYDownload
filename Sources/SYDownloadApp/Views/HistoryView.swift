@@ -8,10 +8,10 @@ struct HistoryView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        PageContainer(title: "历史记录") {
+        CorePageContainer(title: "历史记录", maxWidth: SYDownloadLayout.contentMaxWidth) {
             searchField
         } content: {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+            VStack(alignment: .leading, spacing: CoreSpacing.l) {
                 summaryBar
 
                 if model.filteredHistory.isEmpty {
@@ -42,41 +42,41 @@ struct HistoryView: View {
             guard model.selection == .history else { return }
             searchFocused = true
         }
-        .tint(DesignSystem.accent)
+        .tint(CoreColor.accent)
     }
 
     private var searchField: some View {
-        HStack(spacing: DesignSystem.spaceS) {
+        HStack(spacing: CoreSpacing.s) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(DesignSystem.textTertiary)
+                .foregroundStyle(CoreColor.textTertiary)
                 .accessibilityHidden(true)
 
             TextField("搜索历史（标题、链接、平台）", text: $model.historySearch)
                 .textFieldStyle(.plain)
-                .font(DesignSystem.bodyFont)
+                .font(CoreTypography.bodyFont)
                 .focused($searchFocused)
         }
-        .padding(.horizontal, DesignSystem.controlHorizontalPadding)
-        .frame(width: DesignSystem.pageHeaderSearchWidth, height: DesignSystem.controlHeightSmall)
-        .syInputSurface(isFocused: searchFocused)
+        .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
+        .frame(width: SYDownloadLayout.pageHeaderSearchWidth, height: CoreMetrics.controlHeightSmall)
+        .coreInputSurface(isFocused: searchFocused)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("搜索历史记录")
     }
 
     private var summaryBar: some View {
-        HStack(alignment: .center, spacing: DesignSystem.spaceS) {
+        HStack(alignment: .center, spacing: CoreSpacing.s) {
             Text("共 \(model.filteredHistory.count) 条记录")
-                .syTypography(DesignSystem.typographyControl)
-                .foregroundStyle(DesignSystem.textPrimary)
+                .coreTypography(CoreTypography.control)
+                .foregroundStyle(CoreColor.textPrimary)
                 .monospacedDigit()
 
             Spacer()
 
             Label("按完成时间排序", systemImage: "arrow.down")
-                .syTypography(DesignSystem.typographyCaption)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.caption)
+                .foregroundStyle(CoreColor.textSecondary)
         }
-        .frame(minHeight: DesignSystem.controlRowMinHeight)
+        .frame(minHeight: CoreMetrics.controlRowMinHeight)
     }
 
     private var historyList: some View {
@@ -115,10 +115,10 @@ struct HistoryView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(
-            DesignSystem.panelBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+            CoreColor.panelBackground,
+            in: RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous)
         )
-        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -160,28 +160,28 @@ private struct HistoryRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: DesignSystem.spaceM) {
-            PlatformThumbnail(platform: item.platform, size: DesignSystem.controlHeightLarge)
+        HStack(spacing: CoreSpacing.m) {
+            PlatformThumbnail(platform: item.platform, size: CoreMetrics.controlHeightLarge)
 
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+            VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                 Text(displayTitle)
-                    .syTypography(DesignSystem.typographyControl)
-                    .foregroundStyle(DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.control)
+                    .foregroundStyle(CoreColor.textPrimary)
                     .lineLimit(1)
 
                 Text(item.sourceURL)
-                    .font(DesignSystem.metadataFont.monospaced())
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .font(CoreTypography.captionFont.monospaced())
+                    .foregroundStyle(CoreColor.textSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Text("\(item.platform.displayName) · \(item.completedAt.formatted(date: .abbreviated, time: .shortened))")
-                    .syTypography(DesignSystem.typographyCaption)
-                    .foregroundStyle(DesignSystem.textTertiary)
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.textTertiary)
                     .lineLimit(1)
             }
 
-            Spacer(minLength: DesignSystem.spaceM)
+            Spacer(minLength: CoreSpacing.m)
 
             actions
                 .frame(width: RefinementLayout.historyActionColumnWidth, alignment: .trailing)
@@ -192,19 +192,19 @@ private struct HistoryRow: View {
         .overlay(alignment: .bottom) {
             if showsDivider {
                 Rectangle()
-                    .fill(DesignSystem.divider)
-                    .frame(height: DesignSystem.dividerWidth)
-                    .padding(.leading, RefinementLayout.libraryRowHorizontalPadding + DesignSystem.controlHeightLarge + DesignSystem.spaceM)
+                    .fill(CoreColor.divider)
+                    .frame(height: CoreMetrics.dividerWidth)
+                    .padding(.leading, RefinementLayout.libraryRowHorizontalPadding + CoreMetrics.controlHeightLarge + CoreSpacing.m)
             }
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
-        .animation(DesignSystem.motionFast, value: isHovered)
+        .animation(CoreMotion.fast, value: isHovered)
     }
 
     private var rowBackground: Color {
-        if isSelected { return DesignSystem.selectionBackground }
-        if isHovered { return DesignSystem.controlHoverBackground }
+        if isSelected { return CoreColor.selectionBackground }
+        if isHovered { return CoreColor.controlHoverBackground }
         return Color.clear
     }
 
@@ -215,13 +215,13 @@ private struct HistoryRow: View {
     }
 
     private var actions: some View {
-        HStack(spacing: DesignSystem.spaceS) {
+        HStack(spacing: CoreSpacing.s) {
             Button("在 Finder 中显示", systemImage: "folder") {
                 NSWorkspace.shared.open(URL(fileURLWithPath: item.outputDirectory))
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
-            .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
+            .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
             .help("在 Finder 中显示")
 
             Menu {
@@ -245,7 +245,7 @@ private struct HistoryRow: View {
                     .labelStyle(.iconOnly)
             }
             .menuStyle(.borderlessButton)
-            .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
+            .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
         }
     }
 }

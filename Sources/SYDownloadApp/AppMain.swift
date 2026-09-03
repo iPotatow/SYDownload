@@ -10,7 +10,7 @@ struct SYDownloadApp: App {
     var body: some Scene {
         WindowGroup("SYDownload", id: "main") {
             ContentView()
-                .tint(DesignSystem.accent)
+                .tint(CoreColor.accent)
                 .environmentObject(model)
                 .environmentObject(updater)
                 .sheet(isPresented: $updater.sheet) {
@@ -22,7 +22,7 @@ struct SYDownloadApp: App {
                 }
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: DesignSystem.windowWidth, height: DesignSystem.windowHeight)
+        .defaultSize(width: SYDownloadLayout.windowWidth, height: SYDownloadLayout.windowHeight)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {

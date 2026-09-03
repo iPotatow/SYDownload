@@ -9,46 +9,46 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             brand
 
-            VStack(spacing: DesignSystem.spaceXS) {
+            VStack(spacing: CoreSpacing.xs) {
                 sidebarButton(.download, title: "下载", systemImage: "arrow.down.circle.fill")
                 sidebarButton(.tasks, title: "任务", systemImage: "tray.full.fill")
                 sidebarButton(.history, title: "历史记录", systemImage: "clock.arrow.circlepath")
 
                 Divider()
-                    .overlay(DesignSystem.divider)
-                    .padding(.horizontal, DesignSystem.spaceM)
-                    .padding(.vertical, DesignSystem.spaceS)
+                    .overlay(CoreColor.divider)
+                    .padding(.horizontal, CoreSpacing.m)
+                    .padding(.vertical, CoreSpacing.s)
 
                 sidebarButton(.photos, title: "照片整理", systemImage: "photo.on.rectangle.angled")
 
                 Divider()
-                    .overlay(DesignSystem.divider)
-                    .padding(.horizontal, DesignSystem.spaceM)
-                    .padding(.vertical, DesignSystem.spaceS)
+                    .overlay(CoreColor.divider)
+                    .padding(.horizontal, CoreSpacing.m)
+                    .padding(.vertical, CoreSpacing.s)
 
                 sidebarButton(.settings, title: "设置", systemImage: "slider.horizontal.3")
             }
-            .padding(.top, DesignSystem.spaceS)
+            .padding(.top, CoreSpacing.s)
 
-            Spacer(minLength: DesignSystem.spaceXL)
+            Spacer(minLength: CoreSpacing.xl)
         }
-        .padding(.top, DesignSystem.sidebarTitlebarClearance)
-        .padding(.horizontal, DesignSystem.sidebarPadding)
-        .padding(.bottom, DesignSystem.sidebarPadding)
+        .padding(.top, SYDownloadLayout.sidebarTitlebarClearance)
+        .padding(.horizontal, SYDownloadLayout.sidebarPadding)
+        .padding(.bottom, SYDownloadLayout.sidebarPadding)
     }
 
     private var brand: some View {
-        HStack(spacing: DesignSystem.spaceS) {
-            AppMark(size: DesignSystem.sidebarBrandLogoSize)
+        HStack(spacing: CoreSpacing.s) {
+            AppMark(size: SYDownloadLayout.sidebarBrandLogoSize)
 
             Text("SYDownload")
-                .syTypography(DesignSystem.typographyBrand)
-                .foregroundStyle(DesignSystem.textPrimary)
+                .coreTypography(CoreTypography.brand)
+                .foregroundStyle(CoreColor.textPrimary)
 
             Spacer(minLength: 0)
         }
-        .frame(height: DesignSystem.sidebarBrandHeight)
-        .padding(.horizontal, DesignSystem.spaceS)
+        .frame(height: SYDownloadLayout.sidebarBrandHeight)
+        .padding(.horizontal, CoreSpacing.s)
     }
 
     private func sidebarButton(
@@ -64,15 +64,15 @@ struct SidebarView: View {
             model.selection = section
             focusedSection.wrappedValue = section
         } label: {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 Image(systemName: systemImage)
-                    .font(.system(size: DesignSystem.sidebarNavigationIconSize, weight: .medium))
-                    .frame(width: DesignSystem.sidebarNavigationIconSize)
-                    .foregroundStyle(visuallyActive ? DesignSystem.accent : DesignSystem.textSecondary)
+                    .font(.system(size: CoreMetrics.controlIconSize, weight: .medium))
+                    .frame(width: CoreMetrics.controlIconSize)
+                    .foregroundStyle(visuallyActive ? CoreColor.accent : CoreColor.textSecondary)
 
                 Text(title)
-                    .syTypography(DesignSystem.typographyControl)
-                    .foregroundStyle(DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.control)
+                    .foregroundStyle(CoreColor.textPrimary)
 
                 Spacer(minLength: 0)
             }
@@ -80,9 +80,11 @@ struct SidebarView: View {
         }
         .focused(focusedSection, equals: section)
         .buttonStyle(
-            SidebarButtonStyle(
-                selected: visuallyActive,
-                isFocused: false
+            CoreSidebarButtonStyle(
+                isSelected: selected,
+                isFocused: focused,
+                height: SYDownloadLayout.sidebarNavigationHeight,
+                horizontalPadding: SYDownloadLayout.sidebarNavigationHorizontalPadding
             )
         )
         .accessibilityAddTraits(selected ? .isSelected : [])

@@ -7,59 +7,59 @@ struct DownloadView: View {
     @FocusState private var linkEditorFocused: Bool
 
     var body: some View {
-        PageContainer(title: "下载") {
+        CorePageContainer(title: "下载", maxWidth: SYDownloadLayout.contentMaxWidth) {
             ScrollView {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                VStack(alignment: .leading, spacing: CoreSpacing.l) {
                     composer
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.bottom, DesignSystem.spaceL)
+                .padding(.bottom, CoreSpacing.l)
             }
         }
         .onChange(of: model.input) { _, _ in model.detectLocally() }
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadFocusDownloadInput)) { _ in
             linkEditorFocused = true
         }
-        .tint(DesignSystem.accent)
+        .tint(CoreColor.accent)
     }
 
     private var composer: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
+        VStack(alignment: .leading, spacing: CoreSpacing.m) {
             Text("下载链接")
-                .syTypography(DesignSystem.typographySectionTitle)
-                .foregroundStyle(DesignSystem.textPrimary)
+                .coreTypography(CoreTypography.sectionTitle)
+                .foregroundStyle(CoreColor.textPrimary)
 
             TextField("粘贴一个或多个链接 / 完整分享文本…", text: $model.input, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(DesignSystem.bodyFont)
+                .font(CoreTypography.bodyFont)
                 .lineLimit(8...12)
-                .padding(.horizontal, DesignSystem.controlHorizontalPadding)
-                .padding(.vertical, DesignSystem.spaceS)
-                .frame(height: DesignSystem.downloadComposerHeight, alignment: .topLeading)
-                .syInputSurface(
+                .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
+                .padding(.vertical, CoreSpacing.s)
+                .frame(height: SYDownloadLayout.downloadComposerHeight, alignment: .topLeading)
+                .coreInputSurface(
                     isFocused: linkEditorFocused,
                     isError: inputShowsError
                 )
                 .focused($linkEditorFocused)
                 .accessibilityLabel("下载链接")
 
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 Text("每行一个链接，也可以直接粘贴完整分享文本")
-                    .syTypography(DesignSystem.typographyCaption)
-                    .foregroundStyle(DesignSystem.textTertiary)
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.textTertiary)
 
-                Spacer(minLength: DesignSystem.spaceM)
+                Spacer(minLength: CoreSpacing.m)
 
                 if !model.input.isEmpty {
                     Button("清空", systemImage: "xmark", action: model.clearInput)
                         .buttonStyle(.borderless)
-                        .font(DesignSystem.uiFont)
-                        .frame(height: DesignSystem.controlHeightCompact)
-                        .foregroundStyle(DesignSystem.textSecondary)
+                        .font(CoreTypography.controlFont)
+                        .frame(height: CoreMetrics.controlHeightCompact)
+                        .foregroundStyle(CoreColor.textSecondary)
                 }
             }
 
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 platformChip(.xiaohongshu)
                 platformChip(.douyin)
                 Spacer(minLength: 0)
@@ -67,20 +67,20 @@ struct DownloadView: View {
 
             statusPanel
 
-            HStack(spacing: DesignSystem.spaceM) {
+            HStack(spacing: CoreSpacing.m) {
                 Spacer(minLength: 0)
 
                 Button("检查链接", systemImage: "checkmark.circle", action: validate)
                     .buttonStyle(.bordered)
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightDefault)
                     .disabled(actionsDisabled)
 
                 Button(downloadButtonTitle, systemImage: "arrow.down", action: download)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightLarge)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightLarge)
                     .keyboardShortcut(.return, modifiers: [.command])
                     .disabled(actionsDisabled)
             }
@@ -91,34 +91,34 @@ struct DownloadView: View {
         let count = platformCount(for: platform)
         let active = count > 0
 
-        return HStack(spacing: DesignSystem.spaceXS) {
+        return HStack(spacing: CoreSpacing.xs) {
             PlatformBrandIcon(platform: platform, size: 16, cornerRadius: 4)
 
             Text(platform.displayName)
-                .syTypography(DesignSystem.typographyGroupLabel)
+                .coreTypography(CoreTypography.groupLabel)
 
             Text("\(count)")
-                .syTypography(DesignSystem.typographyGroupLabel)
+                .coreTypography(CoreTypography.groupLabel)
                 .monospacedDigit()
-                .foregroundStyle(active ? DesignSystem.accent : DesignSystem.textTertiary)
-                .padding(.horizontal, DesignSystem.spaceXS)
+                .foregroundStyle(active ? CoreColor.accent : CoreColor.textTertiary)
+                .padding(.horizontal, CoreSpacing.xs)
                 .background(
-                    active ? DesignSystem.selectionBackground : DesignSystem.panelBackground,
+                    active ? CoreColor.selectionBackground : CoreColor.panelBackground,
                     in: Capsule()
                 )
         }
-        .foregroundStyle(active ? DesignSystem.textPrimary : DesignSystem.textSecondary)
-        .padding(.horizontal, DesignSystem.spaceS)
-        .frame(minHeight: DesignSystem.controlHeightCompact)
+        .foregroundStyle(active ? CoreColor.textPrimary : CoreColor.textSecondary)
+        .padding(.horizontal, CoreSpacing.s)
+        .frame(minHeight: CoreMetrics.controlHeightCompact)
         .background(
-            active ? DesignSystem.selectionBackground : DesignSystem.controlBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+            active ? CoreColor.selectionBackground : CoreColor.controlBackground,
+            in: RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
                 .strokeBorder(
-                    active ? DesignSystem.accent.opacity(0.18) : DesignSystem.divider,
-                    lineWidth: DesignSystem.dividerWidth
+                    active ? CoreColor.accent.opacity(0.18) : CoreColor.divider,
+                    lineWidth: CoreMetrics.dividerWidth
                 )
         }
         .accessibilityElement(children: .combine)
@@ -126,49 +126,49 @@ struct DownloadView: View {
     }
 
     private var statusPanel: some View {
-        HStack(spacing: DesignSystem.spaceM) {
+        HStack(spacing: CoreSpacing.m) {
             if model.isParsing || model.isWorking {
                 ProgressView()
                     .controlSize(.small)
-                    .frame(width: DesignSystem.controlIconSize, height: DesignSystem.controlIconSize)
+                    .frame(width: CoreMetrics.controlIconSize, height: CoreMetrics.controlIconSize)
             } else {
                 Image(systemName: statusSymbol)
-                    .font(.system(size: DesignSystem.controlIconSize, weight: .semibold))
+                    .font(.system(size: CoreMetrics.controlIconSize, weight: .semibold))
                     .foregroundStyle(statusColor)
-                    .frame(width: DesignSystem.controlIconSize, height: DesignSystem.controlIconSize)
+                    .frame(width: CoreMetrics.controlIconSize, height: CoreMetrics.controlIconSize)
             }
 
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+            VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                 Text(visibleStatus)
-                    .syTypography(DesignSystem.typographyControl)
-                    .foregroundStyle(model.statusIsError ? DesignSystem.semanticDanger : DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.control)
+                    .foregroundStyle(model.statusIsError ? CoreColor.danger : CoreColor.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(statusDetail)
-                    .syTypography(DesignSystem.typographyCaption)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Spacer(minLength: DesignSystem.spaceM)
+            Spacer(minLength: CoreSpacing.m)
 
             if model.supportedLinkCount > 0 {
                 Text("\(model.supportedLinkCount) 项")
-                    .syTypography(DesignSystem.typographyGroupLabel)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.groupLabel)
+                    .foregroundStyle(CoreColor.textSecondary)
                     .monospacedDigit()
             }
         }
-        .padding(.horizontal, DesignSystem.spaceM)
-        .padding(.vertical, DesignSystem.spaceS)
+        .padding(.horizontal, CoreSpacing.m)
+        .padding(.vertical, CoreSpacing.s)
         .frame(maxWidth: .infinity, minHeight: RefinementLayout.downloadStatusMinHeight, alignment: .leading)
         .background(
             statusColor.opacity(model.statusIsError || model.supportedLinkCount > 0 ? 0.07 : 0.04),
-            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+            in: RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
-                .strokeBorder(statusColor.opacity(0.14), lineWidth: DesignSystem.dividerWidth)
+            RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous)
+                .strokeBorder(statusColor.opacity(0.14), lineWidth: CoreMetrics.dividerWidth)
         }
         .accessibilityElement(children: .combine)
     }
@@ -256,11 +256,11 @@ struct DownloadView: View {
     }
 
     private var statusColor: Color {
-        if model.statusIsError { return DesignSystem.semanticDanger }
+        if model.statusIsError { return CoreColor.danger }
         if !model.validatedInput.isEmpty || model.supportedLinkCount > 0 {
-            return DesignSystem.semanticSuccess
+            return CoreColor.success
         }
-        return DesignSystem.textSecondary
+        return CoreColor.textSecondary
     }
 
     private func platformCount(for platform: DownloadPlatform) -> Int {

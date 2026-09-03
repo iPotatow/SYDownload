@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "SYDownload",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v15)],
     products: [
         .library(name: "SYDownloadCore", targets: ["SYDownloadCore"]),
         .executable(name: "SYDownload", targets: ["SYDownloadApp"]),

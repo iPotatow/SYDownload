@@ -65,32 +65,32 @@ private struct SettingsPopupSelector<Value: Hashable>: View {
                 }
             }
         } label: {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 Text(selectedTitle)
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Spacer(minLength: DesignSystem.spaceS)
+                Spacer(minLength: CoreSpacing.s)
                 Image(systemName: "chevron.up.chevron.down")
-                    .font(DesignSystem.supportingFont)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .font(CoreTypography.captionFont)
+                    .foregroundStyle(CoreColor.textSecondary)
             }
-            .padding(.horizontal, DesignSystem.controlHorizontalPadding)
-            .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
+            .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
             .background(
-                DesignSystem.controlBackground,
-                in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                CoreColor.controlBackground,
+                in: RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                    .strokeBorder(DesignSystem.border, lineWidth: DesignSystem.borderWidth)
+                RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
+                    .strokeBorder(CoreColor.border, lineWidth: CoreMetrics.borderWidth)
             }
             .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault, alignment: .trailing)
+        .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault, alignment: .trailing)
         .accessibilityLabel(title)
         .accessibilityValue(selectedTitle)
     }
@@ -129,31 +129,31 @@ private struct NameFormatSelector: View {
         Button {
             isPresented.toggle()
         } label: {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 Text(selectedSummary)
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Spacer(minLength: DesignSystem.spaceS)
+                Spacer(minLength: CoreSpacing.s)
                 Image(systemName: "chevron.down")
-                    .font(DesignSystem.supportingFont)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .font(CoreTypography.captionFont)
+                    .foregroundStyle(CoreColor.textSecondary)
             }
-            .padding(.horizontal, DesignSystem.controlHorizontalPadding)
-            .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+            .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
+            .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
             .background(
-                DesignSystem.controlBackground,
-                in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                CoreColor.controlBackground,
+                in: RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                    .strokeBorder(DesignSystem.border, lineWidth: DesignSystem.borderWidth)
+                RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
+                    .strokeBorder(CoreColor.border, lineWidth: CoreMetrics.borderWidth)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault, alignment: .trailing)
+        .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault, alignment: .trailing)
         .popover(isPresented: $isPresented) {
             nameFormatPopover
         }
@@ -162,14 +162,14 @@ private struct NameFormatSelector: View {
     }
 
     private var nameFormatPopover: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+        VStack(alignment: .leading, spacing: CoreSpacing.m) {
+            VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                 Text(title)
-                    .syTypography(DesignSystem.typographySectionTitle)
-                    .foregroundStyle(DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.sectionTitle)
+                    .foregroundStyle(CoreColor.textPrimary)
                 Text("至少保留一个字段；已选字段可用右侧箭头调整文件名顺序。")
-                    .syTypography(DesignSystem.typographyCaption)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.textSecondary)
             }
 
             ScrollView {
@@ -181,7 +181,7 @@ private struct NameFormatSelector: View {
             }
             .frame(maxHeight: 360)
         }
-        .padding(DesignSystem.spaceL)
+        .padding(CoreSpacing.l)
         .frame(width: 380)
     }
 
@@ -190,16 +190,16 @@ private struct NameFormatSelector: View {
         let selected = tokens.contains(option.rawValue)
         let selectedIndex = tokens.firstIndex(of: option.rawValue)
 
-        return HStack(spacing: DesignSystem.spaceS) {
+        return HStack(spacing: CoreSpacing.s) {
             Button {
                 toggle(option.rawValue)
             } label: {
-                HStack(spacing: DesignSystem.spaceS) {
+                HStack(spacing: CoreSpacing.s) {
                     Image(systemName: selected ? "checkmark.square.fill" : "square")
-                        .foregroundStyle(selected ? DesignSystem.accent : DesignSystem.textSecondary)
+                        .foregroundStyle(selected ? CoreColor.accent : CoreColor.textSecondary)
                     Text(option.title)
-                        .syTypography(DesignSystem.typographyBody)
-                        .foregroundStyle(DesignSystem.textPrimary)
+                        .coreTypography(CoreTypography.body)
+                        .foregroundStyle(CoreColor.textPrimary)
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
@@ -214,7 +214,7 @@ private struct NameFormatSelector: View {
                     Image(systemName: "chevron.up")
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .foregroundStyle(CoreColor.textSecondary)
                 .disabled(selectedIndex == 0)
                 .help("向前移动")
 
@@ -224,7 +224,7 @@ private struct NameFormatSelector: View {
                     Image(systemName: "chevron.down")
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .foregroundStyle(CoreColor.textSecondary)
                 .disabled(selectedIndex == tokens.count - 1)
                 .help("向后移动")
             } else {
@@ -232,11 +232,11 @@ private struct NameFormatSelector: View {
                 Color.clear.frame(width: 28, height: 20)
             }
         }
-        .frame(minHeight: DesignSystem.settingsRowMinHeight)
+        .frame(minHeight: CoreMetrics.settingsRowMinHeight)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(DesignSystem.divider)
-                .frame(height: DesignSystem.dividerWidth)
+                .fill(CoreColor.divider)
+                .frame(height: CoreMetrics.dividerWidth)
         }
     }
 
@@ -301,8 +301,8 @@ struct SettingsView: View {
     ]
 
     var body: some View {
-        PageContainer(title: "设置") {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+        CorePageContainer(title: "设置", maxWidth: SYDownloadLayout.contentMaxWidth) {
+            VStack(alignment: .leading, spacing: CoreSpacing.l) {
                 settingsTabs
                 if showsEngineStatus {
                     statusBanner
@@ -312,9 +312,9 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .tint(DesignSystem.accent)
+        .tint(CoreColor.accent)
         .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)
-        .animation(reduceMotion ? nil : DesignSystem.motionStandard, value: tab)
+        .animation(reduceMotion ? nil : CoreMotion.standard, value: tab)
         .task {
             let isInitialLoad = !model.hasLoadedEngineSettings
             observingEngineSettingsChanges = false
@@ -372,8 +372,8 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightDefault)
+            .font(CoreTypography.controlFont)
+            .frame(height: CoreMetrics.controlHeightDefault)
             .accessibilityLabel("设置分类")
         }
     }
@@ -381,40 +381,40 @@ struct SettingsView: View {
     @ViewBuilder
     private var statusBanner: some View {
         if model.settingsLoading {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 ProgressView().controlSize(.small)
                 Text("正在同步配置")
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textSecondary)
                 Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, minHeight: DesignSystem.controlRowMinHeight)
+            .frame(maxWidth: .infinity, minHeight: CoreMetrics.controlRowMinHeight)
         } else if !model.settingsStatus.isEmpty {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 Label(
                     model.settingsStatus,
                     systemImage: model.settingsStatusIsError ? "exclamationmark.triangle" : "checkmark.circle"
                 )
-                .syTypography(DesignSystem.typographyBody)
-                .foregroundStyle(model.settingsStatusIsError ? DesignSystem.destructive : DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.body)
+                .foregroundStyle(model.settingsStatusIsError ? CoreColor.danger : CoreColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: DesignSystem.spaceM)
+                Spacer(minLength: CoreSpacing.m)
 
                 if model.settingsStatusIsError {
                     Button("重新读取") { reloadSettings() }
                         .buttonStyle(.bordered)
-                        .font(DesignSystem.uiFont)
-                        .frame(height: DesignSystem.controlHeightDefault)
+                        .font(CoreTypography.controlFont)
+                        .frame(height: CoreMetrics.controlHeightDefault)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: DesignSystem.controlRowMinHeight)
+            .frame(maxWidth: .infinity, minHeight: CoreMetrics.controlRowMinHeight)
         }
     }
 
     private var settingsContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+            VStack(alignment: .leading, spacing: CoreSpacing.l) {
                 switch tab {
                 case .general: generalSettings
                 case .xhs: xhsSettings
@@ -424,37 +424,37 @@ struct SettingsView: View {
                 case .about: aboutSettings
                 }
             }
-            .padding(.bottom, DesignSystem.spaceS)
+            .padding(.bottom, CoreSpacing.s)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .disabled(model.settingsLoading && showsEngineStatus)
-        .opacity(model.settingsLoading && showsEngineStatus ? DesignSystem.disabledOpacity : 1)
+        .opacity(model.settingsLoading && showsEngineStatus ? CoreState.disabledOpacity : 1)
     }
 
     @ViewBuilder
     private var generalSettings: some View {
-        AlignedSettingsSection("保存位置") {
+        CoreSettingsSection("保存位置") {
             SettingsControlRow("下载目录", showsDivider: false) {
-                HStack(spacing: DesignSystem.spaceS) {
+                HStack(spacing: CoreSpacing.s) {
                     TextField("下载目录", text: $model.outputDirectory)
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
                         .frame(width: RefinementLayout.settingsPathFieldWidth)
-                        .frame(height: DesignSystem.controlHeightDefault)
+                        .frame(height: CoreMetrics.controlHeightDefault)
                     Button("更改") { chooseFolder() }
-                        .font(DesignSystem.uiFont)
-                        .frame(height: DesignSystem.controlHeightDefault)
+                        .font(CoreTypography.controlFont)
+                        .frame(height: CoreMetrics.controlHeightDefault)
                 }
             }
 
             Text("小红书与抖音都会直接保存到这个目录，不再额外创建 Download 文件夹。")
-                .syTypography(DesignSystem.typographyCaption)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.caption)
+                .foregroundStyle(CoreColor.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.top, DesignSystem.spaceS)
+                .padding(.top, CoreSpacing.s)
         }
 
-        AlignedSettingsSection("偏好") {
+        CoreSettingsSection("偏好") {
             SettingsControlRow("应用外观", showsDivider: false) {
                 SettingsPopupSelector(
                     title: "应用外观",
@@ -471,10 +471,10 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var updateSettings: some View {
-        AlignedSettingsSection("更新") {
+        CoreSettingsSection("更新") {
             SettingsControlRow("当前版本") {
                 Text(updater.displayVersion)
-                    .syTypography(DesignSystem.typographyBody)
+                    .coreTypography(CoreTypography.body)
                     .monospacedDigit()
                     .textSelection(.enabled)
             }
@@ -489,15 +489,15 @@ struct SettingsView: View {
                 )
             }
 
-            SettingsRow(showsDivider: false) {
-                HStack(spacing: DesignSystem.spaceS) {
+            CoreSettingsRow(showsDivider: false) {
+                HStack(spacing: CoreSpacing.s) {
                     updateStatus
-                    Spacer(minLength: DesignSystem.spaceM)
+                    Spacer(minLength: CoreSpacing.m)
                     Button("检查更新") {
                         updater.checkForUpdates()
                     }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightDefault)
                     .disabled(updater.isChecking || updater.isUpdating)
 
                     if updater.updateAvailable {
@@ -505,8 +505,8 @@ struct SettingsView: View {
                             updater.downloadUpdate()
                         }
                         .buttonStyle(.borderedProminent)
-                        .font(DesignSystem.uiFont)
-                        .frame(height: DesignSystem.controlHeightDefault)
+                        .font(CoreTypography.controlFont)
+                        .frame(height: CoreMetrics.controlHeightDefault)
                         .disabled(updater.isUpdating)
                     }
                 }
@@ -514,14 +514,14 @@ struct SettingsView: View {
             }
 
             if updater.isUpdating {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+                VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                     ProgressView(value: updater.progressBar.1)
                     Text(updater.progressBar.0)
-                        .syTypography(DesignSystem.typographyCaption)
-                        .foregroundStyle(DesignSystem.textSecondary)
+                        .coreTypography(CoreTypography.caption)
+                        .foregroundStyle(CoreColor.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, DesignSystem.spaceS)
+                .padding(.top, CoreSpacing.s)
             }
         }
     }
@@ -529,100 +529,100 @@ struct SettingsView: View {
     @ViewBuilder
     private var updateStatus: some View {
         if updater.isChecking {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 ProgressView().controlSize(.small)
                 Text("正在检查更新…")
             }
-            .foregroundStyle(DesignSystem.textSecondary)
+            .foregroundStyle(CoreColor.textSecondary)
         } else if let error = updater.updateError {
             Label(error, systemImage: "exclamationmark.triangle")
-                .foregroundStyle(DesignSystem.destructive)
+                .foregroundStyle(CoreColor.danger)
                 .fixedSize(horizontal: false, vertical: true)
         } else if updater.updateAvailable, let release = updater.latestRelease {
             Label("发现新版本 \(release.tagName)", systemImage: "arrow.down.circle.fill")
-                .foregroundStyle(DesignSystem.accent)
+                .foregroundStyle(CoreColor.accent)
         } else if let release = updater.latestRelease {
             Label("已是最新版本（\(release.tagName)）", systemImage: "checkmark.circle")
-                .foregroundStyle(DesignSystem.textSecondary)
+                .foregroundStyle(CoreColor.textSecondary)
         } else {
             Text("每天自动检查一次，也可以手动检查。")
-                .foregroundStyle(DesignSystem.textSecondary)
+                .foregroundStyle(CoreColor.textSecondary)
         }
     }
 
     @ViewBuilder
     private var aboutSettings: some View {
-        AlignedSettingsSection("关于 SYDownload") {
-            SettingsRow {
-                HStack(spacing: DesignSystem.spaceL) {
+        CoreSettingsSection("关于 SYDownload") {
+            CoreSettingsRow {
+                HStack(spacing: CoreSpacing.l) {
                     AppMark(size: 48)
-                    VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+                    VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                         Text("SYDownload")
-                            .syTypography(DesignSystem.typographySectionTitle)
-                            .foregroundStyle(DesignSystem.textPrimary)
+                            .coreTypography(CoreTypography.sectionTitle)
+                            .foregroundStyle(CoreColor.textPrimary)
                         Text("小红书与抖音下载工具 · \(updater.displayVersion)")
-                            .syTypography(DesignSystem.typographyBody)
-                            .foregroundStyle(DesignSystem.textSecondary)
+                            .coreTypography(CoreTypography.body)
+                            .foregroundStyle(CoreColor.textSecondary)
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, DesignSystem.spaceS)
+                .padding(.vertical, CoreSpacing.s)
             }
 
-            SettingsRow {
+            CoreSettingsRow {
                 Text("自动识别分享链接并调用内置下载引擎；媒体文件直接写入你选择的下载目录。")
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            SettingsRow(showsDivider: false) {
-                HStack(spacing: DesignSystem.spaceS) {
+            CoreSettingsRow(showsDivider: false) {
+                HStack(spacing: CoreSpacing.s) {
                     Spacer(minLength: 0)
                     Button("问题反馈") {
                         open("https://github.com/iPotatow/SYDownload/issues")
                     }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightDefault)
                     Button("使用文档") {
                         open("https://github.com/iPotatow/SYDownload#readme")
                     }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightDefault)
                     Button("打开 GitHub 仓库") {
                         open("https://github.com/iPotatow/SYDownload")
                     }
                     .buttonStyle(.borderedProminent)
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightDefault)
                 }
                 .frame(maxWidth: .infinity)
             }
         }
 
-        AlignedSettingsSection("开源组件") {
+        CoreSettingsSection("开源组件") {
             SettingsControlRow("下载引擎") {
                 Text("XHS-Downloader · TikTokDownloader")
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textSecondary)
             }
             SettingsControlRow("许可证", showsDivider: false) {
                 Text("GPL-3.0")
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textSecondary)
             }
         }
     }
 
     @ViewBuilder
     private var xhsSettings: some View {
-        AlignedSettingsSection("下载内容") {
+        CoreSettingsSection("下载内容") {
             settingsToggleRow("下载图片", isOn: $model.xhsSettings.imageDownload)
             settingsToggleRow("下载视频", isOn: $model.xhsSettings.videoDownload)
             settingsToggleRow("下载动图", isOn: $model.xhsSettings.liveDownload, showsDivider: false)
         }
 
-        AlignedSettingsSection("格式") {
+        CoreSettingsSection("格式") {
             SettingsControlRow("图片格式") {
                 SettingsPopupSelector(
                     title: "图片格式",
@@ -659,7 +659,7 @@ struct SettingsView: View {
             }
         }
 
-        AlignedSettingsSection("文件管理") {
+        CoreSettingsSection("文件管理") {
             SettingsControlRow("文件命名格式") {
                 NameFormatSelector(
                     title: "小红书文件命名格式",
@@ -676,10 +676,10 @@ struct SettingsView: View {
             settingsToggleRow("记录作品数据", isOn: $model.xhsSettings.recordData, showsDivider: false)
         }
 
-        AlignedSettingsSection("Cookie") {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+        CoreSettingsSection("Cookie") {
+            VStack(alignment: .leading, spacing: CoreSpacing.s) {
                 Text("小红书网页版 Cookie")
-                    .syTypography(DesignSystem.typographyBody)
+                    .coreTypography(CoreTypography.body)
                 plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100, field: .xhsCookie)
                     .accessibilityLabel("小红书网页版 Cookie")
             }
@@ -689,14 +689,14 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var douyinSettings: some View {
-        AlignedSettingsSection("下载内容") {
+        CoreSettingsSection("下载内容") {
             settingsToggleRow("下载音乐", isOn: $model.douyinSettings.music)
             settingsToggleRow("下载动态封面", isOn: $model.douyinSettings.dynamicCover)
             settingsToggleRow("下载静态封面", isOn: $model.douyinSettings.staticCover)
             settingsToggleRow("优先原始画质", isOn: $model.douyinSettings.originalQuality, showsDivider: false)
         }
 
-        AlignedSettingsSection("文件管理") {
+        CoreSettingsSection("文件管理") {
             SettingsControlRow("文件命名格式") {
                 NameFormatSelector(
                     title: "抖音文件命名格式",
@@ -710,56 +710,56 @@ struct SettingsView: View {
                 TextField("64", value: $model.douyinSettings.descLength, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+                    .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
             }
 
             SettingsControlRow("文件名最大长度") {
                 TextField("128", value: $model.douyinSettings.nameLength, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+                    .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
             }
 
             SettingsControlRow("日期格式") {
                 TextField("%Y-%m-%d %H:%M:%S", text: $model.douyinSettings.dateFormat)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+                    .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
             }
 
             SettingsControlRow("文件名分隔符") {
                 TextField("-", text: $model.douyinSettings.split)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+                    .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
             }
 
             SettingsControlRow("数据保存格式") {
                 TextField("留空为不保存", text: $model.douyinSettings.storageFormat)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+                    .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
             }
 
             SettingsControlRow("文件大小限制") {
-                HStack(spacing: DesignSystem.spaceS) {
+                HStack(spacing: CoreSpacing.s) {
                     TextField("0", value: $model.douyinSettings.maxSize, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
-                        .frame(width: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+                        .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
                     Text("0 表示不限制")
-                        .syTypography(DesignSystem.typographyCaption)
-                        .foregroundStyle(DesignSystem.textSecondary)
+                        .coreTypography(CoreTypography.caption)
+                        .foregroundStyle(CoreColor.textSecondary)
                 }
             }
 
             settingsToggleRow("每个作品使用独立文件夹", isOn: $model.douyinSettings.folderMode, showsDivider: false)
         }
 
-        AlignedSettingsSection("Cookie") {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+        CoreSettingsSection("Cookie") {
+            VStack(alignment: .leading, spacing: CoreSpacing.s) {
                 Text("抖音网页版 Cookie（douyin.com）")
-                    .syTypography(DesignSystem.typographyBody)
+                    .coreTypography(CoreTypography.body)
                 plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 92, field: .douyinCookie)
                     .accessibilityLabel("抖音网页版 Cookie")
             }
@@ -769,36 +769,36 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var advancedSettings: some View {
-        AlignedSettingsSection("原始配置文件") {
+        CoreSettingsSection("原始配置文件") {
             configRow(title: "小红书 settings.json", path: model.xhsSettingsPath, showsDivider: true)
             configRow(title: "抖音 settings.json", path: model.douyinSettingsPath, showsDivider: false)
             Text("界面只修改可见字段；代理、网络超时、重试和浏览器指纹等其他字段会保留在原始 JSON 中。")
-                .syTypography(DesignSystem.typographyCaption)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.caption)
+                .foregroundStyle(CoreColor.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, DesignSystem.spaceS)
+                .padding(.top, CoreSpacing.s)
         }
 
-        AlignedSettingsSection("恢复默认配置") {
+        CoreSettingsSection("恢复默认配置") {
             Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
-                .syTypography(DesignSystem.typographyCaption)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.caption)
+                .foregroundStyle(CoreColor.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 Spacer(minLength: 0)
                 Button("恢复小红书默认设置", role: .destructive) { resetTarget = "xiaohongshu" }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightDefault)
                 Button("恢复抖音默认设置", role: .destructive) { resetTarget = "douyin" }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightDefault)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightDefault)
             }
             .frame(maxWidth: .infinity)
-            .padding(.top, DesignSystem.spaceS)
+            .padding(.top, CoreSpacing.s)
         }
 
-        AlignedSettingsSection("数据目录") {
+        CoreSettingsSection("数据目录") {
             pathRow("应用数据", "~/Library/Application Support/SYDownload/", showsDivider: true)
             pathRow("缓存", "~/Library/Caches/SYDownload/", showsDivider: true)
             pathRow("下载文件", model.outputDirectory, showsDivider: false)
@@ -819,40 +819,40 @@ struct SettingsView: View {
     }
 
     private func configRow(title: String, path: String, showsDivider: Bool) -> some View {
-        SettingsRow(showsDivider: showsDivider) {
-            HStack(alignment: .center, spacing: DesignSystem.spaceM) {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+        CoreSettingsRow(showsDivider: showsDivider) {
+            HStack(alignment: .center, spacing: CoreSpacing.m) {
+                VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                     Text(title)
-                        .syTypography(DesignSystem.typographyControl)
+                        .coreTypography(CoreTypography.control)
                     Text(path.isEmpty ? "尚未生成" : path)
-                        .font(DesignSystem.metadataFont.monospaced())
-                        .foregroundStyle(path.isEmpty ? DesignSystem.textSecondary : DesignSystem.textPrimary)
+                        .font(CoreTypography.captionFont.monospaced())
+                        .foregroundStyle(path.isEmpty ? CoreColor.textSecondary : CoreColor.textPrimary)
                         .lineLimit(2)
                         .truncationMode(.middle)
                         .textSelection(.enabled)
                 }
 
-                Spacer(minLength: DesignSystem.spaceM)
+                Spacer(minLength: CoreSpacing.m)
 
                 Button("打开") { openConfig(path) }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightCompact)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightCompact)
                     .disabled(path.isEmpty)
                 Button("在 Finder 中显示") { revealConfig(path) }
-                    .font(DesignSystem.uiFont)
-                    .frame(height: DesignSystem.controlHeightCompact)
+                    .font(CoreTypography.controlFont)
+                    .frame(height: CoreMetrics.controlHeightCompact)
                     .disabled(path.isEmpty)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, DesignSystem.spaceXS)
+            .padding(.vertical, CoreSpacing.xs)
         }
     }
 
     private func pathRow(_ label: String, _ value: String, showsDivider: Bool) -> some View {
         SettingsControlRow(label, showsDivider: showsDivider) {
             Text(value)
-                .font(DesignSystem.metadataFont.monospaced())
-                .foregroundStyle(DesignSystem.textSecondary)
+                .font(CoreTypography.captionFont.monospaced())
+                .foregroundStyle(CoreColor.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .textSelection(.enabled)
@@ -864,28 +864,28 @@ struct SettingsView: View {
         isDirty: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: DesignSystem.spaceM) {
+        HStack(spacing: CoreSpacing.m) {
             Label(
                 isDirty ? "有未保存更改" : "当前配置已保存",
                 systemImage: isDirty ? "circle.fill" : "checkmark.circle"
             )
-            .font(DesignSystem.groupLabelFont)
-            .foregroundStyle(isDirty ? DesignSystem.accent : DesignSystem.textSecondary)
+            .font(CoreTypography.groupLabelFont)
+            .foregroundStyle(isDirty ? CoreColor.accent : CoreColor.textSecondary)
 
-            Spacer(minLength: DesignSystem.spaceM)
+            Spacer(minLength: CoreSpacing.m)
 
             Button(title, action: action)
                 .buttonStyle(.borderedProminent)
-                .font(DesignSystem.uiFont)
-                .frame(height: DesignSystem.controlHeightDefault)
+                .font(CoreTypography.controlFont)
+                .frame(height: CoreMetrics.controlHeightDefault)
                 .disabled(model.settingsLoading || !isDirty)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, DesignSystem.spaceS)
+        .padding(.top, CoreSpacing.s)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(DesignSystem.hairline)
-                .frame(height: DesignSystem.dividerWidth)
+                .fill(CoreColor.divider)
+                .frame(height: CoreMetrics.dividerWidth)
         }
     }
 
@@ -933,11 +933,11 @@ struct SettingsView: View {
         field: SettingsFocusField
     ) -> some View {
         TextEditor(text: text)
-            .font(DesignSystem.metadataFont.monospaced())
+            .font(CoreTypography.captionFont.monospaced())
             .scrollContentBackground(.hidden)
-            .padding(DesignSystem.spaceS)
+            .padding(CoreSpacing.s)
             .frame(minHeight: minHeight)
-            .syInputSurface(isFocused: focusedField == field)
+            .coreInputSurface(isFocused: focusedField == field)
             .focused($focusedField, equals: field)
     }
 

@@ -9,10 +9,10 @@ struct TasksView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        PageContainer(title: "任务") {
+        CorePageContainer(title: "任务", maxWidth: SYDownloadLayout.contentMaxWidth) {
             searchField
         } content: {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+            VStack(alignment: .leading, spacing: CoreSpacing.l) {
                 filterBar
 
                 if displayedTasks.isEmpty {
@@ -46,23 +46,23 @@ struct TasksView: View {
             guard model.selection == .tasks else { return }
             searchFocused = true
         }
-        .tint(DesignSystem.accent)
+        .tint(CoreColor.accent)
     }
 
     private var searchField: some View {
-        HStack(spacing: DesignSystem.spaceS) {
+        HStack(spacing: CoreSpacing.s) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(DesignSystem.textTertiary)
+                .foregroundStyle(CoreColor.textTertiary)
                 .accessibilityHidden(true)
 
             TextField("搜索任务（标题、链接、平台）", text: $searchText)
                 .textFieldStyle(.plain)
-                .font(DesignSystem.bodyFont)
+                .font(CoreTypography.bodyFont)
                 .focused($searchFocused)
         }
-        .padding(.horizontal, DesignSystem.controlHorizontalPadding)
-        .frame(width: DesignSystem.pageHeaderSearchWidth, height: DesignSystem.controlHeightSmall)
-        .syInputSurface(isFocused: searchFocused)
+        .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
+        .frame(width: SYDownloadLayout.pageHeaderSearchWidth, height: CoreMetrics.controlHeightSmall)
+        .coreInputSurface(isFocused: searchFocused)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("搜索任务")
     }
@@ -77,8 +77,8 @@ struct TasksView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightDefault)
+            .font(CoreTypography.controlFont)
+            .frame(height: CoreMetrics.controlHeightDefault)
             .accessibilityLabel("任务状态")
         }
     }
@@ -88,8 +88,8 @@ struct TasksView: View {
             taskTableHeader
 
             Rectangle()
-                .fill(DesignSystem.divider)
-                .frame(height: DesignSystem.dividerWidth)
+                .fill(CoreColor.divider)
+                .frame(height: CoreMetrics.dividerWidth)
 
             List(selection: $selectedTaskID) {
                 ForEach(Array(displayedTasks.enumerated()), id: \.element.id) { index, task in
@@ -113,39 +113,39 @@ struct TasksView: View {
             .background(Color.clear)
         }
         .background(
-            DesignSystem.panelBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+            CoreColor.panelBackground,
+            in: RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous)
         )
-        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var taskTableHeader: some View {
-        HStack(spacing: DesignSystem.spaceM) {
+        HStack(spacing: CoreSpacing.m) {
             Text("任务")
-                .syTypography(DesignSystem.typographyGroupLabel)
-                .padding(.leading, DesignSystem.controlHeightLarge + DesignSystem.spaceS)
+                .coreTypography(CoreTypography.groupLabel)
+                .padding(.leading, CoreMetrics.controlHeightLarge + CoreSpacing.s)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Text("状态")
-                .syTypography(DesignSystem.typographyGroupLabel)
+                .coreTypography(CoreTypography.groupLabel)
                 .frame(width: RefinementLayout.taskStatusColumnWidth, alignment: .leading)
 
             Text("文件数")
-                .syTypography(DesignSystem.typographyGroupLabel)
+                .coreTypography(CoreTypography.groupLabel)
                 .frame(width: RefinementLayout.taskFileColumnWidth, alignment: .leading)
 
             Text("创建时间")
-                .syTypography(DesignSystem.typographyGroupLabel)
+                .coreTypography(CoreTypography.groupLabel)
                 .frame(width: RefinementLayout.taskDateColumnWidth, alignment: .leading)
 
             Text("操作")
-                .syTypography(DesignSystem.typographyGroupLabel)
+                .coreTypography(CoreTypography.groupLabel)
                 .frame(width: RefinementLayout.taskActionColumnWidth, alignment: .trailing)
         }
-        .foregroundStyle(DesignSystem.textSecondary)
+        .foregroundStyle(CoreColor.textSecondary)
         .padding(.horizontal, RefinementLayout.libraryRowHorizontalPadding)
-        .frame(height: DesignSystem.controlRowMinHeight)
+        .frame(height: CoreMetrics.controlRowMinHeight)
     }
 
     @ViewBuilder
@@ -280,19 +280,19 @@ private struct TaskRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: DesignSystem.spaceM) {
-            HStack(spacing: DesignSystem.spaceS) {
-                PlatformThumbnail(platform: task.platform, size: DesignSystem.controlHeightLarge)
+        HStack(spacing: CoreSpacing.m) {
+            HStack(spacing: CoreSpacing.s) {
+                PlatformThumbnail(platform: task.platform, size: CoreMetrics.controlHeightLarge)
 
-                VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+                VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                     Text(displayTitle)
-                        .syTypography(DesignSystem.typographyControl)
-                        .foregroundStyle(DesignSystem.textPrimary)
+                        .coreTypography(CoreTypography.control)
+                        .foregroundStyle(CoreColor.textPrimary)
                         .lineLimit(1)
 
                     Text(detailText)
-                        .syTypography(DesignSystem.typographyCaption)
-                        .foregroundStyle(task.state == .failed ? DesignSystem.destructive : DesignSystem.textSecondary)
+                        .coreTypography(CoreTypography.caption)
+                        .foregroundStyle(task.state == .failed ? CoreColor.danger : CoreColor.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
@@ -305,14 +305,14 @@ private struct TaskRow: View {
                 .frame(width: RefinementLayout.taskStatusColumnWidth, alignment: .leading)
 
             Text(task.fileCount > 0 ? "\(task.fileCount)" : "—")
-                .syTypography(DesignSystem.typographyBody)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.body)
+                .foregroundStyle(CoreColor.textSecondary)
                 .monospacedDigit()
                 .frame(width: RefinementLayout.taskFileColumnWidth, alignment: .leading)
 
             Text(task.createdAt.formatted(date: .numeric, time: .shortened))
-                .syTypography(DesignSystem.typographyCaption)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.caption)
+                .foregroundStyle(CoreColor.textSecondary)
                 .monospacedDigit()
                 .lineLimit(1)
                 .frame(width: RefinementLayout.taskDateColumnWidth, alignment: .leading)
@@ -326,19 +326,19 @@ private struct TaskRow: View {
         .overlay(alignment: .bottom) {
             if showsDivider {
                 Rectangle()
-                    .fill(DesignSystem.divider)
-                    .frame(height: DesignSystem.dividerWidth)
-                    .padding(.leading, RefinementLayout.libraryRowHorizontalPadding + DesignSystem.controlHeightLarge + DesignSystem.spaceS)
+                    .fill(CoreColor.divider)
+                    .frame(height: CoreMetrics.dividerWidth)
+                    .padding(.leading, RefinementLayout.libraryRowHorizontalPadding + CoreMetrics.controlHeightLarge + CoreSpacing.s)
             }
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
-        .animation(DesignSystem.motionFast, value: isHovered)
+        .animation(CoreMotion.fast, value: isHovered)
     }
 
     private var rowBackground: Color {
-        if isSelected { return DesignSystem.selectionBackground }
-        if isHovered { return DesignSystem.controlHoverBackground }
+        if isSelected { return CoreColor.selectionBackground }
+        if isHovered { return CoreColor.controlHoverBackground }
         return Color.clear
     }
 
@@ -359,26 +359,26 @@ private struct TaskRow: View {
     @ViewBuilder
     private var progress: some View {
         if task.state == .downloading {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 if let progress = task.progress {
                     ProgressView(value: progress)
                         .progressViewStyle(.linear)
-                        .tint(DesignSystem.accent)
+                        .tint(CoreColor.accent)
                     Text("\(Int(progress * 100))%")
-                        .font(DesignSystem.metadataFont.monospacedDigit())
-                        .foregroundStyle(DesignSystem.textSecondary)
-                        .frame(width: DesignSystem.controlHeightLarge, alignment: .trailing)
+                        .font(CoreTypography.captionFont.monospacedDigit())
+                        .foregroundStyle(CoreColor.textSecondary)
+                        .frame(width: CoreMetrics.controlHeightLarge, alignment: .trailing)
                 } else {
                     ProgressView()
                         .progressViewStyle(.linear)
-                        .tint(DesignSystem.accent)
+                        .tint(CoreColor.accent)
                 }
             }
             .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
         } else if task.state == .queued {
             ProgressView(value: 0)
                 .progressViewStyle(.linear)
-                .tint(DesignSystem.accent)
+                .tint(CoreColor.accent)
                 .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
         }
     }
@@ -386,13 +386,13 @@ private struct TaskRow: View {
     @ViewBuilder
     private var taskAction: some View {
         if task.state == .completed {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 Button("在 Finder 中显示", systemImage: "folder") {
                     NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
                 }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
-                .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
+                .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
                 .help("在 Finder 中显示")
 
                 Menu {
@@ -408,7 +408,7 @@ private struct TaskRow: View {
                         .labelStyle(.iconOnly)
                 }
                 .menuStyle(.borderlessButton)
-                .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
+                .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
             }
         } else if task.state == .failed || task.state == .cancelled {
             recoveryButton
@@ -417,8 +417,8 @@ private struct TaskRow: View {
                 model.cancelTask(task.id)
             }
             .buttonStyle(.bordered)
-            .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightSmall)
+            .font(CoreTypography.controlFont)
+            .frame(height: CoreMetrics.controlHeightSmall)
         }
     }
 
@@ -432,15 +432,15 @@ private struct TaskRow: View {
                 model.selection = .settings
             }
             .buttonStyle(.borderedProminent)
-            .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightSmall)
+            .font(CoreTypography.controlFont)
+            .frame(height: CoreMetrics.controlHeightSmall)
         case .disk:
             Button("更改保存位置", systemImage: "folder") {
                 model.selection = .settings
             }
             .buttonStyle(.borderedProminent)
-            .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightSmall)
+            .font(CoreTypography.controlFont)
+            .frame(height: CoreMetrics.controlHeightSmall)
         case .notFound:
             Button("打开原链接", systemImage: "safari") {
                 if let url = URL(string: task.sourceURL) {
@@ -448,8 +448,8 @@ private struct TaskRow: View {
                 }
             }
             .buttonStyle(.bordered)
-            .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightSmall)
+            .font(CoreTypography.controlFont)
+            .frame(height: CoreMetrics.controlHeightSmall)
         default:
             Button("重试", systemImage: "arrow.clockwise") {
                 model.retryTask(task)
@@ -458,8 +458,8 @@ private struct TaskRow: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .font(DesignSystem.uiFont)
-            .frame(height: DesignSystem.controlHeightSmall)
+            .font(CoreTypography.controlFont)
+            .frame(height: CoreMetrics.controlHeightSmall)
         }
     }
 }
@@ -472,23 +472,23 @@ struct EmptyLibraryView: View {
     let action: () -> Void
 
     var body: some View {
-        VStack(spacing: DesignSystem.spaceM) {
+        VStack(spacing: CoreSpacing.m) {
             Image(systemName: systemImage)
-                .font(.system(size: DesignSystem.space2XL, weight: .regular))
+                .font(.system(size: CoreSpacing.xxl, weight: .regular))
                 .foregroundStyle(.tertiary)
             Text(title)
-                .font(DesignSystem.sectionTitleFont)
+                .font(CoreTypography.sectionTitleFont)
             Text(message)
-                .font(DesignSystem.bodyFont)
+                .font(CoreTypography.bodyFont)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
             Button(actionTitle, systemImage: "arrow.right", action: action)
                 .buttonStyle(.borderedProminent)
-                .font(DesignSystem.uiFont)
-                .frame(height: DesignSystem.controlHeightDefault)
+                .font(CoreTypography.controlFont)
+                .frame(height: CoreMetrics.controlHeightDefault)
         }
-        .padding(DesignSystem.space2XL)
+        .padding(CoreSpacing.xxl)
         .frame(maxWidth: .infinity)
     }
 }
