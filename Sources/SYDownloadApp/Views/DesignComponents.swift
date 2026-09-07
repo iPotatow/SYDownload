@@ -12,20 +12,18 @@ enum DesignSystem {
     static let spaceXL: CGFloat = 24
     static let space2XL: CGFloat = 32
     static let space3XL: CGFloat = 40
-    static let pageHeaderTop: CGFloat = 24
+    static let pageHeaderTop: CGFloat = 16
     static let titlebarClearance: CGFloat = 32
     static let pageTitlebarClearance: CGFloat = titlebarClearance
     static let sidebarTitlebarClearance: CGFloat = titlebarClearance
 
-    /// Main content uses the 4px grid. The shell provides its own 8px inset;
-    /// pages start with the spec's 16px internal padding.
     static let pageInset: CGFloat = 16
     static let sectionSpacing: CGFloat = 16
     static let panelPadding: CGFloat = 16
     static let sidebarWidth: CGFloat = 220
     static let mainSurfaceInsets = EdgeInsets(
         top: spaceS,
-        leading: 0,
+        leading: spaceS,
         bottom: spaceS,
         trailing: spaceS
     )
@@ -42,16 +40,13 @@ enum DesignSystem {
     static let sidebarNavigationHorizontalPadding: CGFloat = 10
     static let sidebarNavigationIconSize: CGFloat = 16
 
-    static let pageTitleFont = Font.system(size: 24, weight: .semibold, design: .rounded)
+    static let pageTitleFont = Font.system(size: 24, weight: .semibold)
     static let sectionTitleFont = Font.system(size: 16, weight: .semibold)
     static let bodyFont = Font.system(size: 14)
     static let uiFont = Font.system(size: 14, weight: .medium)
     static let supportingFont = Font.system(size: 12)
     static let metadataFont = Font.system(size: 11)
 
-    // The app uses a quiet cyan/purple signature instead of inheriting the
-    // system's often-bright blue accent. Purple is reserved for secondary
-    // emphasis so the palette still feels restrained and legible.
     static let cyan = Color(red: 0.08, green: 0.66, blue: 0.70)
     static let purple = Color(red: 0.43, green: 0.34, blue: 0.78)
     static var accent: Color { cyan }
@@ -60,7 +55,7 @@ enum DesignSystem {
     static var warmSurface: Color { Color.primary.opacity(0.035) }
     static var raisedSurface: Color { Color.primary.opacity(0.06) }
     static var hairline: Color { Color(nsColor: .separatorColor).opacity(0.52) }
-    static var shadow: Color { cyan.opacity(0.045) }
+    static var shadow: Color { Color.black.opacity(0.05) }
 
     static var sidebarBackground: Color { Color(nsColor: .underPageBackgroundColor) }
     static var mainSurfaceBackground: Color { Color(nsColor: .controlBackgroundColor) }
@@ -77,7 +72,6 @@ enum DesignSystem {
     static var warning: Color { Color(nsColor: .systemOrange) }
     static var destructive: Color { Color(nsColor: .systemRed) }
 
-    /// Compatibility aliases used by feature views.
     static var pageMaxWidth: CGFloat { contentMaxWidth }
     static var contentPadding: CGFloat { pageInset }
     static var cardRadius: CGFloat { panelRadius }
@@ -122,11 +116,6 @@ struct AppMark: View {
         .accessibilityLabel("SYDownload")
     }
 
-    /// Avoid Bundle.module here. A signed macOS .app must keep SwiftPM's
-    /// resource bundle under Contents/Resources, while the generated
-    /// Bundle.module accessor expects it next to Bundle.main.bundleURL and
-    /// traps if it is not there. Resolve the packaged icon explicitly and use
-    /// the adjacent SwiftPM bundle only for local `swift run` development.
     private var appIcon: NSImage? {
         let fileName = "SYDownloadIcon.png"
         var candidates: [URL] = []
@@ -176,6 +165,10 @@ struct IconBadge: View {
     }
 }
 
+/// Compact desktop page header. The legacy eyebrow and icon parameters are
+/// retained at the call site for source compatibility, but visual hierarchy is
+/// intentionally carried by title, subtitle, spacing and weight rather than a
+/// marketing-style hero block.
 struct PageHeader: View {
     let eyebrow: String
     let title: String
@@ -183,7 +176,7 @@ struct PageHeader: View {
     let systemImage: String
 
     init(
-        eyebrow: String,
+        eyebrow: String = "",
         title: String,
         subtitle: String,
         systemImage: String = "sparkles"
@@ -195,19 +188,12 @@ struct PageHeader: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: DesignSystem.spaceM) {
-            IconBadge(systemImage: systemImage, tint: DesignSystem.accent, size: 40)
+        VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+            Text(title)
+                .font(DesignSystem.pageTitleFont)
+                .lineLimit(2)
 
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
-                Text(eyebrow)
-                    .font(DesignSystem.metadataFont.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(0.35)
-
-                Text(title)
-                    .font(DesignSystem.pageTitleFont)
-                    .lineLimit(2)
-
+            if !subtitle.isEmpty {
                 Text(subtitle)
                     .font(DesignSystem.bodyFont)
                     .foregroundStyle(.secondary)
@@ -239,7 +225,6 @@ struct SurfaceCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                     .strokeBorder(DesignSystem.hairline, lineWidth: 1)
             }
-            .shadow(color: DesignSystem.shadow, radius: 12, y: 4)
     }
 }
 
@@ -289,9 +274,6 @@ struct StatusPill: View {
                 .font(DesignSystem.supportingFont.weight(.semibold))
         }
         .foregroundStyle(color)
-        .padding(.horizontal, DesignSystem.spaceS)
-        .frame(minHeight: 24)
-        .background(color.opacity(0.10), in: Capsule())
         .accessibilityElement(children: .combine)
     }
 
@@ -323,7 +305,8 @@ struct MetricCard: View {
 
     var body: some View {
         HStack(spacing: DesignSystem.spaceM) {
-            IconBadge(systemImage: systemImage, tint: tint, size: 34)
+            Image(systemName: systemImage)
+                .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(DesignSystem.supportingFont)
@@ -339,15 +322,9 @@ struct MetricCard: View {
             Spacer(minLength: 0)
         }
         .padding(DesignSystem.panelPadding)
-        .background(
-            DesignSystem.rowBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-        )
     }
 }
 
-/// A low-elevation section heading used when a page has several related
-/// controls. It deliberately avoids turning every group into a card.
 struct SectionGroup<Content: View>: View {
     let title: String
     let detail: String?
@@ -376,8 +353,6 @@ struct SectionGroup<Content: View>: View {
     }
 }
 
-/// A compact row for document-like lists and settings. Separation supplies
-/// hierarchy without the visual weight of another rounded container.
 struct InsetRow<Content: View>: View {
     private let content: Content
 
@@ -397,7 +372,6 @@ struct InsetRow<Content: View>: View {
     }
 }
 
-/// A horizontal overview strip for queue and archive totals.
 struct MetricStrip: View {
     let items: [(label: String, value: String, detail: String, symbol: String, tint: Color)]
 
@@ -427,7 +401,6 @@ struct MetricStrip: View {
             }
         }
         .padding(.vertical, DesignSystem.spaceS)
-        .background(DesignSystem.rowBackground, in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous))
     }
 }
 
@@ -476,7 +449,6 @@ struct DesignCardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                     .strokeBorder(DesignSystem.hairline, lineWidth: 1)
             }
-            .shadow(color: DesignSystem.shadow, radius: 12, y: 4)
     }
 }
 
