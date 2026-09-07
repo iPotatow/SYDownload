@@ -15,7 +15,7 @@ struct PhotosView: View {
     @State private var statusMessage = "拖入一个文件夹，或点击选择文件夹开始整理。"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
             header
             folderDropZone
 
@@ -27,7 +27,10 @@ struct PhotosView: View {
                 photoGroups
             }
         }
-        .padding(24)
+        .padding(.horizontal, DesignSystem.contentPadding)
+        .padding(.top, DesignSystem.pageHeaderTop)
+        .padding(.bottom, DesignSystem.space3XL)
+        .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .fileImporter(
             isPresented: $showsFolderImporter,
@@ -55,42 +58,31 @@ struct PhotosView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("照片")
-                    .font(.system(size: 26, weight: .semibold))
-                Text("按文件名中的日期分组，选择一个或多个日期后批量删除。")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+            PageHeader(
+                eyebrow: "PHOTO ORGANIZER",
+                title: "照片整理",
+                subtitle: "按文件名中的日期分组。先预览，再选择要移到废纸篓的日期。",
+                systemImage: "photo.on.rectangle.angled"
+            )
 
             Spacer()
 
             if folderURL != nil {
-                Button {
-                    if let folderURL {
-                        openFolder(folderURL)
-                    }
-                } label: {
-                    Label("重新扫描", systemImage: "arrow.clockwise")
-                }
+                Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
                 .disabled(isScanning || isDeleting)
             }
 
-            Button {
-                showsFolderImporter = true
-            } label: {
-                Label("选择文件夹", systemImage: "folder")
-            }
+            Button("选择文件夹", systemImage: "folder", action: chooseFolder)
             .buttonStyle(.borderedProminent)
             .disabled(isScanning || isDeleting)
         }
     }
 
     private var folderDropZone: some View {
-        VStack(spacing: 9) {
+        VStack(spacing: 10) {
             Image(systemName: isDropTargeted ? "folder.fill.badge.plus" : "folder.badge.plus")
                 .font(.system(size: 26, weight: .medium))
-                .foregroundStyle(isDropTargeted ? Color.accentColor : Color.secondary)
+                .foregroundStyle(isDropTargeted ? DesignSystem.accent : Color.secondary)
 
             if let folderURL {
                 Text(folderURL.lastPathComponent)
@@ -108,17 +100,17 @@ struct PhotosView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 92)
-        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, minHeight: 126)
+        .padding(.horizontal, 24)
         .background(
-            isDropTargeted ? Color.accentColor.opacity(0.09) : Color.primary.opacity(0.035),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            isDropTargeted ? DesignSystem.accent.opacity(0.10) : DesignSystem.warmSurface,
+            in: RoundedRectangle(cornerRadius: DesignSystem.cardRadius, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DesignSystem.cardRadius, style: .continuous)
                 .strokeBorder(
-                    isDropTargeted ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08),
-                    style: StrokeStyle(lineWidth: 1, dash: [6, 5])
+                    isDropTargeted ? DesignSystem.accent.opacity(0.65) : DesignSystem.hairline,
+                    style: StrokeStyle(lineWidth: 1.2, dash: [7, 5])
                 )
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -137,20 +129,20 @@ struct PhotosView: View {
         VStack(spacing: 12) {
             ProgressView()
                 .controlSize(.large)
+                .tint(DesignSystem.accent)
             Text("正在读取图片并解析文件名日期…")
                 .font(.headline)
             Text(statusMessage)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 300)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 38))
-                .foregroundStyle(.secondary)
+        VStack(spacing: 12) {
+            IconBadge(systemImage: "photo.on.rectangle.angled", tint: .secondary, size: 56)
             Text("还没有读取照片")
                 .font(.title3.weight(.semibold))
             Text("支持 2026-09-07、2026_09_07、2026.09.07、20260907、2026年09月07日 等日期格式。")
@@ -158,7 +150,8 @@ struct PhotosView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 300)
+        .designCard()
     }
 
     private var photoGroups: some View {
@@ -197,6 +190,7 @@ struct PhotosView: View {
     private var summaryBar: some View {
         HStack(spacing: 12) {
             Label("\(scanResult.totalCount) 张照片", systemImage: "photo.stack")
+                .font(.headline.weight(.semibold))
             Text("·")
                 .foregroundStyle(.tertiary)
             Text("\(scanResult.groups.count) 个日期")
@@ -212,22 +206,17 @@ struct PhotosView: View {
             Spacer()
 
             if !scanResult.groups.isEmpty {
-                Button(allDatesSelected ? "取消全选" : "全选日期") {
-                    if allDatesSelected {
-                        selectedDates.removeAll()
-                    } else {
-                        selectedDates = Set(scanResult.groups.map(\.id))
-                    }
-                }
-                .buttonStyle(.plain)
-                .disabled(isDeleting)
+                Button(allDatesSelected ? "取消全选" : "全选日期", systemImage: allDatesSelected ? "minus.square" : "checkmark.square", action: toggleAllDates)
+                    .labelStyle(.titleAndIcon)
+                    .buttonStyle(.plain)
+                    .disabled(isDeleting)
             }
         }
         .font(.subheadline)
     }
 
     private func dateGroupRow(_ group: PhotoDateGroup) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 Toggle(
                     isOn: Binding(
@@ -255,15 +244,15 @@ struct PhotosView: View {
 
             thumbnailStrip(group.photos)
         }
-        .padding(14)
+        .padding(DesignSystem.panelPadding)
         .background(
-            selectedDates.contains(group.id) ? Color.accentColor.opacity(0.07) : Color.primary.opacity(0.03),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            selectedDates.contains(group.id) ? DesignSystem.accentTint : DesignSystem.rowBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                 .strokeBorder(
-                    selectedDates.contains(group.id) ? Color.accentColor.opacity(0.28) : Color.primary.opacity(0.05)
+                    selectedDates.contains(group.id) ? DesignSystem.accent.opacity(0.30) : DesignSystem.hairline
                 )
         }
     }
@@ -281,8 +270,11 @@ struct PhotosView: View {
 
             thumbnailStrip(scanResult.ungrouped)
         }
-        .padding(14)
-        .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(DesignSystem.panelPadding)
+        .background(
+            DesignSystem.rowBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+        )
     }
 
     private func thumbnailStrip(_ photos: [PhotoFileItem]) -> some View {
@@ -294,8 +286,8 @@ struct PhotosView: View {
 
                 if photos.count > 8 {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.primary.opacity(0.05))
+                        RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                            .fill(DesignSystem.raisedSurface)
                         Text("+\(photos.count - 8)")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
@@ -336,15 +328,18 @@ struct PhotosView: View {
             }
             .disabled(isDeleting || selectedPhotoURLs.isEmpty)
         }
-        .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(DesignSystem.panelPadding)
+        .background(
+            DesignSystem.rowBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08))
+            RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+                .strokeBorder(DesignSystem.hairline)
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 8)
-        .shadow(radius: 8, y: 3)
+        .shadow(color: DesignSystem.shadow, radius: 8, y: 3)
     }
 
     private var selectedPhotoURLs: [URL] {
@@ -355,6 +350,23 @@ struct PhotosView: View {
 
     private var allDatesSelected: Bool {
         !scanResult.groups.isEmpty && selectedDates.count == scanResult.groups.count
+    }
+
+    private func chooseFolder() {
+        showsFolderImporter = true
+    }
+
+    private func rescan() {
+        guard let folderURL else { return }
+        openFolder(folderURL)
+    }
+
+    private func toggleAllDates() {
+        if allDatesSelected {
+            selectedDates.removeAll()
+        } else {
+            selectedDates = Set(scanResult.groups.map(\.id))
+        }
     }
 
     private func isDirectory(_ url: URL) -> Bool {
@@ -438,12 +450,13 @@ private struct LocalPhotoThumbnail: View {
             }
         }
         .frame(width: 68, height: 68)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.07))
         }
         .help(url.lastPathComponent)
+        .accessibilityLabel(url.lastPathComponent)
     }
 }
 #endif

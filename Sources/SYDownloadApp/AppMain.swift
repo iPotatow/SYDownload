@@ -26,7 +26,7 @@ struct SYDownloadApp: App {
 }
 #else
 import Foundation
-import XDownloaderCore
+import SYDownloadCore
 
 @main
 enum SYDownloadLinuxProbe {

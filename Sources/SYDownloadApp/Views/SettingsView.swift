@@ -9,6 +9,24 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case advanced = "高级"
 
     var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .general: return "gearshape"
+        case .xhs: return "book.pages"
+        case .douyin: return "music.note"
+        case .advanced: return "wrench.and.screwdriver"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .general: return "应用行为、外观和默认保存位置"
+        case .xhs: return "小红书内容类型、格式和 Cookie"
+        case .douyin: return "抖音 / TikTok 内容和文件管理"
+        case .advanced: return "路径、原始配置和恢复操作"
+        }
+    }
 }
 
 struct SettingsView: View {
@@ -24,13 +42,20 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("设置").font(.system(size: 28, weight: .bold))
+                PageHeader(
+                    eyebrow: "WORKSPACE PREFERENCES",
+                    title: "设置",
+                    subtitle: "调整保存位置、下载内容和引擎行为。只保存当前页面管理的字段。",
+                    systemImage: "slider.horizontal.3"
+                )
 
                 Picker("设置分类", selection: $tab) {
                     ForEach(SettingsTab.allCases) { item in Text(item.rawValue).tag(item) }
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 610)
+                .frame(maxWidth: 660)
+
+                settingsContext
 
                 Group {
                     switch tab {
@@ -54,12 +79,52 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(24)
-            .frame(maxWidth: 820, alignment: .leading)
+            .padding(.horizontal, DesignSystem.contentPadding)
+            .padding(.top, DesignSystem.pageHeaderTop)
+            .padding(.bottom, DesignSystem.space3XL)
+            .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .top)
         }
+        .tint(DesignSystem.accent)
+        .animation(.easeOut(duration: 0.18), value: tab)
         .task {
             await model.loadEngineSettings()
+        }
+    }
+
+    private var settingsContext: some View {
+        HStack(spacing: 13) {
+            IconBadge(systemImage: tab.systemImage, tint: DesignSystem.accent, size: 42)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(tab.rawValue)
+                    .font(.headline.weight(.semibold))
+                Text(tab.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 12)
+            if model.settingsLoading {
+                HStack(spacing: 7) {
+                    ProgressView().controlSize(.small)
+                    Text("正在同步配置")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if !model.settingsStatus.isEmpty {
+                Label(model.settingsStatus, systemImage: "checkmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(DesignSystem.panelPadding)
+        .background(
+            DesignSystem.rowBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+                .strokeBorder(DesignSystem.hairline)
         }
     }
 
@@ -335,23 +400,27 @@ struct SettingsView: View {
     }
 
     private func settingCard<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.system(size: 14, weight: .semibold))
-            content()
+        SurfaceCard(padding: 20) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                content()
+            }
         }
-        .padding(16)
-        .designCard()
     }
 
     private func saveBar(title: String, action: @escaping () -> Void) -> some View {
-        HStack {
-            Text("保存时只合并当前页面管理的字段，不会覆盖隐藏配置。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button(title, action: action)
-                .buttonStyle(.borderedProminent)
-                .disabled(model.settingsLoading)
+        SurfaceCard(padding: 16) {
+            HStack(spacing: 12) {
+                IconBadge(systemImage: "square.and.arrow.down", tint: .secondary, size: 34)
+                Text("保存时只合并当前页面管理的字段，不会覆盖隐藏配置。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 12)
+                Button(title, action: action)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.settingsLoading)
+            }
         }
     }
 
@@ -361,10 +430,13 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .padding(8)
             .frame(minHeight: minHeight)
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(
+                DesignSystem.warmSurface,
+                in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+                RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+                    .stroke(DesignSystem.hairline, lineWidth: 1)
             }
     }
 
