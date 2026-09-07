@@ -1,0 +1,98 @@
+name: Build macOS App
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - Package.swift
+      - Sources/**
+      - Tests/**
+      - Bridge/**
+      - script/package_app.sh
+      - script/build_and_run.sh
+      - .github/workflows/build-macos-app.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xdownloader-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          uname -m
+          swift --version
+          python3 --version
+          xcodebuild -version
+
+      - name: Swift tests
+        run: swift test
+
+      - name: Python bridge tests
+        run: python3 -m unittest discover -s Bridge/tests -p 'test_*.py'
+
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: AppleSilicon
+            artifact: XDownloader-macOS-AppleSilicon
+          - runner: macos-15-intel
+            arch: Intel
+            artifact: XDownloader-macOS-Intel
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          uname -m
+          swift --version
+          xcodebuild -version
+
+      - name: Build and stage app
+        env:
+          CONFIGURATION: release
+          APP_VERSION: 0.1.${{ github.run_number }}
+          ADHOC_SIGN: 1
+        run: |
+          chmod +x script/package_app.sh
+          ./script/package_app.sh
+
+      - name: Verify app bundle
+        run: |
+          file dist/XDownloader.app/Contents/MacOS/XDownloader
+          plutil -lint dist/XDownloader.app/Contents/Info.plist
+          codesign --verify --deep --strict --verbose=2 dist/XDownloader.app
+          test -f dist/XDownloader.app/Contents/Resources/bridge/engine_bridge.py
+
+      - name: Archive app
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent XDownloader.app "${{ matrix.artifact }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}.zip
+          if-no-files-found: error
+          retention-days: 14
