@@ -10,8 +10,9 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 CONFIGURATION="${CONFIGURATION:-release}"
-APP_VERSION="${APP_VERSION:-0.1.0}"
+APP_VERSION="${APP_VERSION:-0.2.0}"
 ADHOC_SIGN="${ADHOC_SIGN:-1}"
+BUNDLE_RUNTIME="${BUNDLE_RUNTIME:-1}"
 
 swift build -c "$CONFIGURATION" --product XDownloader
 BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
@@ -23,6 +24,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/bridge"
 cp "$BIN" "$APP/Contents/MacOS/XDownloader"
 chmod +x "$APP/Contents/MacOS/XDownloader"
 cp "$ROOT/Bridge/engine_bridge.py" "$APP/Contents/Resources/bridge/engine_bridge.py"
+printf '%s\n' "$APP_VERSION" > "$APP/Contents/Resources/bundle-version.txt"
+
+if [[ "$BUNDLE_RUNTIME" == "1" ]]; then
+  "$ROOT/script/bundle_runtime.sh" "$APP"
+fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -42,7 +48,24 @@ PLIST
 
 /usr/bin/plutil -lint "$APP/Contents/Info.plist"
 
+if /usr/bin/find "$APP/Contents" -type l -print | /usr/bin/grep -q .; then
+  echo "Refusing to sign app bundle with symbolic links:"
+  /usr/bin/find "$APP/Contents" -type l -print
+  exit 4
+fi
+
 if [[ "$ADHOC_SIGN" == "1" ]]; then
+  # Apple Silicon requires embedded Mach-O code to carry a signature. Sign the
+  # portable Python interpreter, native wheels and helper binaries before the
+  # outer app bundle.
+  while IFS= read -r -d '' candidate; do
+    if [[ -x "$candidate" || "$candidate" == *.dylib || "$candidate" == *.so ]]; then
+      if /usr/bin/file -b "$candidate" | /usr/bin/grep -q 'Mach-O'; then
+        /usr/bin/codesign --force --sign - "$candidate"
+      fi
+    fi
+  done < <(/usr/bin/find "$APP/Contents" -type f -print0)
+
   /usr/bin/codesign --force --deep --sign - "$APP"
   /usr/bin/codesign --verify --deep --strict "$APP"
 fi

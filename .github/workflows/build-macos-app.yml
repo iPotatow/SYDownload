@@ -10,8 +10,7 @@ on:
       - Sources/**
       - Tests/**
       - Bridge/**
-      - script/package_app.sh
-      - script/build_and_run.sh
+      - script/**
       - .github/workflows/build-macos-app.yml
 
 permissions:
@@ -27,7 +26,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Toolchain
         run: |
@@ -60,29 +59,61 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
 
       - name: Toolchain
         run: |
           uname -m
           swift --version
+          uv --version
           xcodebuild -version
 
-      - name: Build and stage app
+      - name: Build self-contained app
         env:
           CONFIGURATION: release
-          APP_VERSION: 0.1.${{ github.run_number }}
+          APP_VERSION: 0.2.${{ github.run_number }}
           ADHOC_SIGN: 1
+          BUNDLE_RUNTIME: 1
+          PYTHON_VERSION: "3.12"
+          XHS_REVISION: cc7c78088afc09082f54ea6263a9fd07c2fa510f
+          DOUK_REVISION: 43e1abc4ab401b31560423450d01648e83c9b48a
         run: |
-          chmod +x script/package_app.sh
+          chmod +x script/*.sh
           ./script/package_app.sh
 
-      - name: Verify app bundle
+      - name: Verify app bundle and embedded runtime
+        env:
+          XDOWNLOADER_APP_SUPPORT: ${{ runner.temp }}/XDownloader-AppSupport
+          XDOWNLOADER_CACHE: ${{ runner.temp }}/XDownloader-Cache
         run: |
-          file dist/XDownloader.app/Contents/MacOS/XDownloader
-          plutil -lint dist/XDownloader.app/Contents/Info.plist
-          codesign --verify --deep --strict --verbose=2 dist/XDownloader.app
-          test -f dist/XDownloader.app/Contents/Resources/bridge/engine_bridge.py
+          APP="dist/XDownloader.app"
+          PYTHON="$APP/Contents/Resources/python/bin/python3"
+          BRIDGE="$APP/Contents/Resources/bridge/engine_bridge.py"
+
+          file "$APP/Contents/MacOS/XDownloader"
+          "$PYTHON" --version
+          plutil -lint "$APP/Contents/Info.plist"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          test -x "$PYTHON"
+          test -f "$APP/Contents/Resources/engines/XHS-Downloader/main.py"
+          test -f "$APP/Contents/Resources/engines/TikTokDownloader/main.py"
+          test -f "$APP/Contents/Resources/engine-manifest.json"
+          test -z "$(find "$APP/Contents" -type l -print -quit)"
+
+          PING="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000001","command":"ping"}' | "$PYTHON" "$BRIDGE" --once)"
+          echo "$PING"
+          echo "$PING" | grep -q '"ok": true'
+
+          VALIDATE="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000002","command":"validate","url":"https://xhslink.com/ci-smoke-test"}' | "$PYTHON" "$BRIDGE" --once)"
+          echo "$VALIDATE"
+          echo "$VALIDATE" | grep -q '"ok": true'
+          test -f "$XDOWNLOADER_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
 
       - name: Archive app
         run: |

@@ -3,11 +3,28 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$ROOT/Engines"
 
-if [[ ! -d "$ROOT/Engines/XHS-Downloader/.git" ]]; then
-  git clone --depth 1 https://github.com/JoeanAmier/XHS-Downloader.git "$ROOT/Engines/XHS-Downloader"
-fi
-if [[ ! -d "$ROOT/Engines/TikTokDownloader/.git" ]]; then
-  git clone --depth 1 https://github.com/JoeanAmier/TikTokDownloader.git "$ROOT/Engines/TikTokDownloader"
-fi
+XHS_REVISION="${XHS_REVISION:-cc7c78088afc09082f54ea6263a9fd07c2fa510f}"
+DOUK_REVISION="${DOUK_REVISION:-43e1abc4ab401b31560423450d01648e83c9b48a}"
 
-echo "Engines ready under $ROOT/Engines"
+fetch_revision() {
+  local url="$1"
+  local revision="$2"
+  local destination="$3"
+
+  if [[ -d "$destination/.git" ]]; then
+    git -C "$destination" fetch -q --depth 1 origin "$revision"
+    git -C "$destination" checkout -q --detach FETCH_HEAD
+    return
+  fi
+
+  rm -rf "$destination"
+  git init -q "$destination"
+  git -C "$destination" remote add origin "$url"
+  git -C "$destination" fetch -q --depth 1 origin "$revision"
+  git -C "$destination" checkout -q --detach FETCH_HEAD
+}
+
+fetch_revision "https://github.com/JoeanAmier/XHS-Downloader.git" "$XHS_REVISION" "$ROOT/Engines/XHS-Downloader"
+fetch_revision "https://github.com/JoeanAmier/TikTokDownloader.git" "$DOUK_REVISION" "$ROOT/Engines/TikTokDownloader"
+
+echo "Pinned engines ready under $ROOT/Engines"
