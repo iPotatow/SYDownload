@@ -15,16 +15,12 @@ struct XDownloaderApp: App {
                     NSApplication.shared.activate(ignoringOtherApps: true)
                 }
         }
-        .defaultSize(width: 1060, height: 680)
+        .defaultSize(width: 1100, height: 720)
+        .windowResizability(.contentMinSize)
 
         Settings {
-            Form {
-                Text("可行性验证版：引擎通过 Python Bridge 接入。")
-                Text("正式版再加入 Cookie 管理、下载队列、历史记录、签名与公证。")
-                    .foregroundStyle(.secondary)
-            }
-            .padding(24)
-            .frame(width: 480)
+            SettingsView(model: model)
+                .frame(width: 720, height: 560)
         }
     }
 }
