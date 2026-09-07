@@ -105,11 +105,56 @@ struct AppMark: View {
     var size: CGFloat = 32
 
     var body: some View {
-        Image("SYDownloadIcon", bundle: .module)
-            .resizable()
-            .scaledToFit()
-            .frame(width: size, height: size)
-            .accessibilityLabel("SYDownload")
+        Group {
+            if let appIcon {
+                Image(nsImage: appIcon)
+                    .resizable()
+            } else {
+                Image(systemName: "arrow.down.circle")
+                    .resizable()
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(DesignSystem.accent)
+                    .padding(size * 0.08)
+            }
+        }
+        .scaledToFit()
+        .frame(width: size, height: size)
+        .accessibilityLabel("SYDownload")
+    }
+
+    /// Avoid Bundle.module here. A signed macOS .app must keep SwiftPM's
+    /// resource bundle under Contents/Resources, while the generated
+    /// Bundle.module accessor expects it next to Bundle.main.bundleURL and
+    /// traps if it is not there. Resolve the packaged icon explicitly and use
+    /// the adjacent SwiftPM bundle only for local `swift run` development.
+    private var appIcon: NSImage? {
+        let fileName = "SYDownloadIcon.png"
+        var candidates: [URL] = []
+
+        if let resourceURL = Bundle.main.resourceURL {
+            candidates.append(resourceURL.appendingPathComponent(fileName))
+            candidates.append(
+                resourceURL
+                    .appendingPathComponent("SYDownload_SYDownloadApp.bundle")
+                    .appendingPathComponent(fileName)
+            )
+        }
+
+        if let executableURL = Bundle.main.executableURL {
+            candidates.append(
+                executableURL
+                    .deletingLastPathComponent()
+                    .appendingPathComponent("SYDownload_SYDownloadApp.bundle")
+                    .appendingPathComponent(fileName)
+            )
+        }
+
+        for url in candidates {
+            if let image = NSImage(contentsOf: url) {
+                return image
+            }
+        }
+        return nil
     }
 }
 

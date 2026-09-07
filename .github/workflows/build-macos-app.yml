@@ -86,6 +86,7 @@ jobs:
           APP="dist/SYDownload.app"
           PYTHON="$APP/Contents/Resources/python/bin/python3"
           BRIDGE="$APP/Contents/Resources/bridge/engine_bridge.py"
+          RESOURCE_BUNDLE="$APP/Contents/Resources/SYDownload_SYDownloadApp.bundle"
 
           file "$APP/Contents/MacOS/SYDownload"
           "$PYTHON" --version
@@ -93,10 +94,12 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
 
           test -x "$PYTHON"
+          test -f "$RESOURCE_BUNDLE/SYDownloadIcon.png"
+          test -f "$APP/Contents/Resources/SYDownloadIcon.png"
           test -f "$APP/Contents/Resources/engines/XHS-Downloader/main.py"
           test -f "$APP/Contents/Resources/engines/TikTokDownloader/main.py"
           test -f "$APP/Contents/Resources/engine-manifest.json"
-          test -z "$(find "$APP/Contents" -type l -print -quit)"
+          test -z "$(find "$APP" -type l -print -quit)"
 
           PING="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000001","command":"ping"}' | "$PYTHON" "$BRIDGE" --once)"
           echo "$PING"

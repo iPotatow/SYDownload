@@ -34,6 +34,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/bridge"
 cp "$BIN" "$APP/Contents/MacOS/SYDownload"
 chmod +x "$APP/Contents/MacOS/SYDownload"
+# Keep the SwiftPM resource bundle in the standard signed app resources area.
+# AppMark resolves it explicitly instead of using Bundle.module at runtime.
 cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
 cp "$RESOURCE" "$APP/Contents/Resources/SYDownloadIcon.png"
 cp "$ROOT/Bridge/engine_bridge.py" "$APP/Contents/Resources/bridge/engine_bridge.py"
@@ -62,9 +64,9 @@ PLIST
 
 /usr/bin/plutil -lint "$APP/Contents/Info.plist"
 
-if /usr/bin/find "$APP/Contents" -type l -print | /usr/bin/grep -q .; then
+if /usr/bin/find "$APP" -type l -print | /usr/bin/grep -q .; then
   echo "Refusing to sign app bundle with symbolic links:"
-  /usr/bin/find "$APP/Contents" -type l -print
+  /usr/bin/find "$APP" -type l -print
   exit 4
 fi
 
@@ -78,7 +80,7 @@ if [[ "$ADHOC_SIGN" == "1" ]]; then
         /usr/bin/codesign --force --sign - "$candidate"
       fi
     fi
-  done < <(/usr/bin/find "$APP/Contents" -type f -print0)
+  done < <(/usr/bin/find "$APP" -type f -print0)
 
   /usr/bin/codesign --force --deep --sign - "$APP"
   /usr/bin/codesign --verify --deep --strict "$APP"
