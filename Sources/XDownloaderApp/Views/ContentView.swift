@@ -22,7 +22,8 @@ struct ContentView: View {
                     } label: {
                         Label("新建下载", systemImage: "plus")
                     }
-                    .help("新建下载")
+                    .keyboardShortcut("n", modifiers: [.command])
+                    .help("新建下载（⌘N）")
                 }
 
                 Button {
