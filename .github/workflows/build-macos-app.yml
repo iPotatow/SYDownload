@@ -115,6 +115,33 @@ jobs:
           echo "$VALIDATE" | grep -q '"ok": true'
           test -f "$XDOWNLOADER_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
 
+      - name: Launch smoke test
+        run: |
+          APP="$PWD/dist/XDownloader.app"
+          /usr/bin/open -n "$APP"
+
+          PID=""
+          for attempt in {1..10}; do
+            PID="$(/usr/bin/pgrep -x XDownloader | /usr/bin/head -n 1 || true)"
+            if [[ -n "$PID" ]]; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ -z "$PID" ]]; then
+            echo "XDownloader failed to stay alive during startup."
+            exit 1
+          fi
+
+          sleep 2
+          if ! /bin/kill -0 "$PID" 2>/dev/null; then
+            echo "XDownloader crashed during startup smoke test."
+            exit 1
+          fi
+
+          /bin/kill "$PID" || true
+
       - name: Archive app
         run: |
           cd dist
