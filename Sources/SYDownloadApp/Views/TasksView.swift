@@ -5,6 +5,7 @@ import AppKit
 struct TasksView: View {
     @ObservedObject var model: AppModel
     @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -28,11 +29,16 @@ struct TasksView: View {
                 if displayedTasks.isEmpty {
                     EmptyLibraryView(
                         systemImage: "tray",
-                        title: model.tasks.isEmpty ? "还没有下载任务" : "没有匹配的任务",
-                        message: model.tasks.isEmpty ? "粘贴链接并开始下载，任务会显示在这里。" : "调整筛选条件或搜索关键词。",
-                        actionTitle: "新建下载"
+                        title: hasTaskQuery ? "没有匹配的任务" : "还没有下载任务",
+                        message: hasTaskQuery ? "清除搜索或筛选条件后查看全部任务。" : "粘贴链接并开始下载，任务会显示在这里。",
+                        actionTitle: hasTaskQuery ? "清除筛选" : "新建下载"
                     ) {
-                        model.selection = .download
+                        if hasTaskQuery {
+                            model.taskFilter = .all
+                            searchText = ""
+                        } else {
+                            model.selection = .download
+                        }
                     }
                     .frame(maxWidth: .infinity, minHeight: 320)
                 } else {
@@ -44,7 +50,7 @@ struct TasksView: View {
                 }
             }
             .padding(.horizontal, DesignSystem.contentPadding)
-            .padding(.top, DesignSystem.pageTitlebarClearance + DesignSystem.pageHeaderTop)
+            .padding(.top, DesignSystem.contentPadding)
             .padding(.bottom, DesignSystem.space2XL)
             .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .top)
@@ -74,6 +80,7 @@ struct TasksView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(model.taskFilter == filter ? .isSelected : [])
                 }
             }
             .padding(2)
@@ -88,6 +95,8 @@ struct TasksView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                 TextField("搜索任务…", text: $searchText)
+                    .accessibilityLabel("搜索任务")
+                    .focused($searchFocused)
                     .textFieldStyle(.plain)
             }
             .padding(.horizontal, DesignSystem.spaceM)
@@ -98,9 +107,13 @@ struct TasksView: View {
             )
             .overlay {
                 RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-                    .strokeBorder(DesignSystem.hairline)
+                    .strokeBorder(searchFocused ? DesignSystem.accent : DesignSystem.hairline, lineWidth: searchFocused ? 2 : 1)
             }
         }
+    }
+
+    private var hasTaskQuery: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.taskFilter != .all
     }
 
     private var displayedTasks: [DownloadTaskItem] {
@@ -163,7 +176,7 @@ private struct TaskRow: View {
                     Text("\(task.platform.displayName) · \(task.detail)")
                         .font(DesignSystem.supportingFont)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if task.state == .downloading || task.state == .queued {
                         ProgressView()
@@ -182,23 +195,24 @@ private struct TaskRow: View {
 
                 if task.state == .completed {
                     Button("打开文件夹", systemImage: "folder", action: openFolder)
-                        .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
-                        .help("打开文件夹")
+                } else if task.state == .failed {
+                    Button("重试", systemImage: "arrow.clockwise") {
+                        model.retryTask(task)
+                    }
+                    .buttonStyle(.bordered)
                 }
 
                 if task.state != .downloading {
                     Button("移除任务", systemImage: "xmark", action: removeTask)
-                        .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
-                        .help("移除任务")
                 }
             }
         }
     }
 
     private func openFolder() {
-        NSWorkspace.shared.open(URL(fileURLWithPath: model.outputDirectory))
+        NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
     }
 
     private func removeTask() {

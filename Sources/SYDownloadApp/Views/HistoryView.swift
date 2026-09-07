@@ -4,6 +4,7 @@ import AppKit
 
 struct HistoryView: View {
     @ObservedObject var model: AppModel
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -35,9 +36,13 @@ struct HistoryView: View {
                         systemImage: "clock.arrow.circlepath",
                         title: model.history.isEmpty ? "还没有下载历史" : "没有匹配的记录",
                         message: model.history.isEmpty ? "下载成功的内容会自动保存在这里。" : "尝试更换搜索关键词。",
-                        actionTitle: "去下载"
+                        actionTitle: model.historySearch.isEmpty ? "去下载" : "清除搜索"
                     ) {
-                        model.selection = .download
+                        if model.historySearch.isEmpty {
+                            model.selection = .download
+                        } else {
+                            model.historySearch = ""
+                        }
                     }
                     .frame(maxWidth: .infinity, minHeight: 320)
                 } else {
@@ -49,7 +54,7 @@ struct HistoryView: View {
                 }
             }
             .padding(.horizontal, DesignSystem.contentPadding)
-            .padding(.top, DesignSystem.pageTitlebarClearance + DesignSystem.pageHeaderTop)
+            .padding(.top, DesignSystem.contentPadding)
             .padding(.bottom, DesignSystem.space2XL)
             .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .top)
@@ -63,6 +68,16 @@ struct HistoryView: View {
                 .foregroundStyle(.secondary)
             TextField("搜索标题、平台或链接", text: $model.historySearch)
                 .textFieldStyle(.plain)
+                .accessibilityLabel("搜索历史记录")
+                .focused($searchFocused)
+            if !model.historySearch.isEmpty {
+                Button("清除搜索", systemImage: "xmark.circle.fill") {
+                    model.historySearch = ""
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, DesignSystem.spaceM)
         .frame(width: 260, height: 32)
@@ -70,10 +85,10 @@ struct HistoryView: View {
             DesignSystem.warmSurface,
             in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-                .strokeBorder(DesignSystem.hairline)
-        }
+            .overlay {
+                RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+                .strokeBorder(searchFocused ? DesignSystem.accent : DesignSystem.hairline, lineWidth: searchFocused ? 2 : 1)
+            }
     }
 }
 
@@ -108,6 +123,12 @@ private struct HistoryRow: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .help("打开位置")
+
+                Button("再次下载", systemImage: "arrow.down") {
+                    model.useHistory(item)
+                }
+                .buttonStyle(.borderless)
+                .help("再次下载")
 
                 Menu {
                     Button("再次下载", systemImage: "arrow.down") {

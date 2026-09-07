@@ -47,6 +47,7 @@ struct DownloadTaskItem: Identifiable {
     var progress: Double?
     var detail: String
     var createdAt: Date
+    var outputDirectory: String
 
     init(
         id: UUID = UUID(),
@@ -56,7 +57,8 @@ struct DownloadTaskItem: Identifiable {
         state: DownloadTaskState = .queued,
         progress: Double? = nil,
         detail: String = "等待下载…",
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        outputDirectory: String = ""
     ) {
         self.id = id
         self.title = title
@@ -66,6 +68,7 @@ struct DownloadTaskItem: Identifiable {
         self.progress = progress
         self.detail = detail
         self.createdAt = createdAt
+        self.outputDirectory = outputDirectory
     }
 }
 
@@ -140,18 +143,21 @@ struct DouyinSettingsForm {
 
 @MainActor
 final class AppModel: ObservableObject {
+    typealias BridgeSender = @Sendable (BridgeRequest) async throws -> BridgeResponse
+
     @Published var selection: AppSection? = .download
     @Published var input = ""
-    @Published var outputDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
-        .first?
-        .appendingPathComponent("SYDownload")
-        .path ?? "~/Downloads/SYDownload"
+    @Published var outputDirectory: String {
+        didSet { defaults.set(outputDirectory, forKey: "SYDownload.outputDirectory") }
+    }
     @Published var status = "粘贴链接后即可开始"
+    @Published var statusIsError = false
     @Published var detectedPlatform: DownloadPlatform = .unknown
     @Published var isWorking = false
     @Published var isParsing = false
     @Published var lastDetails: [String: String] = [:]
     @Published var preview: ParsedPreview?
+    @Published private(set) var validatedInput = ""
     @Published var tasks: [DownloadTaskItem] = []
     @Published var history: [HistoryItem] = []
     @Published var taskFilter: TaskFilter = .all
@@ -160,15 +166,28 @@ final class AppModel: ObservableObject {
     @Published var xhsSettings = XHSSettingsForm()
     @Published var douyinSettings = DouyinSettingsForm()
     @Published var settingsStatus = ""
+    @Published var settingsStatusIsError = false
     @Published var settingsLoading = false
     @Published var hasLoadedEngineSettings = false
     @Published var xhsSettingsPath = ""
     @Published var douyinSettingsPath = ""
 
-    private let bridge = BridgeClient()
+    private let defaults: UserDefaults
+    private let sendBridge: BridgeSender
     private let historyKey = "SYDownload.history.v1"
 
-    init() {
+    init(
+        userDefaults: UserDefaults = .standard,
+        bridgeSend: @escaping BridgeSender = { request in
+            try await BridgeClient().send(request)
+        }
+    ) {
+        defaults = userDefaults
+        sendBridge = bridgeSend
+        outputDirectory = userDefaults.string(forKey: "SYDownload.outputDirectory")
+            ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
+                .first?.appendingPathComponent("SYDownload").path
+            ?? "~/Downloads/SYDownload"
         loadHistory()
     }
 
@@ -192,19 +211,29 @@ final class AppModel: ObservableObject {
     }
 
     func detectLocally() {
+        let normalizedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if preview != nil && normalizedInput != validatedInput {
+            preview = nil
+            lastDetails = [:]
+            validatedInput = ""
+        }
         let newPlatform = PlatformDetector.detect(input)
         if newPlatform != detectedPlatform {
             preview = nil
             lastDetails = [:]
+            validatedInput = ""
         }
         detectedPlatform = newPlatform
 
         if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             status = "粘贴链接后即可开始"
+            statusIsError = false
         } else if newPlatform == .unknown {
             status = "暂未识别到支持的平台链接"
+            statusIsError = true
         } else {
             status = "已识别：\(newPlatform.displayName)"
+            statusIsError = false
         }
     }
 
@@ -213,46 +242,68 @@ final class AppModel: ObservableObject {
         detectedPlatform = .unknown
         preview = nil
         lastDetails = [:]
+        validatedInput = ""
         status = "粘贴链接后即可开始"
+        statusIsError = false
     }
 
     func validateEngine() async {
         detectLocally()
         guard detectedPlatform != .unknown else { return }
+        let sourceURL = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let expectedPlatform = detectedPlatform
         isParsing = true
         defer { isParsing = false }
 
         do {
-            let response = try await bridge.send(.init(command: "validate", url: input))
+            let response = try await sendBridge(.init(command: "validate", url: sourceURL))
+            guard input.trimmingCharacters(in: .whitespacesAndNewlines) == sourceURL,
+                  detectedPlatform == expectedPlatform else { return }
             status = response.message
+            statusIsError = !response.ok
             lastDetails = response.details ?? [:]
             if response.ok {
                 preview = ParsedPreview(
                     platform: response.platform ?? detectedPlatform,
-                    title: "\((response.platform ?? detectedPlatform).displayName)内容已解析",
+                    title: "\((response.platform ?? detectedPlatform).displayName)引擎检查通过",
                     author: "链接已就绪",
                     summary: "已完成平台识别与下载引擎检查，可直接开始下载。"
                 )
+                validatedInput = sourceURL
             } else {
                 preview = nil
+                validatedInput = ""
             }
         } catch {
+            guard input.trimmingCharacters(in: .whitespacesAndNewlines) == sourceURL else { return }
             preview = nil
+            validatedInput = ""
             status = error.localizedDescription
+            statusIsError = true
         }
     }
 
     func runDownload() async {
+        guard !isWorking, !isParsing else { return }
         detectLocally()
         guard detectedPlatform != .unknown else { return }
+        let requestedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let requestedPlatform = detectedPlatform
+        let destination = outputDirectory
 
+        isWorking = true
         if preview == nil {
             await validateEngine()
-            guard preview != nil else { return }
+            guard preview != nil,
+                  input.trimmingCharacters(in: .whitespacesAndNewlines) == requestedInput,
+                  detectedPlatform == requestedPlatform else {
+                isWorking = false
+                return
+            }
         }
 
-        let platform = detectedPlatform
-        let sourceURL = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let platform = requestedPlatform
+        let sourceURL = requestedInput
         let title = preview?.title ?? "\(platform.displayName)下载任务"
         let taskID = UUID()
         let item = DownloadTaskItem(
@@ -262,21 +313,23 @@ final class AppModel: ObservableObject {
             sourceURL: sourceURL,
             state: .downloading,
             progress: nil,
-            detail: "正在调用 \(platform.displayName) 下载引擎…"
+            detail: "正在调用 \(platform.displayName) 下载引擎…",
+            outputDirectory: destination
         )
         tasks.insert(item, at: 0)
         selection = .tasks
-        isWorking = true
         status = "正在下载…"
+        statusIsError = false
 
         do {
-            let response = try await bridge.send(.init(
+            let response = try await sendBridge(.init(
                 command: "download",
                 url: sourceURL,
-                outputDirectory: outputDirectory
+                outputDirectory: destination
             ))
             lastDetails = response.details ?? [:]
             status = response.message
+            statusIsError = !response.ok
             updateTask(taskID) { task in
                 task.state = response.ok ? .completed : .failed
                 task.progress = response.ok ? 1.0 : nil
@@ -289,7 +342,7 @@ final class AppModel: ObservableObject {
                         title: title,
                         platform: platform,
                         sourceURL: sourceURL,
-                        outputDirectory: outputDirectory
+                        outputDirectory: destination
                     ),
                     at: 0
                 )
@@ -300,6 +353,7 @@ final class AppModel: ObservableObject {
             }
         } catch {
             status = error.localizedDescription
+            statusIsError = true
             updateTask(taskID) { task in
                 task.state = .failed
                 task.progress = nil
@@ -316,24 +370,28 @@ final class AppModel: ObservableObject {
         defer { settingsLoading = false }
 
         do {
-            let xhs = try await bridge.send(.init(command: "settings_get", engine: "xiaohongshu"))
+            let xhs = try await sendBridge(.init(command: "settings_get", engine: "xiaohongshu"))
             guard xhs.ok else {
                 settingsStatus = xhs.message
+                settingsStatusIsError = true
                 return
             }
             applyXHSSettings(xhs.details ?? [:])
 
-            let douyin = try await bridge.send(.init(command: "settings_get", engine: "douyin"))
+            let douyin = try await sendBridge(.init(command: "settings_get", engine: "douyin"))
             guard douyin.ok else {
                 settingsStatus = douyin.message
+                settingsStatusIsError = true
                 return
             }
             applyDouyinSettings(douyin.details ?? [:])
 
             hasLoadedEngineSettings = true
             settingsStatus = "已读取原始项目配置。"
+            settingsStatusIsError = false
         } catch {
             settingsStatus = error.localizedDescription
+            settingsStatusIsError = true
         }
     }
 
@@ -386,14 +444,18 @@ final class AppModel: ObservableObject {
         settingsLoading = true
         defer { settingsLoading = false }
         do {
-            let response = try await bridge.send(.init(command: "settings_reset", engine: engine))
+            let response = try await sendBridge(.init(command: "settings_reset", engine: engine))
             settingsStatus = response.message
             if response.ok {
+                settingsStatusIsError = false
                 hasLoadedEngineSettings = false
                 await loadEngineSettings(force: true)
+            } else {
+                settingsStatusIsError = true
             }
         } catch {
             settingsStatus = error.localizedDescription
+            settingsStatusIsError = true
         }
     }
 
@@ -403,6 +465,16 @@ final class AppModel: ObservableObject {
 
     func removeTask(_ id: UUID) {
         tasks.removeAll { $0.id == id && $0.state != .downloading }
+    }
+
+    func retryTask(_ task: DownloadTaskItem) {
+        guard !isWorking else { return }
+        input = task.sourceURL
+        detectedPlatform = task.platform
+        preview = nil
+        validatedInput = ""
+        selection = .download
+        status = "已载入失败任务，可重新检查后下载"
     }
 
     func removeHistory(_ id: UUID) {
@@ -425,18 +497,20 @@ final class AppModel: ObservableObject {
               let json = String(data: data, encoding: .utf8)
         else {
             settingsStatus = "设置数据无法编码。"
+            settingsStatusIsError = true
             return
         }
 
         settingsLoading = true
         defer { settingsLoading = false }
         do {
-            let response = try await bridge.send(.init(
+            let response = try await sendBridge(.init(
                 command: "settings_update",
                 engine: engine,
                 settingsJSON: json
             ))
             settingsStatus = response.message
+            settingsStatusIsError = !response.ok
             if response.ok {
                 if engine == "xiaohongshu" {
                     xhsSettingsPath = response.details?["config_path"] ?? xhsSettingsPath
@@ -446,6 +520,7 @@ final class AppModel: ObservableObject {
             }
         } catch {
             settingsStatus = error.localizedDescription
+            settingsStatusIsError = true
         }
     }
 
@@ -500,11 +575,11 @@ final class AppModel: ObservableObject {
 
     private func persistHistory() {
         guard let data = try? JSONEncoder().encode(history) else { return }
-        UserDefaults.standard.set(data, forKey: historyKey)
+        defaults.set(data, forKey: historyKey)
     }
 
     private func loadHistory() {
-        if let data = UserDefaults.standard.data(forKey: historyKey),
+        if let data = defaults.data(forKey: historyKey),
            let decoded = try? JSONDecoder().decode([HistoryItem].self, from: data) {
             history = decoded
             return

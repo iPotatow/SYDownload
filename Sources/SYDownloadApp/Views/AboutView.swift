@@ -19,11 +19,6 @@ struct AboutView: View {
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Rectangle()
-                .fill(DesignSystem.accent)
-                .frame(width: 42, height: 3)
-                .clipShape(Capsule())
-
             capabilityRow
 
             VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
@@ -32,7 +27,6 @@ struct AboutView: View {
                     .controlSize(.large)
 
                 HStack(spacing: DesignSystem.spaceL) {
-                    linkButton("源码", symbol: "chevron.left.forwardslash.chevron.right", url: "https://github.com/iPotatow/SYdownload")
                     linkButton("问题反馈", symbol: "bubble.left.and.exclamationmark.bubble.right", url: "https://github.com/iPotatow/SYdownload/issues")
                     linkButton("使用文档", symbol: "doc.text", url: "https://github.com/iPotatow/SYdownload#readme")
                 }
@@ -51,7 +45,9 @@ struct AboutView: View {
             .foregroundStyle(.tertiary)
         }
         .padding(DesignSystem.spaceXL)
-        .frame(width: 500, height: 380)
+        .frame(width: 500)
+        .frame(minHeight: 380)
+        .onExitCommand { dismiss() }
         .background(DesignSystem.mainSurfaceBackground)
         .tint(DesignSystem.accent)
     }
@@ -78,7 +74,7 @@ struct AboutView: View {
     private var capabilityRow: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
             capability("本地优先", "链接和配置通过本机 Bridge 处理。", systemImage: "lock.shield", tint: DesignSystem.accent)
-            capability("自包含", "Release 内置 Python 运行时与下载引擎。", systemImage: "shippingbox", tint: DesignSystem.accentSecondary)
+            capability("自包含", "Release 内置 Python 运行时与下载引擎。", systemImage: "shippingbox", tint: DesignSystem.accent)
         }
     }
 

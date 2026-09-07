@@ -32,18 +32,17 @@ struct SidebarView: View {
             sidebarFooter
         }
         .padding(.top, DesignSystem.sidebarTitlebarClearance)
+        .padding(.horizontal, DesignSystem.spaceS)
+        .padding(.bottom, DesignSystem.spaceS)
     }
 
     private var brand: some View {
         HStack(spacing: DesignSystem.spaceS) {
-            AppMark(size: 32)
+            AppMark(size: 40)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("SYDownload")
                     .font(.system(size: 15, weight: .semibold))
-                Text("媒体下载工作台")
-                    .font(DesignSystem.metadataFont)
-                    .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
@@ -53,17 +52,24 @@ struct SidebarView: View {
     }
 
     private var sidebarFooter: some View {
-        HStack(spacing: DesignSystem.spaceS) {
-            Circle()
-                .fill(DesignSystem.success)
-                .frame(width: 7, height: 7)
-            Text("两个下载引擎已接入")
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+            HStack(spacing: DesignSystem.spaceS) {
+                Image(systemName: "lock.shield")
+                Text("本地优先")
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
+            } label: {
+                Label("关于 SYDownload", systemImage: "info.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("关于 SYDownload")
         }
         .font(DesignSystem.metadataFont)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, DesignSystem.spaceL)
-        .padding(.bottom, DesignSystem.spaceL)
+        .padding(.horizontal, DesignSystem.spaceS)
     }
 
     private func sidebarButton(
