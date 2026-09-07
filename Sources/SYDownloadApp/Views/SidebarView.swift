@@ -10,21 +10,25 @@ struct SidebarView: View {
             brand
 
             VStack(spacing: DesignSystem.spaceXS) {
-                sectionLabel("工作区")
                 sidebarButton(.download, title: "下载", systemImage: "arrow.down.circle.fill")
                 sidebarButton(.tasks, title: "任务", systemImage: "tray.full.fill")
                 sidebarButton(.history, title: "历史记录", systemImage: "clock.arrow.circlepath")
 
-                sectionLabel("工具")
+                Divider()
+                    .padding(.horizontal, DesignSystem.spaceM)
+                    .padding(.vertical, DesignSystem.spaceS)
+
                 sidebarButton(.photos, title: "照片整理", systemImage: "photo.on.rectangle.angled")
 
-                sectionLabel("偏好")
+                Divider()
+                    .padding(.horizontal, DesignSystem.spaceM)
+                    .padding(.vertical, DesignSystem.spaceS)
+
                 sidebarButton(.settings, title: "设置", systemImage: "slider.horizontal.3")
             }
             .padding(.horizontal, DesignSystem.spaceS)
 
             Spacer(minLength: DesignSystem.spaceXL)
-
             sidebarFooter
         }
         .padding(.top, DesignSystem.sidebarTitlebarClearance)
@@ -32,11 +36,11 @@ struct SidebarView: View {
 
     private var brand: some View {
         HStack(spacing: DesignSystem.spaceS) {
-            AppMark(size: 40)
+            AppMark(size: 32)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("SYDownload")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold))
                 Text("媒体下载工作台")
                     .font(DesignSystem.metadataFont)
                     .foregroundStyle(.secondary)
@@ -49,26 +53,17 @@ struct SidebarView: View {
     }
 
     private var sidebarFooter: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Label("两个下载引擎已接入", systemImage: "checkmark.circle")
+        HStack(spacing: DesignSystem.spaceS) {
+            Circle()
+                .fill(DesignSystem.success)
+                .frame(width: 7, height: 7)
+            Text("两个下载引擎已接入")
                 .foregroundStyle(.secondary)
-            Text("Apple Silicon · macOS 14+")
-                .foregroundStyle(.tertiary)
         }
         .font(DesignSystem.metadataFont)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DesignSystem.spaceL)
         .padding(.bottom, DesignSystem.spaceL)
-    }
-
-    private func sectionLabel(_ title: String) -> some View {
-        Text(title)
-            .font(DesignSystem.metadataFont.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, DesignSystem.spaceM)
-            .padding(.top, DesignSystem.spaceS)
-            .accessibilityAddTraits(.isHeader)
     }
 
     private func sidebarButton(
@@ -96,7 +91,12 @@ struct SidebarView: View {
             .contentShape(Rectangle())
         }
         .focused(focusedSection, equals: section)
-        .buttonStyle(SidebarButtonStyle(selected: selected, isFocused: focusedSection.wrappedValue == section))
+        .buttonStyle(
+            SidebarButtonStyle(
+                selected: selected,
+                isFocused: focusedSection.wrappedValue == section
+            )
+        )
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
