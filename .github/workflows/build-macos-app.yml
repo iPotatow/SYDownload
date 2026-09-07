@@ -42,20 +42,9 @@ jobs:
         run: python3 -m unittest discover -s Bridge/tests -p 'test_*.py'
 
   build:
-    name: Build ${{ matrix.arch }}
+    name: Build Apple Silicon
     needs: test
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-latest
-            arch: AppleSilicon
-            artifact: SYDownload-macOS-AppleSilicon
-          - runner: macos-15-intel
-            arch: Intel
-            artifact: SYDownload-macOS-Intel
-
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-latest
 
     steps:
       - name: Checkout
@@ -145,12 +134,12 @@ jobs:
       - name: Archive app
         run: |
           cd dist
-          ditto -c -k --sequesterRsrc --keepParent SYDownload.app "${{ matrix.artifact }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent SYDownload.app SYDownload-macOS-AppleSilicon.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}.zip
+          name: SYDownload-macOS-AppleSilicon
+          path: dist/SYDownload-macOS-AppleSilicon.zip
           if-no-files-found: error
           retention-days: 14
