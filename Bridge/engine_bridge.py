@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""XDownloader bridge between the SwiftUI shell and bundled Python engines.
+"""SYDownload bridge between the SwiftUI shell and bundled Python engines.
 
 Protocol: one JSON request per line, one JSON response per line.
 The bridge keeps the native UI independent from upstream downloader internals.
@@ -25,9 +25,9 @@ ENGINE_NAMES = {
     "tiktok": "TikTokDownloader",
 }
 ENV_NAMES = {
-    "xiaohongshu": "XDOWNLOADER_XHS_ROOT",
-    "douyin": "XDOWNLOADER_DOUK_ROOT",
-    "tiktok": "XDOWNLOADER_DOUK_ROOT",
+    "xiaohongshu": "SYDOWNLOAD_XHS_ROOT",
+    "douyin": "SYDOWNLOAD_DOUK_ROOT",
+    "tiktok": "SYDOWNLOAD_DOUK_ROOT",
 }
 ENGINE_PLATFORMS = {
     "XHS-Downloader": "xiaohongshu",
@@ -184,22 +184,29 @@ def project_root() -> Path:
 
 
 def app_support_dir() -> Path:
-    override = os.environ.get("XDOWNLOADER_APP_SUPPORT")
+    override = os.environ.get("SYDOWNLOAD_APP_SUPPORT")
     target = (
         Path(override).expanduser()
         if override
-        else Path.home() / "Library" / "Application Support" / "XDownloader"
+        else Path.home() / "Library" / "Application Support" / "SYDownload"
     )
+    if not override and not target.exists():
+        legacy = Path.home() / "Library" / "Application Support" / "XDownloader"
+        if legacy.is_dir():
+            try:
+                shutil.copytree(legacy, target)
+            except OSError:
+                pass
     target.mkdir(parents=True, exist_ok=True)
     return target
 
 
 def cache_dir() -> Path:
-    override = os.environ.get("XDOWNLOADER_CACHE")
+    override = os.environ.get("SYDOWNLOAD_CACHE")
     target = (
         Path(override).expanduser()
         if override
-        else Path.home() / "Library" / "Caches" / "XDownloader"
+        else Path.home() / "Library" / "Caches" / "SYDownload"
     )
     target.mkdir(parents=True, exist_ok=True)
     return target
@@ -238,7 +245,7 @@ def stage_bundled_engine(name: str) -> Path | None:
 
     revision = engine_revision(name)
     destination = app_support_dir() / "engines" / name / revision
-    marker = destination / ".xdownloader-staged"
+    marker = destination / ".sydownload-staged"
     if (destination / "main.py").is_file() and marker.is_file():
         return destination
 
@@ -251,7 +258,7 @@ def stage_bundled_engine(name: str) -> Path | None:
         symlinks=True,
         ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
     )
-    marker_incoming = incoming / ".xdownloader-staged"
+    marker_incoming = incoming / ".sydownload-staged"
     marker_incoming.write_text(revision + "\n", encoding="utf-8")
 
     if destination.exists():
@@ -593,7 +600,7 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
         )
 
     output_raw = req.get("outputDirectory") or str(
-        Path.home() / "Downloads" / "XDownloader"
+        Path.home() / "Downloads" / "SYDownload"
     )
     output = Path(output_raw).expanduser()
     output.mkdir(parents=True, exist_ok=True)

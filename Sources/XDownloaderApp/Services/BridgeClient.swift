@@ -43,7 +43,7 @@ struct BridgeClient: Sendable {
             environment["PYTHONDONTWRITEBYTECODE"] = "1"
             environment["PYTHONNOUSERSITE"] = "1"
             if let resources = Bundle.main.resourceURL?.path {
-                environment["XDOWNLOADER_BUNDLE_RESOURCES"] = resources
+                environment["SYDOWNLOAD_BUNDLE_RESOURCES"] = resources
             }
             process.environment = environment
 
@@ -78,7 +78,7 @@ struct BridgeClient: Sendable {
     }
 
     private func resolveBridgeURL() throws -> URL {
-        if let override = ProcessInfo.processInfo.environment["XDOWNLOADER_BRIDGE"] {
+        if let override = ProcessInfo.processInfo.environment["SYDOWNLOAD_BRIDGE"] {
             let url = URL(fileURLWithPath: override)
             if FileManager.default.fileExists(atPath: url.path) { return url }
         }
@@ -96,7 +96,7 @@ struct BridgeClient: Sendable {
     }
 
     private func resolvePython() throws -> PythonLaunch {
-        if let override = ProcessInfo.processInfo.environment["XDOWNLOADER_PYTHON"] {
+        if let override = ProcessInfo.processInfo.environment["SYDOWNLOAD_PYTHON"] {
             let url = URL(fileURLWithPath: override)
             if FileManager.default.isExecutableFile(atPath: url.path) {
                 return PythonLaunch(executable: url, argumentsPrefix: [])

@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: xdownloader-macos-${{ github.ref }}
+  group: sydownload-macos-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -50,10 +50,10 @@ jobs:
         include:
           - runner: macos-latest
             arch: AppleSilicon
-            artifact: XDownloader-macOS-AppleSilicon
+            artifact: SYDownload-macOS-AppleSilicon
           - runner: macos-15-intel
             arch: Intel
-            artifact: XDownloader-macOS-Intel
+            artifact: SYDownload-macOS-Intel
 
     runs-on: ${{ matrix.runner }}
 
@@ -88,14 +88,14 @@ jobs:
 
       - name: Verify app bundle and embedded runtime
         env:
-          XDOWNLOADER_APP_SUPPORT: ${{ runner.temp }}/XDownloader-AppSupport
-          XDOWNLOADER_CACHE: ${{ runner.temp }}/XDownloader-Cache
+          SYDOWNLOAD_APP_SUPPORT: ${{ runner.temp }}/SYDownload-AppSupport
+          SYDOWNLOAD_CACHE: ${{ runner.temp }}/SYDownload-Cache
         run: |
-          APP="dist/XDownloader.app"
+          APP="dist/SYDownload.app"
           PYTHON="$APP/Contents/Resources/python/bin/python3"
           BRIDGE="$APP/Contents/Resources/bridge/engine_bridge.py"
 
-          file "$APP/Contents/MacOS/XDownloader"
+          file "$APP/Contents/MacOS/SYDownload"
           "$PYTHON" --version
           plutil -lint "$APP/Contents/Info.plist"
           codesign --verify --deep --strict --verbose=2 "$APP"
@@ -113,16 +113,16 @@ jobs:
           VALIDATE="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000002","command":"validate","url":"https://xhslink.com/ci-smoke-test"}' | "$PYTHON" "$BRIDGE" --once)"
           echo "$VALIDATE"
           echo "$VALIDATE" | grep -q '"ok": true'
-          test -f "$XDOWNLOADER_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
+          test -f "$SYDOWNLOAD_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
 
       - name: Launch smoke test
         run: |
-          APP="$PWD/dist/XDownloader.app"
+          APP="$PWD/dist/SYDownload.app"
           /usr/bin/open -n "$APP"
 
           PID=""
           for attempt in {1..10}; do
-            PID="$(/usr/bin/pgrep -x XDownloader | /usr/bin/head -n 1 || true)"
+            PID="$(/usr/bin/pgrep -x SYDownload | /usr/bin/head -n 1 || true)"
             if [[ -n "$PID" ]]; then
               break
             fi
@@ -130,13 +130,13 @@ jobs:
           done
 
           if [[ -z "$PID" ]]; then
-            echo "XDownloader failed to stay alive during startup."
+            echo "SYDownload failed to stay alive during startup."
             exit 1
           fi
 
           sleep 2
           if ! /bin/kill -0 "$PID" 2>/dev/null; then
-            echo "XDownloader crashed during startup smoke test."
+            echo "SYDownload crashed during startup smoke test."
             exit 1
           fi
 
@@ -145,7 +145,7 @@ jobs:
       - name: Archive app
         run: |
           cd dist
-          ditto -c -k --sequesterRsrc --keepParent XDownloader.app "${{ matrix.artifact }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent SYDownload.app "${{ matrix.artifact }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

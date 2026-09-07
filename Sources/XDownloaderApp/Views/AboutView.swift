@@ -25,7 +25,7 @@ struct AboutView: View {
             AppMark(size: 72)
 
             VStack(spacing: 6) {
-                Text("XDownloader")
+                Text("SYDownload")
                     .font(.system(size: 24, weight: .bold))
                 Text("v\(version)")
                     .font(.system(size: 13, weight: .medium, design: .monospaced))

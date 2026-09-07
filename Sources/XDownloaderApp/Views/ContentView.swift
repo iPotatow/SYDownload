@@ -33,7 +33,7 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "info.circle")
                 }
-                .help("关于 XDownloader")
+                .help("关于 SYDownload")
             }
         }
         .sheet(isPresented: $showsAbout) {

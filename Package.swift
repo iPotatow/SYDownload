@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "XDownloaderSpike",
+    name: "SYDownload",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "XDownloaderCore", targets: ["XDownloaderCore"]),
-        .executable(name: "XDownloader", targets: ["XDownloaderApp"]),
+        .library(name: "SYDownloadCore", targets: ["XDownloaderCore"]),
+        .executable(name: "SYDownload", targets: ["XDownloaderApp"]),
     ],
     targets: [
         .target(name: "XDownloaderCore"),

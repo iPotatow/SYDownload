@@ -1,6 +1,6 @@
-# XDownloader macOS
+# SYDownload macOS
 
-原生 SwiftUI macOS 下载器可行性项目，复用 XHS-Downloader 与 TikTokDownloader/DouK 的 Python 下载能力。
+原生 SwiftUI macOS 下载器，复用 XHS-Downloader 与 TikTokDownloader/DouK 的 Python 下载能力。
 
 ## 当前能力
 
@@ -13,20 +13,20 @@
 - Release Artifact 内置 Python 3.12
 - Release Artifact 内置 XHS-Downloader 与 TikTokDownloader/DouK 源码
 - Release Artifact 内置两个引擎的 Python 依赖
-- App 首次调用引擎时，把只读模板复制到 `~/Library/Application Support/XDownloader/engines/` 后运行，避免修改签名后的 `.app`
+- App 首次调用引擎时，把只读模板复制到 `~/Library/Application Support/SYDownload/engines/` 后运行，避免修改签名后的 `.app`
 
 ## 自包含 Artifact
 
 `.github/workflows/build-macos-app.yml` 在 `main` 分支构建：
 
-- `XDownloader-macOS-AppleSilicon.zip`
-- `XDownloader-macOS-Intel.zip`
+- `SYDownload-macOS-AppleSilicon.zip`
+- `SYDownload-macOS-Intel.zip`
 
 App Bundle 主要结构：
 
 ```text
-XDownloader.app/Contents/
-├── MacOS/XDownloader
+SYDownload.app/Contents/
+├── MacOS/SYDownload
 └── Resources/
     ├── bridge/engine_bridge.py
     ├── python/                 # portable CPython 3.12 + site-packages
@@ -61,9 +61,9 @@ BUNDLE_RUNTIME=1 CONFIGURATION=release ./script/package_app.sh
 
 ## 数据目录
 
-- 引擎运行副本与持久数据：`~/Library/Application Support/XDownloader/`
-- 缓存：`~/Library/Caches/XDownloader/`
-- 媒体文件：用户选择的下载目录
+- 引擎运行副本与持久数据：`~/Library/Application Support/SYDownload/`
+- 缓存：`~/Library/Caches/SYDownload/`
+- 媒体文件：用户选择的下载目录（默认 `~/Downloads/SYDownload/`）
 - `.app/Contents/` 运行期间保持只读
 
 ## 当前边界

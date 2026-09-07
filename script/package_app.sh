@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "Packaging XDownloader.app requires macOS."
+  echo "Packaging SYDownload.app requires macOS."
   exit 2
 fi
 
@@ -14,15 +14,15 @@ APP_VERSION="${APP_VERSION:-0.2.0}"
 ADHOC_SIGN="${ADHOC_SIGN:-1}"
 BUNDLE_RUNTIME="${BUNDLE_RUNTIME:-1}"
 
-swift build -c "$CONFIGURATION" --product XDownloader
+swift build -c "$CONFIGURATION" --product SYDownload
 BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
-BIN="$BIN_DIR/XDownloader"
-APP="$ROOT/dist/XDownloader.app"
+BIN="$BIN_DIR/SYDownload"
+APP="$ROOT/dist/SYDownload.app"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/bridge"
-cp "$BIN" "$APP/Contents/MacOS/XDownloader"
-chmod +x "$APP/Contents/MacOS/XDownloader"
+cp "$BIN" "$APP/Contents/MacOS/SYDownload"
+chmod +x "$APP/Contents/MacOS/SYDownload"
 cp "$ROOT/Bridge/engine_bridge.py" "$APP/Contents/Resources/bridge/engine_bridge.py"
 printf '%s\n' "$APP_VERSION" > "$APP/Contents/Resources/bundle-version.txt"
 
@@ -35,10 +35,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleExecutable</key><string>XDownloader</string>
-<key>CFBundleIdentifier</key><string>com.xdownloader.spike</string>
-<key>CFBundleName</key><string>XDownloader</string>
-<key>CFBundleDisplayName</key><string>XDownloader</string>
+<key>CFBundleExecutable</key><string>SYDownload</string>
+<key>CFBundleIdentifier</key><string>com.sydownload.app</string>
+<key>CFBundleName</key><string>SYDownload</string>
+<key>CFBundleDisplayName</key><string>SYDownload</string>
 <key>CFBundleVersion</key><string>${APP_VERSION}</string>
 <key>CFBundleShortVersionString</key><string>${APP_VERSION}</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
