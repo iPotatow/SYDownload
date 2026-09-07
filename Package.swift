@@ -12,7 +12,8 @@ let package = Package(
         .target(name: "SYDownloadCore"),
         .executableTarget(
             name: "SYDownloadApp",
-            dependencies: ["SYDownloadCore"]
+            dependencies: ["SYDownloadCore"],
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "SYDownloadCoreTests",

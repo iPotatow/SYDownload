@@ -31,6 +31,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var tab: SettingsTab = .general
     @AppStorage("completionNotification") private var completionNotification = true
@@ -40,23 +41,69 @@ struct SettingsView: View {
     @AppStorage("preferredLanguage") private var preferredLanguage = "简体中文"
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                PageHeader(
-                    eyebrow: "WORKSPACE PREFERENCES",
-                    title: "设置",
-                    subtitle: "调整保存位置、下载内容和引擎行为。只保存当前页面管理的字段。",
-                    systemImage: "slider.horizontal.3"
-                )
+        VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+            PageHeader(
+                eyebrow: "WORKSPACE PREFERENCES",
+                title: "设置",
+                subtitle: "调整保存位置、下载内容和引擎行为。",
+                systemImage: "slider.horizontal.3"
+            )
 
-                Picker("设置分类", selection: $tab) {
-                    ForEach(SettingsTab.allCases) { item in Text(item.rawValue).tag(item) }
+            HStack(alignment: .top, spacing: DesignSystem.spaceL) {
+                settingsNavigation.frame(width: 154)
+                settingsContent
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(.horizontal, DesignSystem.contentPadding)
+        .padding(.top, DesignSystem.pageTitlebarClearance + DesignSystem.pageHeaderTop)
+        .padding(.bottom, DesignSystem.spaceL)
+        .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .tint(DesignSystem.accent)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: tab)
+        .task {
+            await model.loadEngineSettings()
+        }
+    }
+
+    private var settingsNavigation: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+            Text("设置分类")
+                .font(DesignSystem.metadataFont.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, DesignSystem.spaceS)
+                .padding(.bottom, DesignSystem.spaceS)
+            ForEach(SettingsTab.allCases) { item in
+                Button {
+                    tab = item
+                } label: {
+                    HStack(spacing: DesignSystem.spaceS) {
+                        Image(systemName: item.systemImage)
+                            .frame(width: DesignSystem.sidebarNavigationIconSize)
+                        Text(item.rawValue)
+                        Spacer(minLength: 0)
+                    }
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 660)
+                .buttonStyle(SettingsNavigationButtonStyle(selected: tab == item))
+                .accessibilityAddTraits(tab == item ? .isSelected : [])
+                .help(item.description)
+            }
+            Spacer(minLength: 0)
+            Label("设置会直接写入引擎配置", systemImage: "lock.shield")
+                .font(DesignSystem.metadataFont)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, DesignSystem.spaceS)
+        }
+        .padding(DesignSystem.spaceS)
+        .background(DesignSystem.rowBackground, in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
+    }
 
+    private var settingsContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
                 settingsContext
-
                 Group {
                     switch tab {
                     case .general: generalSettings
@@ -65,31 +112,23 @@ struct SettingsView: View {
                     case .advanced: advancedSettings
                     }
                 }
-
                 if model.settingsLoading {
-                    HStack(spacing: 8) {
+                    HStack(spacing: DesignSystem.spaceS) {
                         ProgressView().controlSize(.small)
                         Text("正在同步原始项目配置…")
                     }
-                    .font(.system(size: 13))
+                    .font(DesignSystem.supportingFont)
                     .foregroundStyle(.secondary)
                 } else if !model.settingsStatus.isEmpty {
                     Label(model.settingsStatus, systemImage: "info.circle")
-                        .font(.system(size: 13))
+                        .font(DesignSystem.supportingFont)
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, DesignSystem.contentPadding)
-            .padding(.top, DesignSystem.pageHeaderTop)
-            .padding(.bottom, DesignSystem.space3XL)
-            .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, DesignSystem.space2XL)
         }
-        .tint(DesignSystem.accent)
-        .animation(.easeOut(duration: 0.18), value: tab)
-        .task {
-            await model.loadEngineSettings()
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var settingsContext: some View {
@@ -482,6 +521,27 @@ struct SettingsView: View {
     private func revealConfig(_ path: String) {
         guard !path.isEmpty else { return }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+}
+
+private struct SettingsNavigationButtonStyle: ButtonStyle {
+    let selected: Bool
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(DesignSystem.uiFont.weight(selected ? .semibold : .medium))
+            .foregroundStyle(selected ? DesignSystem.accent : Color.primary)
+            .padding(.horizontal, DesignSystem.spaceS)
+            .frame(height: 34)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                selected ? DesignSystem.sidebarAccent : (configuration.isPressed || hovered ? DesignSystem.sidebarHover : .clear),
+                in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+            )
+            .opacity(isEnabled ? 1 : 0.5)
+            .onHover { hovered = $0 }
     }
 }
 #endif

@@ -15,20 +15,21 @@ struct PhotosView: View {
     @State private var statusMessage = "拖入一个文件夹，或点击选择文件夹开始整理。"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
             header
-            folderDropZone
-
-            if isScanning {
-                scanningState
-            } else if folderURL == nil {
-                emptyState
-            } else {
-                photoGroups
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: DesignSystem.spaceL) {
+                    folderRail.frame(width: 196)
+                    workspaceResults
+                }
+                VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                    folderRail
+                    workspaceResults
+                }
             }
         }
         .padding(.horizontal, DesignSystem.contentPadding)
-        .padding(.top, DesignSystem.pageHeaderTop)
+        .padding(.top, DesignSystem.pageTitlebarClearance + DesignSystem.pageHeaderTop)
         .padding(.bottom, DesignSystem.space3XL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -53,6 +54,39 @@ struct PhotosView: View {
             }
         } message: {
             Text("将把 \(selectedPhotoURLs.count) 张照片从当前文件夹移到废纸篓。")
+        }
+    }
+
+    private var folderRail: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
+            Text("文件夹工作区")
+                .font(DesignSystem.sectionTitleFont)
+            folderDropZone
+            if isScanning {
+                scanningState
+            } else if folderURL == nil {
+                Text("先选择一个图片文件夹，应用会递归扫描并按日期分组。")
+                    .font(DesignSystem.supportingFont)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Label("已准备扫描", systemImage: "checkmark.circle.fill")
+                    .font(DesignSystem.supportingFont)
+                    .foregroundStyle(DesignSystem.accent)
+            }
+        }
+        .padding(DesignSystem.panelPadding)
+        .background(DesignSystem.rowBackground, in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var workspaceResults: some View {
+        if folderURL == nil && !isScanning {
+            emptyState.frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if isScanning {
+            Color.clear.frame(maxWidth: .infinity, minHeight: 320)
+        } else {
+            photoGroups.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -100,8 +134,8 @@ struct PhotosView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 126)
-        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, minHeight: 122)
+        .padding(.horizontal, DesignSystem.spaceM)
         .background(
             isDropTargeted ? DesignSystem.accent.opacity(0.10) : DesignSystem.warmSurface,
             in: RoundedRectangle(cornerRadius: DesignSystem.cardRadius, style: .continuous)

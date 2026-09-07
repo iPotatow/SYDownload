@@ -27,20 +27,25 @@ struct SidebarView: View {
 
             sidebarFooter
         }
+        .padding(.top, DesignSystem.sidebarTitlebarClearance)
     }
 
     private var brand: some View {
-        VStack(spacing: 6) {
-            AppMark(size: 56)
-            Text("SYDownload")
-                .font(DesignSystem.sectionTitleFont)
-            Text("媒体下载工作台")
-                .font(DesignSystem.supportingFont)
-                .foregroundStyle(.secondary)
+        HStack(spacing: DesignSystem.spaceS) {
+            AppMark(size: 40)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("SYDownload")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                Text("媒体下载工作台")
+                    .font(DesignSystem.metadataFont)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 42)
-        .padding(.bottom, DesignSystem.spaceXL)
+        .frame(height: DesignSystem.sidebarBrandHeight)
+        .padding(.horizontal, DesignSystem.spaceL)
     }
 
     private var sidebarFooter: some View {

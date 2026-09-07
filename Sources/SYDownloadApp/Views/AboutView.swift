@@ -10,7 +10,7 @@ struct AboutView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
             header
 
             Text("自动识别分享链接，并调用内置下载引擎。轻量、直接，内容始终写入你选择的文件夹。")
@@ -18,6 +18,11 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Rectangle()
+                .fill(DesignSystem.accent)
+                .frame(width: 42, height: 3)
+                .clipShape(Capsule())
 
             capabilityRow
 
@@ -46,7 +51,7 @@ struct AboutView: View {
             .foregroundStyle(.tertiary)
         }
         .padding(DesignSystem.spaceXL)
-        .frame(width: 500, height: 390)
+        .frame(width: 500, height: 380)
         .background(DesignSystem.mainSurfaceBackground)
         .tint(DesignSystem.accent)
     }
@@ -71,9 +76,9 @@ struct AboutView: View {
     }
 
     private var capabilityRow: some View {
-        HStack(spacing: DesignSystem.spaceM) {
-            capability("本地优先", "链接和配置通过本机 Bridge 处理。", systemImage: "lock.shield", tint: DesignSystem.success)
-            capability("自包含", "Release 内置 Python 运行时与下载引擎。", systemImage: "shippingbox", tint: DesignSystem.accent)
+        VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+            capability("本地优先", "链接和配置通过本机 Bridge 处理。", systemImage: "lock.shield", tint: DesignSystem.accent)
+            capability("自包含", "Release 内置 Python 运行时与下载引擎。", systemImage: "shippingbox", tint: DesignSystem.accentSecondary)
         }
     }
 
