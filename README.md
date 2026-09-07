@@ -9,7 +9,7 @@
 - Swift ↔ Python JSON Lines IPC
 - XHS 真实 CLI 下载链路
 - DouK 单作品兼容适配器
-- GitHub Actions 同时构建 Apple Silicon / Intel `.app`
+- GitHub Actions 仅构建 Apple Silicon `.app`
 - Release Artifact 内置 Python 3.12
 - Release Artifact 内置 XHS-Downloader 与 TikTokDownloader/DouK 源码
 - Release Artifact 内置两个引擎的 Python 依赖
@@ -20,7 +20,6 @@
 `.github/workflows/build-macos-app.yml` 在 `main` 分支构建：
 
 - `SYDownload-macOS-AppleSilicon.zip`
-- `SYDownload-macOS-Intel.zip`
 
 App Bundle 主要结构：
 
