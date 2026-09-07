@@ -7,8 +7,6 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case download
     case tasks
     case history
-    case xiaohongshu
-    case douyinTikTok
     case settings
 
     var id: String { rawValue }
@@ -102,6 +100,43 @@ struct ParsedPreview: Equatable {
     var summary: String
 }
 
+struct XHSSettingsForm {
+    var imageDownload = true
+    var videoDownload = true
+    var liveDownload = false
+    var imageFormat = "JPEG"
+    var videoPreference = "resolution"
+    var noteFormat = ""
+    var folderName = "Download"
+    var nameFormat = "发布时间 作者昵称 作品标题"
+    var folderMode = false
+    var authorArchive = false
+    var downloadRecord = true
+    var writeMtime = false
+    var recordData = false
+    var cookie = ""
+}
+
+struct DouyinSettingsForm {
+    var music = false
+    var dynamicCover = false
+    var staticCover = false
+    var originalQuality = false
+    var folderName = "Download"
+    var folderMode = false
+    var nameFormat = "create_time type nickname desc"
+    var descLength = 64
+    var nameLength = 128
+    var dateFormat = "%Y-%m-%d %H:%M:%S"
+    var split = "-"
+    var storageFormat = ""
+    var maxSize = 0
+    var cookie = ""
+    var cookieTikTok = ""
+    var ffmpeg = ""
+    var liveQualities = ""
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var selection: AppSection? = .download
@@ -121,10 +156,13 @@ final class AppModel: ObservableObject {
     @Published var taskFilter: TaskFilter = .all
     @Published var historySearch = ""
 
-    @Published var includeVideo = true
-    @Published var includeCover = true
-    @Published var includeAudio = false
-    @Published var includeText = false
+    @Published var xhsSettings = XHSSettingsForm()
+    @Published var douyinSettings = DouyinSettingsForm()
+    @Published var settingsStatus = ""
+    @Published var settingsLoading = false
+    @Published var hasLoadedEngineSettings = false
+    @Published var xhsSettingsPath = ""
+    @Published var douyinSettingsPath = ""
 
     private let bridge = BridgeClient()
     private let historyKey = "XDownloader.history.v1"
@@ -166,15 +204,6 @@ final class AppModel: ObservableObject {
             status = "暂未识别到支持的平台链接"
         } else {
             status = "已识别：\(newPlatform.displayName)"
-        }
-    }
-
-    func focusPlatform(_ platform: DownloadPlatform) {
-        selection = .download
-        detectedPlatform = platform
-        preview = nil
-        if input.isEmpty {
-            status = "已切换到 \(platform.displayName)，请粘贴链接"
         }
     }
 
@@ -280,6 +309,93 @@ final class AppModel: ObservableObject {
         isWorking = false
     }
 
+    func loadEngineSettings(force: Bool = false) async {
+        guard force || !hasLoadedEngineSettings else { return }
+        settingsLoading = true
+        defer { settingsLoading = false }
+
+        do {
+            let xhs = try await bridge.send(.init(command: "settings_get", engine: "xiaohongshu"))
+            guard xhs.ok else {
+                settingsStatus = xhs.message
+                return
+            }
+            applyXHSSettings(xhs.details ?? [:])
+
+            let douyin = try await bridge.send(.init(command: "settings_get", engine: "douyin"))
+            guard douyin.ok else {
+                settingsStatus = douyin.message
+                return
+            }
+            applyDouyinSettings(douyin.details ?? [:])
+
+            hasLoadedEngineSettings = true
+            settingsStatus = "已读取原始项目配置。"
+        } catch {
+            settingsStatus = error.localizedDescription
+        }
+    }
+
+    func saveXHSSettings() async {
+        let values: [String: Any] = [
+            "work_path": outputDirectory,
+            "image_download": xhsSettings.imageDownload,
+            "video_download": xhsSettings.videoDownload,
+            "live_download": xhsSettings.liveDownload,
+            "image_format": xhsSettings.imageFormat,
+            "video_preference": xhsSettings.videoPreference,
+            "note_format": xhsSettings.noteFormat,
+            "folder_name": xhsSettings.folderName,
+            "name_format": xhsSettings.nameFormat,
+            "folder_mode": xhsSettings.folderMode,
+            "author_archive": xhsSettings.authorArchive,
+            "download_record": xhsSettings.downloadRecord,
+            "write_mtime": xhsSettings.writeMtime,
+            "record_data": xhsSettings.recordData,
+            "cookie": xhsSettings.cookie,
+        ]
+        await saveEngineSettings(engine: "xiaohongshu", values: values)
+    }
+
+    func saveDouyinSettings() async {
+        let values: [String: Any] = [
+            "root": outputDirectory,
+            "music": douyinSettings.music,
+            "dynamic_cover": douyinSettings.dynamicCover,
+            "static_cover": douyinSettings.staticCover,
+            "original_quality": douyinSettings.originalQuality,
+            "folder_name": douyinSettings.folderName,
+            "folder_mode": douyinSettings.folderMode,
+            "name_format": douyinSettings.nameFormat,
+            "desc_length": douyinSettings.descLength,
+            "name_length": douyinSettings.nameLength,
+            "date_format": douyinSettings.dateFormat,
+            "split": douyinSettings.split,
+            "storage_format": douyinSettings.storageFormat,
+            "max_size": douyinSettings.maxSize,
+            "cookie": douyinSettings.cookie,
+            "cookie_tiktok": douyinSettings.cookieTikTok,
+            "ffmpeg": douyinSettings.ffmpeg,
+            "live_qualities": douyinSettings.liveQualities,
+        ]
+        await saveEngineSettings(engine: "douyin", values: values)
+    }
+
+    func resetEngineSettings(_ engine: String) async {
+        settingsLoading = true
+        defer { settingsLoading = false }
+        do {
+            let response = try await bridge.send(.init(command: "settings_reset", engine: engine))
+            settingsStatus = response.message
+            if response.ok {
+                hasLoadedEngineSettings = false
+                await loadEngineSettings(force: true)
+            }
+        } catch {
+            settingsStatus = error.localizedDescription
+        }
+    }
+
     func clearCompletedTasks() {
         tasks.removeAll { $0.state == .completed }
     }
@@ -300,6 +416,80 @@ final class AppModel: ObservableObject {
         preview = nil
         selection = .download
         status = "已载入历史链接，可重新解析"
+    }
+
+    private func saveEngineSettings(engine: String, values: [String: Any]) async {
+        guard JSONSerialization.isValidJSONObject(values),
+              let data = try? JSONSerialization.data(withJSONObject: values, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8)
+        else {
+            settingsStatus = "设置数据无法编码。"
+            return
+        }
+
+        settingsLoading = true
+        defer { settingsLoading = false }
+        do {
+            let response = try await bridge.send(.init(
+                command: "settings_update",
+                engine: engine,
+                settingsJSON: json
+            ))
+            settingsStatus = response.message
+            if response.ok {
+                if engine == "xiaohongshu" {
+                    xhsSettingsPath = response.details?["config_path"] ?? xhsSettingsPath
+                } else {
+                    douyinSettingsPath = response.details?["config_path"] ?? douyinSettingsPath
+                }
+            }
+        } catch {
+            settingsStatus = error.localizedDescription
+        }
+    }
+
+    private func applyXHSSettings(_ details: [String: String]) {
+        xhsSettings.imageDownload = boolValue(details["image_download"], fallback: true)
+        xhsSettings.videoDownload = boolValue(details["video_download"], fallback: true)
+        xhsSettings.liveDownload = boolValue(details["live_download"], fallback: false)
+        xhsSettings.imageFormat = details["image_format"] ?? "JPEG"
+        xhsSettings.videoPreference = details["video_preference"] ?? "resolution"
+        xhsSettings.noteFormat = details["note_format"] ?? ""
+        xhsSettings.folderName = details["folder_name"] ?? "Download"
+        xhsSettings.nameFormat = details["name_format"] ?? "发布时间 作者昵称 作品标题"
+        xhsSettings.folderMode = boolValue(details["folder_mode"], fallback: false)
+        xhsSettings.authorArchive = boolValue(details["author_archive"], fallback: false)
+        xhsSettings.downloadRecord = boolValue(details["download_record"], fallback: true)
+        xhsSettings.writeMtime = boolValue(details["write_mtime"], fallback: false)
+        xhsSettings.recordData = boolValue(details["record_data"], fallback: false)
+        xhsSettings.cookie = details["cookie"] ?? ""
+        xhsSettingsPath = details["config_path"] ?? ""
+    }
+
+    private func applyDouyinSettings(_ details: [String: String]) {
+        douyinSettings.music = boolValue(details["music"], fallback: false)
+        douyinSettings.dynamicCover = boolValue(details["dynamic_cover"], fallback: false)
+        douyinSettings.staticCover = boolValue(details["static_cover"], fallback: false)
+        douyinSettings.originalQuality = boolValue(details["original_quality"], fallback: false)
+        douyinSettings.folderName = details["folder_name"] ?? "Download"
+        douyinSettings.folderMode = boolValue(details["folder_mode"], fallback: false)
+        douyinSettings.nameFormat = details["name_format"] ?? "create_time type nickname desc"
+        douyinSettings.descLength = Int(details["desc_length"] ?? "") ?? 64
+        douyinSettings.nameLength = Int(details["name_length"] ?? "") ?? 128
+        douyinSettings.dateFormat = details["date_format"] ?? "%Y-%m-%d %H:%M:%S"
+        douyinSettings.split = details["split"] ?? "-"
+        douyinSettings.storageFormat = details["storage_format"] ?? ""
+        douyinSettings.maxSize = Int(details["max_size"] ?? "") ?? 0
+        douyinSettings.cookie = details["cookie"] ?? ""
+        douyinSettings.cookieTikTok = details["cookie_tiktok"] ?? ""
+        douyinSettings.ffmpeg = details["ffmpeg"] ?? ""
+        douyinSettings.liveQualities = details["live_qualities"] ?? ""
+        douyinSettingsPath = details["config_path"] ?? ""
+    }
+
+    private func boolValue(_ value: String?, fallback: Bool) -> Bool {
+        guard let value else { return fallback }
+        return ["true", "1", "yes", "on"].contains(value.lowercased())
     }
 
     private func updateTask(_ id: UUID, mutation: (inout DownloadTaskItem) -> Void) {

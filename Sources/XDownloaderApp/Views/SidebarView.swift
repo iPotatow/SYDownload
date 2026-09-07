@@ -15,11 +15,6 @@ struct SidebarView: View {
                 }
 
                 Section {
-                    sidebarRow("小红书", systemImage: "book.pages", value: .xiaohongshu)
-                    sidebarRow("抖音 / TikTok", systemImage: "play.rectangle", value: .douyinTikTok)
-                }
-
-                Section {
                     sidebarRow("设置", systemImage: "gearshape", value: .settings)
                 }
             }

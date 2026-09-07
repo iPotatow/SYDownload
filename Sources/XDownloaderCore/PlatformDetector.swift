@@ -9,8 +9,7 @@ public enum DownloadPlatform: String, Codable, Sendable, CaseIterable {
     public var displayName: String {
         switch self {
         case .xiaohongshu: return "小红书"
-        case .douyin: return "抖音"
-        case .tiktok: return "TikTok"
+        case .douyin, .tiktok: return "抖音"
         case .unknown: return "未知平台"
         }
     }

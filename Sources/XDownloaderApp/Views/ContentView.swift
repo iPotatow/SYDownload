@@ -47,10 +47,6 @@ struct ContentView: View {
             TasksView(model: model)
         case .history:
             HistoryView(model: model)
-        case .xiaohongshu:
-            PlatformLandingView(model: model, platform: .xiaohongshu)
-        case .douyinTikTok:
-            PlatformLandingView(model: model, platform: .douyin)
         case .settings:
             SettingsView(model: model)
         }
