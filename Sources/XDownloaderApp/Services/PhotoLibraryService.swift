@@ -42,23 +42,17 @@ struct PhotoDeleteResult: Sendable {
 }
 
 enum PhotoLibraryService {
-    private static let separatedDateRegex = try! NSRegularExpression(
-        pattern: #"(?<!\d)((?:19|20)\d{2})(?:[-_.]|年)(0?[1-9]|1[0-2])(?:[-_.]|月)(0?[1-9]|[12]\d|3[01])日?(?!\d)"#
-    )
-    private static let compactDateRegex = try! NSRegularExpression(
-        pattern: #"(?<!\d)((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)"#
-    )
-
     static func scan(folder: URL) throws -> PhotoScanResult {
         let resourceValues = try folder.resourceValues(forKeys: [.isDirectoryKey])
         guard resourceValues.isDirectory == true else {
             throw CocoaError(.fileReadUnsupportedScheme)
         }
 
-        let keys: [URLResourceKey] = [.isRegularFileKey]
+        let regexes = makeDateRegexes()
+        let keys: Set<URLResourceKey> = [.isRegularFileKey]
         guard let enumerator = FileManager.default.enumerator(
             at: folder,
-            includingPropertiesForKeys: keys,
+            includingPropertiesForKeys: Array(keys),
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else {
             throw CocoaError(.fileReadUnknown)
@@ -69,10 +63,10 @@ enum PhotoLibraryService {
 
         for case let fileURL as URL in enumerator {
             guard isImageFile(fileURL) else { continue }
-            guard (try? fileURL.resourceValues(forKeys: Set(keys)).isRegularFile) == true else { continue }
+            guard (try? fileURL.resourceValues(forKeys: keys).isRegularFile) == true else { continue }
 
             let photo = PhotoFileItem(url: fileURL)
-            if let parsed = dateInfo(fromFileName: fileURL.lastPathComponent) {
+            if let parsed = dateInfo(fromFileName: fileURL.lastPathComponent, regexes: regexes) {
                 if var existing = grouped[parsed.key] {
                     existing.photos.append(photo)
                     grouped[parsed.key] = existing
@@ -119,7 +113,18 @@ enum PhotoLibraryService {
     }
 
     static func dateKey(fromFileName fileName: String) -> String? {
-        dateInfo(fromFileName: fileName)?.key
+        dateInfo(fromFileName: fileName, regexes: makeDateRegexes())?.key
+    }
+
+    private static func makeDateRegexes() -> [NSRegularExpression] {
+        [
+            try! NSRegularExpression(
+                pattern: #"(?<!\d)((?:19|20)\d{2})(?:[-_.]|年)(0?[1-9]|1[0-2])(?:[-_.]|月)(0?[1-9]|[12]\d|3[01])日?(?!\d)"#
+            ),
+            try! NSRegularExpression(
+                pattern: #"(?<!\d)((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)"#
+            ),
+        ]
     }
 
     private static func isImageFile(_ url: URL) -> Bool {
@@ -129,11 +134,14 @@ enum PhotoLibraryService {
         return type.conforms(to: .image)
     }
 
-    private static func dateInfo(fromFileName fileName: String) -> (key: String, date: Date)? {
+    private static func dateInfo(
+        fromFileName fileName: String,
+        regexes: [NSRegularExpression]
+    ) -> (key: String, date: Date)? {
         let stem = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
         let fullRange = NSRange(stem.startIndex..<stem.endIndex, in: stem)
 
-        for regex in [separatedDateRegex, compactDateRegex] {
+        for regex in regexes {
             guard let match = regex.firstMatch(in: stem, range: fullRange),
                   let year = integerGroup(1, match: match, source: stem),
                   let month = integerGroup(2, match: match, source: stem),
