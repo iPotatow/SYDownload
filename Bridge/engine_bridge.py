@@ -29,6 +29,142 @@ ENV_NAMES = {
     "douyin": "XDOWNLOADER_DOUK_ROOT",
     "tiktok": "XDOWNLOADER_DOUK_ROOT",
 }
+ENGINE_PLATFORMS = {
+    "XHS-Downloader": "xiaohongshu",
+    "TikTokDownloader": "douyin",
+}
+VISIBLE_SETTINGS = {
+    "XHS-Downloader": (
+        "image_download",
+        "video_download",
+        "live_download",
+        "image_format",
+        "video_preference",
+        "note_format",
+        "folder_name",
+        "name_format",
+        "folder_mode",
+        "author_archive",
+        "download_record",
+        "write_mtime",
+        "record_data",
+        "cookie",
+    ),
+    "TikTokDownloader": (
+        "music",
+        "dynamic_cover",
+        "static_cover",
+        "original_quality",
+        "folder_name",
+        "folder_mode",
+        "name_format",
+        "desc_length",
+        "name_length",
+        "date_format",
+        "split",
+        "storage_format",
+        "max_size",
+        "cookie",
+        "cookie_tiktok",
+        "ffmpeg",
+        "live_qualities",
+    ),
+}
+FALLBACK_DEFAULTS = {
+    "XHS-Downloader": {
+        "mapping_data": {},
+        "work_path": "",
+        "folder_name": "Download",
+        "name_format": "发布时间 作者昵称 作品标题",
+        "impersonate": "chrome146",
+        "cookie": "",
+        "proxy": None,
+        "proxy_download": False,
+        "timeout": 10,
+        "chunk": 1024 * 1024 * 2,
+        "max_retry": 5,
+        "record_data": False,
+        "image_format": "JPEG",
+        "image_download": True,
+        "video_download": True,
+        "live_download": False,
+        "video_preference": "resolution",
+        "folder_mode": False,
+        "download_record": True,
+        "author_archive": False,
+        "write_mtime": False,
+        "language": "zh_CN",
+        "script_server": False,
+        "note_format": "",
+        "disclaimer_accepted": False,
+    },
+    "TikTokDownloader": {
+        "accounts_urls": [{"mark": "", "url": "", "tab": "", "earliest": "", "latest": "", "enable": True}],
+        "accounts_urls_tiktok": [{"mark": "", "url": "", "tab": "", "earliest": "", "latest": "", "enable": True}],
+        "mix_urls": [{"mark": "", "url": "", "enable": True}],
+        "mix_urls_tiktok": [{"mark": "", "url": "", "enable": True}],
+        "owner_url": {"mark": "", "url": "", "uid": "", "sec_uid": "", "nickname": ""},
+        "owner_url_tiktok": None,
+        "root": "",
+        "folder_name": "Download",
+        "name_format": "create_time type nickname desc",
+        "desc_length": 64,
+        "name_length": 128,
+        "date_format": "%Y-%m-%d %H:%M:%S",
+        "split": "-",
+        "folder_mode": False,
+        "music": False,
+        "truncate": 50,
+        "storage_format": "",
+        "cookie": "",
+        "cookie_tiktok": "",
+        "dynamic_cover": False,
+        "static_cover": False,
+        "proxy": "",
+        "proxy_tiktok": "",
+        "twc_tiktok": "",
+        "download": True,
+        "max_size": 0,
+        "chunk": 1024 * 1024 * 2,
+        "timeout": 10,
+        "max_retry": 5,
+        "max_pages": 0,
+        "run_command": "",
+        "ffmpeg": "",
+        "live_qualities": "",
+        "original_quality": False,
+        "douyin_platform": True,
+        "tiktok_platform": True,
+        "browser_info": {
+            "impersonate": "chrome146",
+            "pc_libra_divert": "Mac",
+            "browser_language": "zh-CN",
+            "browser_platform": "MacIntel",
+            "browser_name": "Chrome",
+            "browser_version": "146.0.0.0",
+            "engine_name": "Blink",
+            "engine_version": "146.0.0.0",
+            "os_name": "Mac OS",
+            "os_version": "10.15.7",
+            "webid": "",
+        },
+        "browser_info_tiktok": {
+            "impersonate": "chrome146",
+            "app_language": "zh-Hans",
+            "browser_language": "zh-CN",
+            "browser_name": "Mozilla",
+            "browser_platform": "MacIntel",
+            "browser_version": "5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+            "language": "zh-Hans",
+            "os": "mac",
+            "priority_region": "US",
+            "region": "US",
+            "tz_name": "Asia/Shanghai",
+            "webcast_language": "zh-Hans",
+            "device_id": "",
+        },
+    },
+}
 
 
 def detect_platform(text: str) -> str:
@@ -95,13 +231,7 @@ def bundled_engine_source(name: str) -> Path | None:
 
 
 def stage_bundled_engine(name: str) -> Path | None:
-    """Copy bundled engine source to Application Support before executing it.
-
-    Upstream projects create configuration, Volume and generated JS files next
-    to their source tree. The signed app bundle must remain immutable, so the
-    engine source is treated as a template and executed from a writable,
-    revisioned Application Support directory.
-    """
+    """Copy bundled engine source to Application Support before executing it."""
     source = bundled_engine_source(name)
     if source is None:
         return None
@@ -144,7 +274,6 @@ def resolve_engine(platform: str) -> Path | None:
     if staged is not None:
         return staged
 
-    # Development fallback used by script/fetch_engines.sh.
     dev = project_root() / "Engines" / name
     return dev if (dev / "main.py").is_file() else None
 
@@ -163,6 +292,180 @@ def response(
         "message": message,
         "details": {k: str(v) for k, v in details.items()} or None,
     }
+
+
+def read_json(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+        return value if isinstance(value, dict) else None
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
+def write_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=4) + "\n",
+        encoding="utf-8",
+    )
+
+
+def stable_settings_path(name: str) -> Path:
+    return app_support_dir() / "Config" / name / "settings.json"
+
+
+def engine_settings_path(engine: Path) -> Path:
+    return engine / "Volume" / "settings.json"
+
+
+def upstream_defaults(name: str, engine: Path) -> dict[str, Any]:
+    """Read the defaults from the bundled upstream settings class when possible."""
+    old_cwd = Path.cwd()
+    sys.path.insert(0, str(engine))
+    os.chdir(engine)
+    try:
+        if name == "XHS-Downloader":
+            from source.module.settings import Settings as UpstreamSettings  # type: ignore
+        else:
+            from src.config.settings import Settings as UpstreamSettings  # type: ignore
+        value = getattr(UpstreamSettings, "default", {})
+        if isinstance(value, dict):
+            return json.loads(json.dumps(value, ensure_ascii=False))
+    except Exception:
+        pass
+    finally:
+        os.chdir(old_cwd)
+        try:
+            sys.path.remove(str(engine))
+        except ValueError:
+            pass
+    return json.loads(json.dumps(FALLBACK_DEFAULTS[name], ensure_ascii=False))
+
+
+def legacy_settings(name: str, engine: Path) -> dict[str, Any] | None:
+    current = read_json(engine_settings_path(engine))
+    if current is not None:
+        return current
+
+    root = app_support_dir() / "engines" / name
+    if not root.is_dir():
+        return None
+    candidates = list(root.glob("*/Volume/settings.json"))
+    candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
+    for path in candidates:
+        value = read_json(path)
+        if value is not None:
+            return value
+    return None
+
+
+def ensure_stable_settings(name: str, engine: Path) -> dict[str, Any]:
+    path = stable_settings_path(name)
+    defaults = upstream_defaults(name, engine)
+    existing = read_json(path)
+    if existing is None:
+        existing = legacy_settings(name, engine) or {}
+    merged = defaults
+    merged.update(existing)
+    write_json(path, merged)
+    return merged
+
+
+def sync_engine_settings(name: str, engine: Path) -> dict[str, Any]:
+    data = ensure_stable_settings(name, engine)
+    write_json(engine_settings_path(engine), data)
+    return data
+
+
+def update_engine_settings(name: str, engine: Path, values: dict[str, Any]) -> dict[str, Any]:
+    data = ensure_stable_settings(name, engine)
+    data.update(values)
+    write_json(stable_settings_path(name), data)
+    write_json(engine_settings_path(engine), data)
+    return data
+
+
+def capture_engine_settings(name: str, engine: Path) -> None:
+    generated = read_json(engine_settings_path(engine))
+    if generated is None:
+        return
+    stable = ensure_stable_settings(name, engine)
+    stable.update(generated)
+    write_json(stable_settings_path(name), stable)
+
+
+def settings_engine(req: dict[str, Any]) -> tuple[str, str, Path] | None:
+    platform = (req.get("engine") or "").strip().lower()
+    if platform == "tiktok":
+        platform = "douyin"
+    name = ENGINE_NAMES.get(platform)
+    if name is None:
+        return None
+    engine = resolve_engine(platform)
+    if engine is None:
+        return None
+    return platform, name, engine
+
+
+def settings_get(req: dict[str, Any]) -> dict[str, Any]:
+    resolved = settings_engine(req)
+    if resolved is None:
+        return response(req.get("id"), False, None, "找不到对应下载引擎。")
+    platform, name, engine = resolved
+    data = sync_engine_settings(name, engine)
+    details = {key: data.get(key, "") for key in VISIBLE_SETTINGS[name]}
+    details["config_path"] = stable_settings_path(name)
+    return response(req.get("id"), True, None, f"已读取{('小红书' if platform == 'xiaohongshu' else '抖音')}设置。", **details)
+
+
+def settings_update(req: dict[str, Any]) -> dict[str, Any]:
+    resolved = settings_engine(req)
+    if resolved is None:
+        return response(req.get("id"), False, None, "找不到对应下载引擎。")
+    platform, name, engine = resolved
+    raw = req.get("settingsJSON") or "{}"
+    try:
+        values = json.loads(raw)
+    except json.JSONDecodeError:
+        return response(req.get("id"), False, None, "设置数据不是有效 JSON。")
+    if not isinstance(values, dict):
+        return response(req.get("id"), False, None, "设置数据必须是 JSON 对象。")
+    update_engine_settings(name, engine, values)
+    return response(
+        req.get("id"),
+        True,
+        None,
+        f"已保存{('小红书' if platform == 'xiaohongshu' else '抖音')}设置。",
+        config_path=stable_settings_path(name),
+    )
+
+
+def settings_reset(req: dict[str, Any]) -> dict[str, Any]:
+    resolved = settings_engine(req)
+    if resolved is None:
+        return response(req.get("id"), False, None, "找不到对应下载引擎。")
+    platform, name, engine = resolved
+    defaults = upstream_defaults(name, engine)
+    write_json(stable_settings_path(name), defaults)
+    write_json(engine_settings_path(engine), defaults)
+    return response(
+        req.get("id"),
+        True,
+        None,
+        f"已恢复{('小红书' if platform == 'xiaohongshu' else '抖音')}上游默认设置。",
+        config_path=stable_settings_path(name),
+    )
+
+
+def settings_path(req: dict[str, Any]) -> dict[str, Any]:
+    resolved = settings_engine(req)
+    if resolved is None:
+        return response(req.get("id"), False, None, "找不到对应下载引擎。")
+    _, name, engine = resolved
+    ensure_stable_settings(name, engine)
+    return response(req.get("id"), True, None, "配置文件已就绪。", config_path=stable_settings_path(name))
 
 
 def validate(req: dict[str, Any]) -> dict[str, Any]:
@@ -185,13 +488,15 @@ def validate(req: dict[str, Any]) -> dict[str, Any]:
         )
 
     name = ENGINE_NAMES[platform]
+    sync_engine_settings(name, engine)
     return response(
         req.get("id"),
         True,
         platform,
-        "平台识别、内置 Python 和下载引擎均已就绪。",
+        "平台识别、内置 Python、下载引擎和配置均已就绪。",
         engine=engine,
         engine_revision=engine_revision(name),
+        settings=stable_settings_path(name),
         python=sys.executable,
         app_support=app_support_dir(),
         cache=cache_dir(),
@@ -293,21 +598,28 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
     output = Path(output_raw).expanduser()
     output.mkdir(parents=True, exist_ok=True)
 
+    name = ENGINE_NAMES[platform]
+    path_key = "work_path" if platform == "xiaohongshu" else "root"
+    update_engine_settings(name, engine, {path_key: str(output)})
+
     try:
         if platform == "xiaohongshu":
             ok, log = run_xhs(engine, url, output)
         else:
             ok, log = asyncio.run(run_douk_in_process(engine, url, output, platform))
+        capture_engine_settings(name, engine)
         return response(
             req.get("id"),
             ok,
             platform,
             "下载调用完成。" if ok else "下载引擎返回失败。",
             engine=engine,
+            settings=stable_settings_path(name),
             output=output,
             log=log,
         )
     except Exception as exc:
+        capture_engine_settings(name, engine)
         return response(
             req.get("id"),
             False,
@@ -340,6 +652,14 @@ def handle(req: dict[str, Any]) -> dict[str, Any]:
         return validate(req)
     if command == "download":
         return download(req)
+    if command == "settings_get":
+        return settings_get(req)
+    if command == "settings_update":
+        return settings_update(req)
+    if command == "settings_reset":
+        return settings_reset(req)
+    if command == "settings_path":
+        return settings_path(req)
     return response(req.get("id"), False, None, f"未知命令：{command}")
 
 
