@@ -4,9 +4,8 @@ import AppKit
 
 private enum SettingsTab: String, CaseIterable, Identifiable {
     case general = "通用"
-    case download = "下载"
     case xhs = "小红书"
-    case douyin = "抖音/TikTok"
+    case douyin = "抖音"
     case advanced = "高级"
 
     var id: String { rawValue }
@@ -23,31 +22,45 @@ struct SettingsView: View {
     @AppStorage("preferredLanguage") private var preferredLanguage = "简体中文"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("设置").font(.system(size: 28, weight: .bold))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("设置").font(.system(size: 28, weight: .bold))
 
-            Picker("设置分类", selection: $tab) {
-                ForEach(SettingsTab.allCases) { item in Text(item.rawValue).tag(item) }
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 610)
+                Picker("设置分类", selection: $tab) {
+                    ForEach(SettingsTab.allCases) { item in Text(item.rawValue).tag(item) }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 610)
 
-            Group {
-                switch tab {
-                case .general: generalSettings
-                case .download: downloadSettings
-                case .xhs:
-                    engineSettings(title: "小红书引擎", subtitle: "XHS-Downloader 已内置在 App 中，首次使用会复制到 Application Support 后运行。", symbol: "book.pages.fill", accent: .red)
-                case .douyin:
-                    engineSettings(title: "抖音 / TikTok 引擎", subtitle: "TikTokDownloader / DouK 已内置。部分高级签名能力仍可能依赖下一阶段加入的 Node.js。", symbol: "play.rectangle.fill", accent: .blue)
-                case .advanced: advancedSettings
+                Group {
+                    switch tab {
+                    case .general: generalSettings
+                    case .xhs: xhsSettings
+                    case .douyin: douyinSettings
+                    case .advanced: advancedSettings
+                    }
+                }
+
+                if model.settingsLoading {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("正在同步原始项目配置…")
+                    }
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                } else if !model.settingsStatus.isEmpty {
+                    Label(model.settingsStatus, systemImage: "info.circle")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
                 }
             }
-            Spacer(minLength: 0)
+            .padding(24)
+            .frame(maxWidth: 820, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .top)
         }
-        .padding(24)
-        .frame(maxWidth: 760, alignment: .leading)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .task {
+            await model.loadEngineSettings()
+        }
     }
 
     private var generalSettings: some View {
@@ -57,6 +70,9 @@ struct SettingsView: View {
                     TextField("下载目录", text: $model.outputDirectory).textFieldStyle(.roundedBorder)
                     Button("更改") { chooseFolder() }
                 }
+                Text("下载时会同步到小红书的 work_path 与抖音的 root。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             settingCard("行为") {
@@ -92,71 +108,228 @@ struct SettingsView: View {
         }
     }
 
-    private var downloadSettings: some View {
+    private var xhsSettings: some View {
         VStack(alignment: .leading, spacing: 18) {
-            settingCard("默认下载内容") {
+            settingCard("下载内容") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Toggle("视频（无水印）", isOn: $model.includeVideo)
-                    Toggle("封面图片", isOn: $model.includeCover)
-                    Toggle("音频（MP3）", isOn: $model.includeAudio)
-                    Toggle("文案内容", isOn: $model.includeText)
+                    Toggle("下载图片", isOn: $model.xhsSettings.imageDownload)
+                    Toggle("下载视频", isOn: $model.xhsSettings.videoDownload)
+                    Toggle("下载动图", isOn: $model.xhsSettings.liveDownload)
                 }
                 .toggleStyle(.checkbox)
             }
-            settingCard("任务策略") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("当前版本按真实下载结果更新任务状态。", systemImage: "checkmark.circle")
-                    Label("实时字节级进度需要下一阶段让 Python Bridge 持续回传进度事件。", systemImage: "arrow.triangle.2.circlepath")
+
+            settingCard("格式") {
+                VStack(spacing: 12) {
+                    LabeledContent("图片格式") {
+                        Picker("", selection: $model.xhsSettings.imageFormat) {
+                            ForEach(["JPEG", "PNG", "WEBP", "HEIC", "AUTO"], id: \.self) { value in
+                                Text(value).tag(value)
+                            }
+                        }
+                        .labelsHidden().frame(width: 160)
+                    }
+                    LabeledContent("视频偏好") {
+                        Picker("", selection: $model.xhsSettings.videoPreference) {
+                            Text("分辨率优先").tag("resolution")
+                            Text("码率优先").tag("bitrate")
+                            Text("文件大小优先").tag("size")
+                        }
+                        .labelsHidden().frame(width: 160)
+                    }
+                    LabeledContent("作品信息格式") {
+                        Picker("", selection: $model.xhsSettings.noteFormat) {
+                            Text("不保存").tag("")
+                            Text("TXT").tag("txt")
+                            Text("Markdown").tag("md")
+                            Text("全部").tag("all")
+                        }
+                        .labelsHidden().frame(width: 160)
+                    }
                 }
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+            }
+
+            settingCard("文件管理") {
+                VStack(alignment: .leading, spacing: 12) {
+                    LabeledContent("文件夹名称") {
+                        TextField("Download", text: $model.xhsSettings.folderName)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 280)
+                    }
+                    LabeledContent("文件命名格式") {
+                        TextField("发布时间 作者昵称 作品标题", text: $model.xhsSettings.nameFormat)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 360)
+                    }
+                    Divider()
+                    Toggle("每个作品使用独立文件夹", isOn: $model.xhsSettings.folderMode)
+                    Toggle("按作者归档", isOn: $model.xhsSettings.authorArchive)
+                    Toggle("记录下载历史", isOn: $model.xhsSettings.downloadRecord)
+                    Toggle("将文件修改时间写为作品发布时间", isOn: $model.xhsSettings.writeMtime)
+                    Toggle("记录作品数据", isOn: $model.xhsSettings.recordData)
+                }
+                .toggleStyle(.checkbox)
+            }
+
+            settingCard("Cookie") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("小红书网页版 Cookie")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100)
+                }
+            }
+
+            saveBar(title: "保存小红书设置") {
+                Task { await model.saveXHSSettings() }
             }
         }
     }
 
-    private func engineSettings(title: String, subtitle: String, symbol: String, accent: Color) -> some View {
+    private var douyinSettings: some View {
         VStack(alignment: .leading, spacing: 18) {
-            settingCard(title) {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: symbol)
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(accent)
-                        .frame(width: 44, height: 44)
-                        .background(accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("已随 App 打包").font(.headline)
-                        Text(subtitle).font(.system(size: 13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            settingCard("下载内容") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle("下载音乐", isOn: $model.douyinSettings.music)
+                    Toggle("下载动态封面", isOn: $model.douyinSettings.dynamicCover)
+                    Toggle("下载静态封面", isOn: $model.douyinSettings.staticCover)
+                    Toggle("优先原始画质", isOn: $model.douyinSettings.originalQuality)
+                }
+                .toggleStyle(.checkbox)
+            }
+
+            settingCard("文件管理") {
+                VStack(alignment: .leading, spacing: 12) {
+                    LabeledContent("文件夹名称") {
+                        TextField("Download", text: $model.douyinSettings.folderName)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 280)
                     }
-                    Spacer()
+                    LabeledContent("文件命名格式") {
+                        TextField("create_time type nickname desc", text: $model.douyinSettings.nameFormat)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 360)
+                    }
+                    LabeledContent("描述最大长度") {
+                        TextField("64", value: $model.douyinSettings.descLength, format: .number)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 110)
+                    }
+                    LabeledContent("文件名最大长度") {
+                        TextField("128", value: $model.douyinSettings.nameLength, format: .number)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 110)
+                    }
+                    LabeledContent("日期格式") {
+                        TextField("%Y-%m-%d %H:%M:%S", text: $model.douyinSettings.dateFormat)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 280)
+                    }
+                    LabeledContent("文件名分隔符") {
+                        TextField("-", text: $model.douyinSettings.split)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 110)
+                    }
+                    LabeledContent("数据保存格式") {
+                        TextField("留空为不保存", text: $model.douyinSettings.storageFormat)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 200)
+                    }
+                    LabeledContent("文件大小限制") {
+                        HStack(spacing: 6) {
+                            TextField("0", value: $model.douyinSettings.maxSize, format: .number)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 110)
+                            Text("0 表示不限制")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Toggle("每个作品使用独立文件夹", isOn: $model.douyinSettings.folderMode)
+                        .toggleStyle(.checkbox)
                 }
             }
-            settingCard("运行目录") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("~/Library/Application Support/XDownloader/engines/").font(.system(.body, design: .monospaced))
-                    Text("签名后的 App Bundle 保持只读，引擎在可写副本中运行。").font(.caption).foregroundStyle(.secondary)
+
+            settingCard("Cookie") {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("国内链接 Cookie（douyin.com）")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 90)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("国际链接 Cookie（tiktok.com）")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        plainTextEditor(text: $model.douyinSettings.cookieTikTok, minHeight: 90)
+                    }
                 }
+            }
+
+            saveBar(title: "保存抖音设置") {
+                Task { await model.saveDouyinSettings() }
             }
         }
     }
 
     private var advancedSettings: some View {
         VStack(alignment: .leading, spacing: 18) {
+            settingCard("抖音高级功能") {
+                VStack(spacing: 12) {
+                    LabeledContent("FFmpeg 路径") {
+                        TextField("留空使用上游默认行为", text: $model.douyinSettings.ffmpeg)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 360)
+                    }
+                    LabeledContent("直播画质") {
+                        TextField("留空使用默认画质", text: $model.douyinSettings.liveQualities)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 240)
+                    }
+                    HStack {
+                        Spacer()
+                        Button("保存高级设置") {
+                            Task { await model.saveDouyinSettings() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+
+            settingCard("原始配置文件") {
+                VStack(alignment: .leading, spacing: 14) {
+                    configRow(title: "小红书 settings.json", path: model.xhsSettingsPath)
+                    Divider()
+                    configRow(title: "抖音 settings.json", path: model.douyinSettingsPath)
+                    Text("App 只修改界面中可见的字段。代理、网络超时、重试、浏览器指纹等未展示字段会原样保留在原始 JSON 中。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            settingCard("恢复默认配置") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 10) {
+                        Button("恢复小红书默认设置", role: .destructive) {
+                            Task { await model.resetEngineSettings("xiaohongshu") }
+                        }
+                        Button("恢复抖音默认设置", role: .destructive) {
+                            Task { await model.resetEngineSettings("douyin") }
+                        }
+                    }
+                }
+            }
+
             settingCard("数据目录") {
                 VStack(alignment: .leading, spacing: 10) {
                     pathRow("应用数据", "~/Library/Application Support/XDownloader/")
                     pathRow("缓存", "~/Library/Caches/XDownloader/")
                     pathRow("下载文件", model.outputDirectory)
                 }
-            }
-            settingCard("当前构建") {
-                VStack(alignment: .leading, spacing: 7) {
-                    LabeledContent("Python", value: "3.12（内置）")
-                    LabeledContent("XHS-Downloader", value: "固定版本")
-                    LabeledContent("TikTokDownloader", value: "固定版本")
-                    LabeledContent("Node.js", value: "暂未内置")
-                    LabeledContent("ffmpeg", value: "暂未内置")
-                }
-                .font(.system(size: 13))
             }
         }
     }
@@ -168,6 +341,47 @@ struct SettingsView: View {
         }
         .padding(16)
         .designCard()
+    }
+
+    private func saveBar(title: String, action: @escaping () -> Void) -> some View {
+        HStack {
+            Text("保存时只合并当前页面管理的字段，不会覆盖隐藏配置。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button(title, action: action)
+                .buttonStyle(.borderedProminent)
+                .disabled(model.settingsLoading)
+        }
+    }
+
+    private func plainTextEditor(text: Binding<String>, minHeight: CGFloat) -> some View {
+        TextEditor(text: text)
+            .font(.system(size: 12, design: .monospaced))
+            .scrollContentBackground(.hidden)
+            .padding(8)
+            .frame(minHeight: minHeight)
+            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+            }
+    }
+
+    private func configRow(title: String, path: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title).font(.system(size: 13, weight: .medium))
+            Text(path.isEmpty ? "尚未生成" : path)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(path.isEmpty ? .secondary : .primary)
+                .textSelection(.enabled)
+            HStack(spacing: 8) {
+                Button("打开") { openConfig(path) }
+                    .disabled(path.isEmpty)
+                Button("在 Finder 中显示") { revealConfig(path) }
+                    .disabled(path.isEmpty)
+            }
+        }
     }
 
     private func pathRow(_ label: String, _ value: String) -> some View {
@@ -186,6 +400,16 @@ struct SettingsView: View {
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
         if panel.runModal() == .OK, let url = panel.url { model.outputDirectory = url.path }
+    }
+
+    private func openConfig(_ path: String) {
+        guard !path.isEmpty else { return }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    }
+
+    private func revealConfig(_ path: String) {
+        guard !path.isEmpty else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 }
 #endif

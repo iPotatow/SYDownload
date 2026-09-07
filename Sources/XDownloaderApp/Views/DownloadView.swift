@@ -15,7 +15,7 @@ struct DownloadView: View {
                 inputCard
 
                 if let preview = model.preview {
-                    PreviewCard(model: model, preview: preview)
+                    PreviewCard(preview: preview)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
@@ -63,7 +63,7 @@ struct DownloadView: View {
                     .overlay { RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.primary.opacity(0.10), lineWidth: 1) }
 
                 if model.input.isEmpty {
-                    Text("粘贴小红书 / 抖音 / TikTok 链接，支持多个分享文本")
+                    Text("粘贴小红书 / 抖音链接，支持分享文本")
                         .foregroundStyle(.tertiary)
                         .font(.system(size: 14))
                         .padding(.horizontal, 16)
@@ -85,8 +85,7 @@ struct DownloadView: View {
 
             HStack(spacing: 8) {
                 PlatformChip(platform: .xiaohongshu, selected: model.detectedPlatform == .xiaohongshu)
-                PlatformChip(platform: .douyin, selected: model.detectedPlatform == .douyin)
-                PlatformChip(platform: .tiktok, selected: model.detectedPlatform == .tiktok)
+                PlatformChip(platform: .douyin, selected: model.detectedPlatform == .douyin || model.detectedPlatform == .tiktok)
                 Spacer()
                 Button {
                     Task { await model.validateEngine() }
@@ -144,7 +143,6 @@ struct DownloadView: View {
 }
 
 private struct PreviewCard: View {
-    @ObservedObject var model: AppModel
     let preview: ParsedPreview
 
     var body: some View {
@@ -162,23 +160,14 @@ private struct PreviewCard: View {
                     }
                     .font(.system(size: 13))
                     HStack(spacing: 22) {
-                        metadata("类型", "视频")
+                        metadata("类型", "自动识别")
                         metadata("状态", "可下载")
-                        metadata("质量", "原画")
+                        metadata("配置", "使用设置页参数")
                     }
                     Text(preview.summary).font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
-            Divider()
-            HStack(spacing: 24) {
-                Toggle("视频（无水印）", isOn: $model.includeVideo)
-                Toggle("封面图片", isOn: $model.includeCover)
-                Toggle("音频（MP3）", isOn: $model.includeAudio)
-                Toggle("文案内容", isOn: $model.includeText)
-            }
-            .toggleStyle(.checkbox)
-            .font(.system(size: 13))
         }
         .padding(16)
         .designCard()
@@ -190,38 +179,6 @@ private struct PreviewCard: View {
             Text(value).foregroundStyle(.primary)
         }
         .font(.system(size: 13))
-    }
-}
-
-struct PlatformLandingView: View {
-    @ObservedObject var model: AppModel
-    let platform: DownloadPlatform
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            PlatformThumbnail(platform: platform, size: 112)
-            VStack(spacing: 8) {
-                Text(platform == .douyin ? "抖音 / TikTok" : platform.displayName).font(.system(size: 28, weight: .bold))
-                Text(platform == .xiaohongshu ? "支持笔记、图文与视频链接，统一进入下载队列。" : "支持抖音与 TikTok 单作品链接，使用内置 DouK 引擎处理。")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 480)
-            }
-            HStack(spacing: 24) {
-                Label("自动识别链接", systemImage: "link.badge.plus")
-                Label("原画下载", systemImage: "arrow.down.circle")
-                Label("统一历史记录", systemImage: "clock.arrow.circlepath")
-            }
-            .font(.system(size: 13))
-            .foregroundStyle(.secondary)
-            Button("开始下载") { model.focusPlatform(platform) }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(32)
     }
 }
 #endif
