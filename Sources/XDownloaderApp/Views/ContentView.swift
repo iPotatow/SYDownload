@@ -5,10 +5,11 @@ import XDownloaderCore
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showsAbout = false
+    @State private var showsPhotos = false
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(model: model)
+            SidebarView(model: model, showsPhotos: $showsPhotos)
         } detail: {
             detail
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -16,8 +17,9 @@ struct ContentView: View {
         .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if model.selection != .download {
+                if showsPhotos || model.selection != .download {
                     Button {
+                        showsPhotos = false
                         model.selection = .download
                     } label: {
                         Label("新建下载", systemImage: "plus")
@@ -37,19 +39,28 @@ struct ContentView: View {
         .sheet(isPresented: $showsAbout) {
             AboutView()
         }
+        .onChange(of: model.selection) { _, newSelection in
+            if newSelection != nil {
+                showsPhotos = false
+            }
+        }
     }
 
     @ViewBuilder
     private var detail: some View {
-        switch model.selection ?? .download {
-        case .download:
-            DownloadView(model: model)
-        case .tasks:
-            TasksView(model: model)
-        case .history:
-            HistoryView(model: model)
-        case .settings:
-            SettingsView(model: model)
+        if showsPhotos {
+            PhotosView()
+        } else {
+            switch model.selection ?? .download {
+            case .download:
+                DownloadView(model: model)
+            case .tasks:
+                TasksView(model: model)
+            case .history:
+                HistoryView(model: model)
+            case .settings:
+                SettingsView(model: model)
+            }
         }
     }
 }
