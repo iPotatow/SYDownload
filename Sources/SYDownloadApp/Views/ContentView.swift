@@ -24,21 +24,19 @@ struct ContentView: View {
             .layoutPriority(1)
 
             detail
-                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(
+                    minWidth: 0,
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
                 .background(
                     DesignSystem.mainSurfaceBackground,
                     in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                 )
-                .overlay(alignment: .topTrailing) {
-                    Circle()
-                        .fill(DesignSystem.purple.opacity(0.035))
-                        .frame(width: 220, height: 220)
-                        .blur(radius: 54)
-                        .offset(x: 70, y: -90)
-                        .allowsHitTesting(false)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
-                .shadow(color: DesignSystem.shadow, radius: 8, y: 3)
+                .clipShape(
+                    RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+                )
                 .overlay {
                     if colorSchemeContrast == .increased {
                         RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
