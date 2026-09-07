@@ -6,16 +6,13 @@ import AppKit
 struct XDownloaderApp: App {
     @StateObject private var model = AppModel()
 
-    init() {
-        NSApp.setActivationPolicy(.regular)
-    }
-
     var body: some Scene {
         WindowGroup("XDownloader", id: "main") {
             ContentView()
                 .environmentObject(model)
                 .onAppear {
-                    NSApp.activate(ignoringOtherApps: true)
+                    NSApplication.shared.setActivationPolicy(.regular)
+                    NSApplication.shared.activate(ignoringOtherApps: true)
                 }
         }
         .defaultSize(width: 1060, height: 680)
