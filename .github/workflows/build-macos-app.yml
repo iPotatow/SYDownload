@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - VERSION
+      - .github/workflows/build-macos-app.yml
     tags:
       - "v*"
   workflow_dispatch:
@@ -98,8 +99,6 @@ jobs:
           APP="dist/SYDownload.app"
           PYTHON="$APP/Contents/Resources/python/bin/python3"
           BRIDGE="$APP/Contents/Resources/bridge/engine_bridge.py"
-          RESOURCE_BUNDLE="$APP/Contents/Resources/SYDownload_SYDownloadApp.bundle"
-          MODULE_BUNDLE="$APP/SYDownload_SYDownloadApp.bundle"
 
           file "$APP/Contents/MacOS/SYDownload"
           "$PYTHON" --version
@@ -109,12 +108,11 @@ jobs:
 
           test -x "$PYTHON"
           test -f "$APP/Contents/Resources/bridge/download_runtime.py"
-          test -f "$RESOURCE_BUNDLE/SYDownloadIcon.png"
-          test -f "$RESOURCE_BUNDLE/XiaohongshuPlatformIcon.jpg"
-          test -f "$RESOURCE_BUNDLE/DouyinPlatformIcon.jpg"
-          test -f "$MODULE_BUNDLE/XiaohongshuPlatformIcon.jpg"
-          test -f "$MODULE_BUNDLE/DouyinPlatformIcon.jpg"
           test -f "$APP/Contents/Resources/SYDownloadIcon.png"
+          test -f "$APP/Contents/Resources/XiaohongshuPlatformIcon.jpg"
+          test -f "$APP/Contents/Resources/DouyinPlatformIcon.jpg"
+          test ! -e "$APP/SYDownload_SYDownloadApp.bundle"
+          test ! -e "$APP/Contents/Resources/SYDownload_SYDownloadApp.bundle"
           test -f "$APP/Contents/Resources/engines/XHS-Downloader/main.py"
           test -f "$APP/Contents/Resources/engines/TikTokDownloader/main.py"
           test -f "$APP/Contents/Resources/engine-manifest.json"
@@ -129,14 +127,9 @@ jobs:
           echo "$VALIDATE" | grep -q '"ok": true'
           test -f "$SYDOWNLOAD_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
 
-      - name: Launch smoke test without build-directory resources
+      - name: Installed-app launch smoke test
         run: |
           APP="$PWD/dist/SYDownload.app"
-
-          # Bundle.module otherwise falls back to SwiftPM's absolute build path,
-          # which does not exist after a user installs the packaged app.
-          find .build -type d -name 'SYDownload_SYDownloadApp.bundle' -prune -exec rm -rf {} + || true
-
           /usr/bin/open -n "$APP"
 
           PID=""
