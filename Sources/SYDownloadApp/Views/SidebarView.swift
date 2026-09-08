@@ -29,7 +29,6 @@ struct SidebarView: View {
             .padding(.top, DesignSystem.spaceS)
 
             Spacer(minLength: DesignSystem.spaceXL)
-            sidebarFooter
         }
         .padding(.top, DesignSystem.sidebarTitlebarClearance)
         .padding(.horizontal, DesignSystem.spaceS)
@@ -46,27 +45,6 @@ struct SidebarView: View {
             Spacer(minLength: 0)
         }
         .frame(height: DesignSystem.sidebarBrandHeight)
-        .padding(.horizontal, DesignSystem.spaceS)
-    }
-
-    private var sidebarFooter: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-            HStack(spacing: DesignSystem.spaceS) {
-                Image(systemName: "lock.shield")
-                Text("本地优先")
-                    .foregroundStyle(.secondary)
-            }
-            Button {
-                NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
-            } label: {
-                Label("关于 SYDownload", systemImage: "info.circle")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("关于 SYDownload")
-        }
-        .font(.caption)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DesignSystem.spaceS)
     }
 

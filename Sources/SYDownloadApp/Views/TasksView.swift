@@ -51,13 +51,6 @@ struct TasksView: View {
         .padding(.bottom, DesignSystem.spaceL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .searchable(text: $searchText, prompt: "搜索任务")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("清空已完成", systemImage: "checkmark.circle", action: model.clearCompletedTasks)
-                    .disabled(completedCount == 0)
-            }
-        }
         .onDeleteCommand(perform: removeSelectedTask)
         .onChange(of: model.taskFilter) { _, _ in
             selectedTaskID = nil

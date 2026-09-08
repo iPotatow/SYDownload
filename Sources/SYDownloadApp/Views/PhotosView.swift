@@ -48,16 +48,6 @@ struct PhotosView: View {
                 statusIsError = true
             }
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                if folderURL != nil {
-                    Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
-                        .disabled(isScanning || isDeleting)
-                }
-                Button("选择文件夹", systemImage: "folder", action: chooseFolder)
-                    .disabled(isScanning || isDeleting)
-            }
-        }
         .alert("删除所选日期的照片？", isPresented: $showsDeleteConfirmation) {
             Button("取消", role: .cancel) {}
             Button("移到废纸篓", role: .destructive) {

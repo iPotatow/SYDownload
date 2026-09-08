@@ -20,15 +20,6 @@ struct DownloadView: View {
             .frame(maxWidth: .infinity, alignment: .top)
         }
         .onChange(of: model.input) { _, _ in model.detectLocally() }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("新建下载", systemImage: "plus") {
-                    model.clearInput()
-                    linkEditorFocused = true
-                }
-                .help("新建下载")
-            }
-        }
         .tint(DesignSystem.accent)
     }
 

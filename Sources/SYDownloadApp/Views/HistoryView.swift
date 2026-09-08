@@ -70,7 +70,6 @@ struct HistoryView: View {
         .padding(.bottom, DesignSystem.spaceL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .searchable(text: $model.historySearch, prompt: "搜索标题、平台或链接")
         .onDeleteCommand(perform: removeSelectedHistory)
         .tint(DesignSystem.accent)
     }
