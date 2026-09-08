@@ -71,4 +71,4 @@ BUNDLE_RUNTIME=1 CONFIGURATION=release ./script/package_app.sh
 2. ffmpeg 尚未内嵌；直播下载等依赖 ffmpeg 的能力暂不作为本阶段通过标准。
 3. Artifact 目前使用 ad-hoc 签名，仅用于开发和真机验证；尚未做 Developer ID、Hardened Runtime 与 notarization。
 4. DouK 仍通过内部类完成单链接处理；正式版应继续收敛成稳定 adapter。
-5. 当前 UI 还是单任务 Spike，后续再加入解析预览、任务队列、进度、历史与 Cookie 管理。
+5. 下载执行仍为单任务模型；真正的任务队列、实时进度、暂停/取消与任务恢复仍待完善。

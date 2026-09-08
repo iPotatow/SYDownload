@@ -4,7 +4,6 @@ import SYDownloadCore
 
 struct DownloadView: View {
     @ObservedObject var model: AppModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var linkEditorFocused: Bool
 
     var body: some View {
@@ -12,12 +11,6 @@ struct DownloadView: View {
             VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
                 header
                 composer
-
-                if let preview = model.preview {
-                    PreviewCard(preview: preview)
-                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
-                }
-
                 statusLine
             }
             .padding(.horizontal, DesignSystem.contentPadding)
@@ -27,10 +20,6 @@ struct DownloadView: View {
             .frame(maxWidth: .infinity, alignment: .top)
         }
         .onChange(of: model.input) { _, _ in model.detectLocally() }
-        .animation(
-            reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.32, dampingFraction: 1),
-            value: model.preview
-        )
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("新建下载", systemImage: "plus") {
@@ -180,13 +169,13 @@ struct DownloadView: View {
     private var statusSymbol: String {
         if model.statusIsError { return "exclamationmark.triangle.fill" }
         if model.detectedPlatform == .unknown { return "info.circle" }
-        return model.preview == nil ? "link" : "checkmark.circle.fill"
+        return model.validatedInput.isEmpty ? "link" : "checkmark.circle.fill"
     }
 
     private var statusColor: Color {
         if model.statusIsError { return DesignSystem.destructive }
         if model.detectedPlatform == .unknown { return .secondary }
-        return model.preview == nil ? DesignSystem.accent : DesignSystem.success
+        return model.validatedInput.isEmpty ? DesignSystem.accent : DesignSystem.success
     }
 
     private func validate() {
@@ -195,39 +184,6 @@ struct DownloadView: View {
 
     private func download() {
         Task { await model.runDownload() }
-    }
-}
-
-private struct PreviewCard: View {
-    let preview: ParsedPreview
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-            Text("检查结果")
-                .font(DesignSystem.sectionTitleFont)
-
-            InsetRow {
-                HStack(alignment: .top, spacing: DesignSystem.spaceM) {
-                    PlatformThumbnail(platform: preview.platform, size: 48)
-
-                    VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
-                        Text(preview.title)
-                            .font(.headline.weight(.semibold))
-                            .lineLimit(2)
-                        Text(preview.author)
-                            .font(DesignSystem.supportingFont)
-                            .foregroundStyle(.secondary)
-                        Text(preview.summary)
-                            .font(DesignSystem.supportingFont)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: DesignSystem.spaceM)
-                    PlatformChip(platform: preview.platform, selected: true)
-                }
-            }
-        }
     }
 }
 #endif
