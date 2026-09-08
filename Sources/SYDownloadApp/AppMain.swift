@@ -5,11 +5,16 @@ import AppKit
 @main
 struct SYDownloadApp: App {
     @StateObject private var model = AppModel()
+    @StateObject private var updater = SYDownloadUpdater(owner: "iPotatow", repo: "SYDownload")
 
     var body: some Scene {
         WindowGroup("SYDownload", id: "main") {
             ContentView()
                 .environmentObject(model)
+                .environmentObject(updater)
+                .sheet(isPresented: $updater.sheet) {
+                    SYDownloadUpdateSheet(updater: updater)
+                }
                 .onAppear {
                     NSApplication.shared.setActivationPolicy(.regular)
                     NSApplication.shared.activate(ignoringOtherApps: true)
@@ -29,6 +34,12 @@ struct SYDownloadApp: App {
                 Button("关于 SYDownload") {
                     NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
                 }
+            }
+            CommandGroup(after: .appInfo) {
+                Button("检查更新…") {
+                    updater.checkForUpdates(sheet: true, force: true)
+                }
+                .keyboardShortcut("u", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .appSettings) {
                 Button("设置…") {
