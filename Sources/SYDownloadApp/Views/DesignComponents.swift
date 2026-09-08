@@ -70,16 +70,23 @@ enum DesignSystem {
 extension DownloadPlatform {
     var designColor: Color {
         switch self {
-        case .xiaohongshu: return DesignSystem.accent
-        case .douyin, .tiktok: return DesignSystem.accent
+        case .xiaohongshu, .douyin: return DesignSystem.accent
         case .unknown: return .secondary
         }
     }
 
-    var designSymbol: String {
+    var brandAssetName: String? {
+        switch self {
+        case .xiaohongshu: return "XiaohongshuPlatformIcon"
+        case .douyin: return "DouyinPlatformIcon"
+        case .unknown: return nil
+        }
+    }
+
+    var fallbackSymbol: String {
         switch self {
         case .xiaohongshu: return "book.pages.fill"
-        case .douyin, .tiktok: return "music.note"
+        case .douyin: return "music.note"
         case .unknown: return "link"
         }
     }
@@ -175,21 +182,60 @@ struct SurfaceCard<Content: View>: View {
     }
 }
 
+struct PlatformBrandIcon: View {
+    let platform: DownloadPlatform
+    var size: CGFloat
+    var cornerRadius: CGFloat
+
+    var body: some View {
+        Group {
+            if let image = brandImage {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(platform.designColor.opacity(0.09))
+                    Image(systemName: platform.fallbackSymbol)
+                        .font(.system(size: size * 0.42, weight: .medium))
+                        .foregroundStyle(platform.designColor)
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .accessibilityHidden(true)
+    }
+
+    private var brandImage: NSImage? {
+        guard let assetName = platform.brandAssetName,
+              let url = Bundle.module.url(forResource: assetName, withExtension: "jpg")
+        else { return nil }
+        return NSImage(contentsOf: url)
+    }
+}
+
 struct PlatformChip: View {
     let platform: DownloadPlatform
     var selected = false
 
     var body: some View {
-        Label(platform.displayName, systemImage: platform.designSymbol)
-            .font(DesignSystem.supportingFont.weight(selected ? .semibold : .medium))
-            .foregroundStyle(selected ? platform.designColor : .secondary)
-            .padding(.horizontal, DesignSystem.spaceS)
-            .frame(minHeight: 24)
-            .background(
-                selected ? platform.designColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor),
-                in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-            )
-            .accessibilityAddTraits(selected ? .isSelected : [])
+        HStack(spacing: DesignSystem.spaceXS) {
+            PlatformBrandIcon(platform: platform, size: 16, cornerRadius: 4)
+            Text(platform.displayName)
+        }
+        .font(DesignSystem.supportingFont.weight(selected ? .semibold : .medium))
+        .foregroundStyle(selected ? platform.designColor : .secondary)
+        .padding(.horizontal, DesignSystem.spaceS)
+        .frame(minHeight: 24)
+        .background(
+            selected ? platform.designColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor),
+            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -198,14 +244,11 @@ struct PlatformThumbnail: View {
     var size: CGFloat = 56
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                .fill(platform.designColor.opacity(0.09))
-            Image(systemName: platform.designSymbol)
-                .font(.system(size: size * 0.28, weight: .medium))
-                .foregroundStyle(platform.designColor)
-        }
-        .frame(width: size, height: size)
+        PlatformBrandIcon(
+            platform: platform,
+            size: size,
+            cornerRadius: DesignSystem.rowRadius
+        )
         .accessibilityLabel(platform.displayName)
     }
 }

@@ -203,13 +203,14 @@ final class AppModelDownloadTests: XCTestCase {
 
         let validations = await recorder.requests(for: "validate")
         let downloads = await recorder.requests(for: "download")
-        XCTAssertEqual(validations.map(\.url), [xhs, douyin, tiktok])
-        XCTAssertEqual(downloads.map(\.url), [xhs, douyin, tiktok])
+        XCTAssertEqual(validations.map(\.url), [xhs, douyin])
+        XCTAssertEqual(downloads.map(\.url), [xhs, douyin])
         XCTAssertEqual(model.tasks.map(\.sourceURL), [xhs, douyin, unsupported, tiktok])
         XCTAssertEqual(model.tasks.count, 4)
         XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == unsupported })?.state, .failed)
-        XCTAssertEqual(model.history.map(\.sourceURL), [xhs, douyin, tiktok])
-        XCTAssertEqual(model.status, "批量下载完成：3 成功，1 失败")
+        XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == tiktok })?.state, .failed)
+        XCTAssertEqual(model.history.map(\.sourceURL), [xhs, douyin])
+        XCTAssertEqual(model.status, "批量下载完成：2 成功，2 失败")
     }
 
     func testValidationFailureDoesNotBlockOtherLinks() async {

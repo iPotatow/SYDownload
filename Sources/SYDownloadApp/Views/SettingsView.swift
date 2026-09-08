@@ -24,7 +24,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "应用行为、外观和默认保存位置"
         case .xhs: return "小红书内容类型、格式和 Cookie"
-        case .douyin: return "抖音 / TikTok 内容和文件管理"
+        case .douyin: return "抖音内容和文件管理"
         case .advanced: return "路径、原始配置和恢复操作"
         }
     }
@@ -335,21 +335,12 @@ struct SettingsView: View {
         }
 
         Section("Cookie") {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                    Text("国内链接 Cookie（douyin.com）")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 90)
-                        .accessibilityLabel("国内链接 Cookie")
-                }
-                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                    Text("国际链接 Cookie（tiktok.com）")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    plainTextEditor(text: $model.douyinSettings.cookieTikTok, minHeight: 90)
-                        .accessibilityLabel("国际链接 Cookie")
-                }
+            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+                Text("抖音网页版 Cookie（douyin.com）")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 90)
+                    .accessibilityLabel("抖音网页版 Cookie")
             }
         }
     }

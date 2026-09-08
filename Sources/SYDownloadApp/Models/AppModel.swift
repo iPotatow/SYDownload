@@ -129,7 +129,6 @@ struct DouyinSettingsForm {
     var storageFormat = ""
     var maxSize = 0
     var cookie = ""
-    var cookieTikTok = ""
     var ffmpeg = ""
     var liveQualities = ""
 }
@@ -231,7 +230,7 @@ final class AppModel: ObservableObject {
     }
 
     var hasDouyinLinks: Bool {
-        detectedLinks.contains { $0.platform == .douyin || $0.platform == .tiktok }
+        detectedLinks.contains { $0.platform == .douyin }
     }
 
     func detectLocally() {
@@ -520,7 +519,6 @@ final class AppModel: ObservableObject {
             "storage_format": douyinSettings.storageFormat,
             "max_size": douyinSettings.maxSize,
             "cookie": douyinSettings.cookie,
-            "cookie_tiktok": douyinSettings.cookieTikTok,
             "ffmpeg": douyinSettings.ffmpeg,
             "live_qualities": douyinSettings.liveQualities,
         ]
@@ -579,12 +577,10 @@ final class AppModel: ObservableObject {
 
     private var detectionSummary: String {
         let xhsCount = detectedLinks.filter { $0.platform == .xiaohongshu }.count
-        let douyinCount = detectedLinks.filter {
-            $0.platform == .douyin || $0.platform == .tiktok
-        }.count
+        let douyinCount = detectedLinks.filter { $0.platform == .douyin }.count
         var parts: [String] = []
         if xhsCount > 0 { parts.append("小红书 \(xhsCount)") }
-        if douyinCount > 0 { parts.append("抖音/TikTok \(douyinCount)") }
+        if douyinCount > 0 { parts.append("抖音 \(douyinCount)") }
 
         var result = "已识别 \(supportedLinkCount) 个支持链接"
         if !parts.isEmpty {
@@ -729,7 +725,6 @@ final class AppModel: ObservableObject {
         douyinSettings.storageFormat = details["storage_format"] ?? ""
         douyinSettings.maxSize = Int(details["max_size"] ?? "") ?? 0
         douyinSettings.cookie = details["cookie"] ?? ""
-        douyinSettings.cookieTikTok = details["cookie_tiktok"] ?? ""
         douyinSettings.ffmpeg = details["ffmpeg"] ?? ""
         douyinSettings.liveQualities = details["live_qualities"] ?? ""
         douyinSettingsPath = details["config_path"] ?? ""

@@ -3,13 +3,12 @@ import Foundation
 public enum DownloadPlatform: String, Codable, Sendable, CaseIterable, Hashable {
     case xiaohongshu
     case douyin
-    case tiktok
     case unknown
 
     public var displayName: String {
         switch self {
         case .xiaohongshu: return "小红书"
-        case .douyin, .tiktok: return "抖音"
+        case .douyin: return "抖音"
         case .unknown: return "未知平台"
         }
     }
@@ -70,9 +69,6 @@ public enum PlatformDetector {
         }
         if text.contains("douyin.com") {
             return .douyin
-        }
-        if text.contains("tiktok.com") {
-            return .tiktok
         }
         return .unknown
     }

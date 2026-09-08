@@ -10,8 +10,8 @@ import Testing
     #expect(PlatformDetector.detect("https://v.douyin.com/abc") == .douyin)
 }
 
-@Test func detectsTikTok() {
-    #expect(PlatformDetector.detect("https://www.tiktok.com/@user/video/1") == .tiktok)
+@Test func rejectsTikTok() {
+    #expect(PlatformDetector.detect("https://www.tiktok.com/@user/video/1") == .unknown)
 }
 
 @Test func rejectsUnknown() {
@@ -39,7 +39,7 @@ import Testing
         .xiaohongshu,
         .douyin,
         .unknown,
-        .tiktok,
+        .unknown,
     ])
 }
 

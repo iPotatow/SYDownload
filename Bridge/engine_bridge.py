@@ -22,12 +22,10 @@ sys.dont_write_bytecode = True
 ENGINE_NAMES = {
     "xiaohongshu": "XHS-Downloader",
     "douyin": "TikTokDownloader",
-    "tiktok": "TikTokDownloader",
 }
 ENV_NAMES = {
     "xiaohongshu": "SYDOWNLOAD_XHS_ROOT",
     "douyin": "SYDOWNLOAD_DOUK_ROOT",
-    "tiktok": "SYDOWNLOAD_DOUK_ROOT",
 }
 ENGINE_PLATFORMS = {
     "XHS-Downloader": "xiaohongshu",
@@ -65,7 +63,6 @@ VISIBLE_SETTINGS = {
         "storage_format",
         "max_size",
         "cookie",
-        "cookie_tiktok",
         "ffmpeg",
         "live_qualities",
     ),
@@ -173,8 +170,6 @@ def detect_platform(text: str) -> str:
         return "xiaohongshu"
     if "douyin.com" in value:
         return "douyin"
-    if "tiktok.com" in value:
-        return "tiktok"
     return "unknown"
 
 
@@ -398,8 +393,6 @@ def capture_engine_settings(name: str, engine: Path) -> None:
 
 def settings_engine(req: dict[str, Any]) -> tuple[str, str, Path] | None:
     platform = (req.get("engine") or "").strip().lower()
-    if platform == "tiktok":
-        platform = "douyin"
     name = ENGINE_NAMES.get(platform)
     if name is None:
         return None
@@ -532,7 +525,6 @@ async def run_douk_in_process(
     engine: Path,
     url: str,
     output: Path,
-    platform: str,
 ) -> tuple[bool, str]:
     """Compatibility adapter around DouK's current internal single-work flow."""
     sys.path.insert(0, str(engine))
@@ -558,15 +550,13 @@ async def run_douk_in_process(
             app.parameter.set_headers_cookie()
 
             worker = ClipboardMonitor(app.parameter, app.database)
-            tiktok = platform == "tiktok"
-            link_object = worker.links_tiktok if tiktok else worker.links
-            ids = await link_object.run(url)
+            ids = await worker.links.run(url)
             if not any(ids):
                 return False, "DouK 未能从链接提取作品 ID。"
 
             root, params, logger = worker.record.run(app.parameter, blank=True)
             async with logger(root, console=worker.console, **params) as record:
-                await worker._handle_detail(ids, tiktok, record)
+                await worker._handle_detail(ids, False, record)
             app.close()
             return True, f"DouK 已处理作品 ID：{ids}"
     finally:
@@ -606,7 +596,7 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
         if platform == "xiaohongshu":
             ok, log = run_xhs(engine, url, output)
         else:
-            ok, log = asyncio.run(run_douk_in_process(engine, url, output, platform))
+            ok, log = asyncio.run(run_douk_in_process(engine, url, output))
         capture_engine_settings(name, engine)
         return response(
             req.get("id"),

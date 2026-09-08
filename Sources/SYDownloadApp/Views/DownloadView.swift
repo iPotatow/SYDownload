@@ -27,7 +27,7 @@ struct DownloadView: View {
         HStack(alignment: .top, spacing: DesignSystem.spaceL) {
             PageHeader(
                 title: "下载",
-                subtitle: "可一次粘贴多个链接或分享文本，支持小红书、抖音与 TikTok。"
+                subtitle: "可一次粘贴多个链接或分享文本，支持小红书与抖音。"
             )
 
             Spacer(minLength: 0)

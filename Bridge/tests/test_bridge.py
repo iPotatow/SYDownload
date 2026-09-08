@@ -18,7 +18,7 @@ class BridgeTests(unittest.TestCase):
     def test_detector(self):
         self.assertEqual(mod.detect_platform("https://xhslink.com/a"), "xiaohongshu")
         self.assertEqual(mod.detect_platform("https://v.douyin.com/a"), "douyin")
-        self.assertEqual(mod.detect_platform("https://www.tiktok.com/@a/video/1"), "tiktok")
+        self.assertEqual(mod.detect_platform("https://www.tiktok.com/@a/video/1"), "unknown")
         self.assertEqual(mod.detect_platform("https://example.com"), "unknown")
 
     def test_ping_protocol(self):
