@@ -76,6 +76,9 @@ jobs:
             script/bundle_runtime.sh
             .github/workflows/build-macos-app.yml
 
+      - name: Install DMG tooling
+        run: brew install create-dmg
+
       - name: Build self-contained app
         env:
           CONFIGURATION: release
@@ -153,28 +156,83 @@ jobs:
 
           /bin/kill "$PID" || true
 
-      - name: Package ZIP and checksum
+      - name: Package ZIP, DMG, and checksums
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP="$PWD/dist/SYDownload.app"
+          RELEASE_DIR="$RUNNER_TEMP/release"
+          CI_ARTIFACT_DIR="$RUNNER_TEMP/ci-artifact"
+
+          test -d "$APP"
+          rm -rf "$RELEASE_DIR" "$CI_ARTIFACT_DIR"
+          mkdir -p "$RELEASE_DIR" "$CI_ARTIFACT_DIR"
+
+          # Release ZIP: exactly one archive layer containing SYDownload.app.
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP" \
+            "$RELEASE_DIR/SYDownload.zip"
+
+          # GatePass-style DMG with Applications drop target and quarantine helper.
+          script/build_dmg.sh "$APP" "$VERSION" "$RELEASE_DIR"
+
+          (
+            cd "$RELEASE_DIR"
+            shasum -a 256 SYDownload.zip "SYDownload-$VERSION.dmg" > SHA256SUMS
+          )
+
+          # actions/upload-artifact is itself downloaded as a ZIP. Keep the
+          # release ZIP out of this directory so the Actions artifact is not
+          # a ZIP containing another ZIP.
+          ditto "$APP" "$CI_ARTIFACT_DIR/SYDownload.app"
+          cp "$RELEASE_DIR/SYDownload-$VERSION.dmg" "$CI_ARTIFACT_DIR/"
+
+      - name: Verify release packages
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
 
           RELEASE_DIR="$RUNNER_TEMP/release"
-          mkdir -p "$RELEASE_DIR"
+          ZIP="$RELEASE_DIR/SYDownload.zip"
+          DMG="$RELEASE_DIR/SYDownload-$VERSION.dmg"
+          ZIP_EXTRACT="$RUNNER_TEMP/zip-verify"
+          DMG_MOUNT="$RUNNER_TEMP/dmg-mount"
 
-          ditto -c -k --sequesterRsrc --keepParent \
-            dist/SYDownload.app \
-            "$RELEASE_DIR/SYDownload-macOS-AppleSilicon.zip"
+          test -s "$ZIP"
+          test -s "$DMG"
+          test -s "$RELEASE_DIR/SHA256SUMS"
+
+          rm -rf "$ZIP_EXTRACT" "$DMG_MOUNT"
+          mkdir -p "$ZIP_EXTRACT" "$DMG_MOUNT"
+          ditto -xk "$ZIP" "$ZIP_EXTRACT"
+          test -d "$ZIP_EXTRACT/SYDownload.app"
+          test ! -f "$ZIP_EXTRACT/SYDownload.zip"
+          codesign --verify --deep --strict "$ZIP_EXTRACT/SYDownload.app"
+
+          hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$DMG_MOUNT"
+          trap 'hdiutil detach "$DMG_MOUNT" >/dev/null 2>&1 || true' EXIT
+          test -d "$DMG_MOUNT/SYDownload.app"
+          test -L "$DMG_MOUNT/Applications"
+          test -f "$DMG_MOUNT/解除隔离.command"
+          codesign --verify --deep --strict "$DMG_MOUNT/SYDownload.app"
+          hdiutil detach "$DMG_MOUNT"
+          trap - EXIT
 
           (
             cd "$RELEASE_DIR"
-            shasum -a 256 SYDownload-macOS-AppleSilicon.zip > SHA256SUMS
+            shasum -a 256 -c SHA256SUMS
           )
 
-      - name: Upload release package
+      - name: Upload CI package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: SYDownload-${{ steps.version.outputs.version }}
-          path: ${{ runner.temp }}/release
+          path: ${{ runner.temp }}/ci-artifact
           if-no-files-found: error
           retention-days: 14
 
@@ -188,5 +246,6 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            ${{ runner.temp }}/release/SYDownload-macOS-AppleSilicon.zip
+            ${{ runner.temp }}/release/SYDownload.zip
+            ${{ runner.temp }}/release/SYDownload-${{ steps.version.outputs.version }}.dmg
             ${{ runner.temp }}/release/SHA256SUMS

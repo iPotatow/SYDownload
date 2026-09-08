@@ -32,6 +32,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @EnvironmentObject private var updater: SYDownloadUpdater
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var tab: SettingsTab = .general
@@ -188,6 +189,94 @@ struct SettingsView: View {
                 .labelsHidden()
                 .frame(width: fieldWidth)
             }
+        }
+
+        Section("更新") {
+            LabeledContent("当前版本") {
+                Text(updater.displayVersion)
+                    .monospacedDigit()
+                    .textSelection(.enabled)
+            }
+
+            LabeledContent("更新源") {
+                Picker("", selection: $updater.updateSource) {
+                    ForEach(SYDownloadUpdateSource.allCases) { source in
+                        Text(source.displayName).tag(source)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: fieldWidth)
+            }
+
+            HStack(spacing: DesignSystem.spaceS) {
+                updateStatus
+                Spacer(minLength: DesignSystem.spaceM)
+                Button("检查更新") {
+                    updater.checkForUpdates()
+                }
+                .disabled(updater.isChecking || updater.isUpdating)
+
+                if updater.updateAvailable {
+                    Button("下载安装") {
+                        updater.downloadUpdate()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(updater.isUpdating)
+                }
+            }
+
+            if updater.isUpdating {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+                    ProgressView(value: updater.progressBar.1)
+                    Text(updater.progressBar.0)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+
+        Section("关于") {
+            LabeledContent("SYDownload") {
+                Text(updater.displayVersion)
+                    .monospacedDigit()
+            }
+            Text("支持小红书与抖音分享链接下载，下载内容写入你选择的文件夹。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: DesignSystem.spaceS) {
+                Button("关于 SYDownload") {
+                    NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
+                }
+                Button("查看项目主页") {
+                    if let url = URL(string: "https://github.com/iPotatow/SYDownload") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var updateStatus: some View {
+        if updater.isChecking {
+            HStack(spacing: DesignSystem.spaceS) {
+                ProgressView().controlSize(.small)
+                Text("正在检查更新…")
+            }
+            .foregroundStyle(.secondary)
+        } else if let error = updater.updateError {
+            Label(error, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(DesignSystem.destructive)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if updater.updateAvailable, let release = updater.latestRelease {
+            Label("发现新版本 \(release.tagName)", systemImage: "arrow.down.circle.fill")
+                .foregroundStyle(DesignSystem.accent)
+        } else if let release = updater.latestRelease {
+            Label("已是最新版本（\(release.tagName)）", systemImage: "checkmark.circle")
+                .foregroundStyle(.secondary)
+        } else {
+            Text("自动检查每天最多一次，也可以在这里手动检查。")
+                .foregroundStyle(.secondary)
         }
     }
 
