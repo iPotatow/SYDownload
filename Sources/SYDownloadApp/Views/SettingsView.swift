@@ -347,19 +347,6 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var advancedSettings: some View {
-        Section("抖音高级功能") {
-            LabeledContent("FFmpeg 路径") {
-                TextField("留空使用上游默认行为", text: $model.douyinSettings.ffmpeg)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: fieldWidth)
-            }
-            LabeledContent("直播画质") {
-                TextField("留空使用默认画质", text: $model.douyinSettings.liveQualities)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: fieldWidth)
-            }
-        }
-
         Section("原始配置文件") {
             configRow(title: "小红书 settings.json", path: model.xhsSettingsPath)
             configRow(title: "抖音 settings.json", path: model.douyinSettingsPath)

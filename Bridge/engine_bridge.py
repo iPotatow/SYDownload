@@ -63,8 +63,6 @@ VISIBLE_SETTINGS = {
         "storage_format",
         "max_size",
         "cookie",
-        "ffmpeg",
-        "live_qualities",
     ),
 }
 FALLBACK_DEFAULTS = {

@@ -129,8 +129,6 @@ struct DouyinSettingsForm {
     var storageFormat = ""
     var maxSize = 0
     var cookie = ""
-    var ffmpeg = ""
-    var liveQualities = ""
 }
 
 private struct LinkValidationResult {
@@ -519,8 +517,6 @@ final class AppModel: ObservableObject {
             "storage_format": douyinSettings.storageFormat,
             "max_size": douyinSettings.maxSize,
             "cookie": douyinSettings.cookie,
-            "ffmpeg": douyinSettings.ffmpeg,
-            "live_qualities": douyinSettings.liveQualities,
         ]
         await saveEngineSettings(engine: "douyin", values: values)
     }
@@ -725,8 +721,6 @@ final class AppModel: ObservableObject {
         douyinSettings.storageFormat = details["storage_format"] ?? ""
         douyinSettings.maxSize = Int(details["max_size"] ?? "") ?? 0
         douyinSettings.cookie = details["cookie"] ?? ""
-        douyinSettings.ffmpeg = details["ffmpeg"] ?? ""
-        douyinSettings.liveQualities = details["live_qualities"] ?? ""
         douyinSettingsPath = details["config_path"] ?? ""
     }
 
