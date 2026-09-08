@@ -45,6 +45,17 @@ struct PhotosView: View {
                 }
             case .failure(let error):
                 statusMessage = error.localizedDescription
+                statusIsError = true
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if folderURL != nil {
+                    Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
+                        .disabled(isScanning || isDeleting)
+                }
+                Button("选择文件夹", systemImage: "folder", action: chooseFolder)
+                    .disabled(isScanning || isDeleting)
             }
         }
         .alert("删除所选日期的照片？", isPresented: $showsDeleteConfirmation) {
@@ -59,23 +70,10 @@ struct PhotosView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: DesignSystem.spaceL) {
-            PageHeader(
-                title: "照片整理",
-                subtitle: "按文件名中的日期分组，预览后再选择需要处理的日期。"
-            )
-
-            Spacer(minLength: DesignSystem.spaceL)
-
-            if folderURL != nil {
-                Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
-                    .buttonStyle(.borderless)
-                    .disabled(isScanning || isDeleting)
-                Button("选择文件夹", systemImage: "folder", action: chooseFolder)
-                    .buttonStyle(.bordered)
-                    .disabled(isScanning || isDeleting)
-            }
-        }
+        PageHeader(
+            title: "照片整理",
+            subtitle: "按文件名中的日期分组，预览后再选择需要处理的日期。"
+        )
     }
 
     @ViewBuilder
@@ -132,6 +130,7 @@ struct PhotosView: View {
         .dropDestination(for: URL.self) { urls, _ in
             guard let folder = urls.first(where: isDirectory) else {
                 statusMessage = "请拖入文件夹，而不是单个文件。"
+                statusIsError = true
                 return false
             }
             openFolder(folder)

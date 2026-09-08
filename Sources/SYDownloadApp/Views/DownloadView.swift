@@ -6,7 +6,6 @@ struct DownloadView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var linkEditorFocused: Bool
-    @State private var advancedExpanded = false
 
     var body: some View {
         ScrollView {
@@ -32,6 +31,15 @@ struct DownloadView: View {
             reduceMotion ? .easeOut(duration: 0.14) : .spring(response: 0.32, dampingFraction: 1),
             value: model.preview
         )
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("新建下载", systemImage: "plus") {
+                    model.clearInput()
+                    linkEditorFocused = true
+                }
+                .help("新建下载")
+            }
+        }
         .tint(DesignSystem.accent)
     }
 
@@ -101,27 +109,20 @@ struct DownloadView: View {
 
             Divider()
 
-            DisclosureGroup(isExpanded: $advancedExpanded) {
-                HStack(spacing: DesignSystem.spaceM) {
-                    Label(platformStatus, systemImage: "link")
-                        .font(DesignSystem.supportingFont)
-                        .foregroundStyle(.secondary)
-
-                    Spacer(minLength: DesignSystem.spaceS)
-
-                    Button("检查链接", systemImage: "checkmark.circle", action: validate)
-                        .buttonStyle(.borderless)
-                        .disabled(
-                            model.detectedPlatform == .unknown
-                                || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                || model.isParsing
-                        )
-                }
-                .padding(.top, DesignSystem.spaceS)
-            } label: {
-                Text("高级选项")
-                    .font(DesignSystem.supportingFont.weight(.medium))
+            HStack(spacing: DesignSystem.spaceM) {
+                Label(platformStatus, systemImage: "link")
+                    .font(DesignSystem.supportingFont)
                     .foregroundStyle(.secondary)
+
+                Spacer(minLength: DesignSystem.spaceS)
+
+                Button("检查链接", systemImage: "checkmark.circle", action: validate)
+                    .buttonStyle(.borderless)
+                    .disabled(
+                        model.detectedPlatform == .unknown
+                            || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || model.isParsing
+                    )
             }
 
             HStack {
