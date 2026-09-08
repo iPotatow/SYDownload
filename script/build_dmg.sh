@@ -31,9 +31,9 @@ fi
 mkdir -p "$RELEASE_DIR" "$DMG_ROOT" "$BACKGROUND_DIR"
 
 ditto "$APP" "$DMG_ROOT/SYDownload.app"
-cp "$ROOT_DIR/.github/release-assets/解除隔离并打开 SYDownload.command" \
-  "$DMG_ROOT/解除隔离.command"
-chmod +x "$DMG_ROOT/解除隔离.command"
+cp "$ROOT_DIR/.github/release-assets/Install.command" \
+  "$DMG_ROOT/Install.command"
+chmod +x "$DMG_ROOT/Install.command"
 
 swift "$ROOT_DIR/script/create_dmg_background.swift" "$BACKGROUND_DIR/dmg-background.png"
 
@@ -48,8 +48,8 @@ rm -f "$FINAL_DMG"
   --icon "SYDownload.app" 140 190 \
   --hide-extension "SYDownload.app" \
   --app-drop-link 400 190 \
-  --icon "解除隔离.command" 270 290 \
-  --hide-extension "解除隔离.command" \
+  --icon "Install.command" 270 290 \
+  --hide-extension "Install.command" \
   --no-internet-enable \
   --format UDZO \
   "$FINAL_DMG" \
