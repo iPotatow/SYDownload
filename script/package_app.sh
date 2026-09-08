@@ -18,29 +18,22 @@ swift build -c "$CONFIGURATION" --product SYDownload
 BIN_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
 BIN="$BIN_DIR/SYDownload"
 APP="$ROOT/dist/SYDownload.app"
-RESOURCE="$ROOT/Sources/SYDownloadApp/Resources/SYDownloadIcon.png"
-RESOURCE_BUNDLE="$BIN_DIR/SYDownload_SYDownloadApp.bundle"
+RESOURCE_DIR="$ROOT/Sources/SYDownloadApp/Resources"
 
-if [[ ! -f "$RESOURCE" ]]; then
-  echo "Missing app icon resource: $RESOURCE" >&2
-  exit 3
-fi
-if [[ ! -d "$RESOURCE_BUNDLE" ]]; then
-  echo "Missing SwiftPM resource bundle: $RESOURCE_BUNDLE" >&2
-  exit 3
-fi
+for resource in SYDownloadIcon.png XiaohongshuPlatformIcon.jpg DouyinPlatformIcon.jpg; do
+  if [[ ! -f "$RESOURCE_DIR/$resource" ]]; then
+    echo "Missing app resource: $RESOURCE_DIR/$resource" >&2
+    exit 3
+  fi
+done
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/bridge"
 cp "$BIN" "$APP/Contents/MacOS/SYDownload"
 chmod +x "$APP/Contents/MacOS/SYDownload"
-# SwiftPM's generated Bundle.module accessor for an executable resolves the
-# resource bundle next to Bundle.main.bundleURL. Keep that location available
-# in the manually assembled .app, and also retain the conventional Resources
-# copy for direct bundle/resource inspection.
-cp -R "$RESOURCE_BUNDLE" "$APP/"
-cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
-cp "$RESOURCE" "$APP/Contents/Resources/SYDownloadIcon.png"
+cp "$RESOURCE_DIR/SYDownloadIcon.png" "$APP/Contents/Resources/SYDownloadIcon.png"
+cp "$RESOURCE_DIR/XiaohongshuPlatformIcon.jpg" "$APP/Contents/Resources/XiaohongshuPlatformIcon.jpg"
+cp "$RESOURCE_DIR/DouyinPlatformIcon.jpg" "$APP/Contents/Resources/DouyinPlatformIcon.jpg"
 cp "$ROOT/Bridge/engine_bridge.py" "$APP/Contents/Resources/bridge/engine_bridge.py"
 cp "$ROOT/Bridge/download_runtime.py" "$APP/Contents/Resources/bridge/download_runtime.py"
 printf '%s\n' "$APP_VERSION" > "$APP/Contents/Resources/bundle-version.txt"
