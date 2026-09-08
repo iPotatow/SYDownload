@@ -14,9 +14,9 @@ struct AboutView: View {
             header
 
             Text("自动识别分享链接，并调用内置下载引擎。轻量、直接，内容始终写入你选择的文件夹。")
-                .font(DesignSystem.bodyFont)
+                .font(.body)
                 .foregroundStyle(.secondary)
-                .lineSpacing(3)
+                .lineSpacing(DesignSystem.spaceXS)
                 .fixedSize(horizontal: false, vertical: true)
 
             capabilityRow
@@ -41,7 +41,7 @@ struct AboutView: View {
                 Spacer()
                 Text("GPL-3.0")
             }
-            .font(DesignSystem.metadataFont)
+            .font(.caption)
             .foregroundStyle(.tertiary)
         }
         .padding(DesignSystem.spaceXL)
@@ -57,9 +57,9 @@ struct AboutView: View {
             AppMark(size: 56)
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text("SYDownload")
-                    .font(DesignSystem.pageTitleFont)
+                    .font(.title2.weight(.semibold))
                 Text("小红书与抖音下载工具 · v\(version)")
-                    .font(DesignSystem.bodyFont)
+                    .font(.body)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: DesignSystem.spaceL)
@@ -86,11 +86,11 @@ struct AboutView: View {
     ) -> some View {
         HStack(spacing: DesignSystem.spaceM) {
             IconBadge(systemImage: systemImage, tint: tint, size: 36)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text(title)
-                    .font(DesignSystem.uiFont.weight(.semibold))
+                    .font(.callout.weight(.semibold))
                 Text(message)
-                    .font(DesignSystem.supportingFont)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
