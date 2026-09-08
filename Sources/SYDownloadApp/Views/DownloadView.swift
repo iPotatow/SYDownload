@@ -27,7 +27,7 @@ struct DownloadView: View {
         HStack(alignment: .top, spacing: DesignSystem.spaceL) {
             PageHeader(
                 title: "下载",
-                subtitle: "粘贴链接即可开始下载，支持小红书、抖音与 TikTok。"
+                subtitle: "可一次粘贴多个链接或分享文本，支持小红书、抖音与 TikTok。"
             )
 
             Spacer(minLength: 0)
@@ -39,7 +39,7 @@ struct DownloadView: View {
             Text("下载链接")
                 .font(.headline)
 
-            TextField("粘贴链接或完整分享文本…", text: $model.input, axis: .vertical)
+            TextField("粘贴一个或多个链接 / 完整分享文本…", text: $model.input, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(8...12)
                 .focused($linkEditorFocused)
@@ -48,11 +48,11 @@ struct DownloadView: View {
             HStack(spacing: DesignSystem.spaceS) {
                 PlatformChip(
                     platform: .xiaohongshu,
-                    selected: model.detectedPlatform == .xiaohongshu
+                    selected: model.hasXHSLinks
                 )
                 PlatformChip(
                     platform: .douyin,
-                    selected: model.detectedPlatform == .douyin || model.detectedPlatform == .tiktok
+                    selected: model.hasDouyinLinks
                 )
 
                 Spacer(minLength: DesignSystem.spaceL)
@@ -76,20 +76,21 @@ struct DownloadView: View {
                 Button("检查链接", systemImage: "checkmark.circle", action: validate)
                     .buttonStyle(.borderless)
                     .disabled(
-                        model.detectedPlatform == .unknown
+                        !model.hasSupportedLinks
                             || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || model.isWorking
                             || model.isParsing
                     )
             }
 
             HStack {
                 Spacer()
-                Button("开始下载", systemImage: "arrow.down", action: download)
+                Button(downloadButtonTitle, systemImage: "arrow.down", action: download)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .keyboardShortcut(.return, modifiers: [.command])
                     .disabled(
-                        model.detectedPlatform == .unknown
+                        !model.hasSupportedLinks
                             || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             || model.isWorking
                             || model.isParsing
@@ -99,12 +100,27 @@ struct DownloadView: View {
     }
 
     private var platformStatus: String {
-        switch model.detectedPlatform {
-        case .unknown:
-            return model.input.isEmpty ? "等待识别平台" : "暂未识别支持的平台"
-        default:
-            return "已识别为 \(model.detectedPlatform.displayName)"
+        if model.detectedLinks.isEmpty {
+            return model.input.isEmpty ? "等待识别平台" : "暂未识别到链接"
         }
+        if model.supportedLinkCount == 0 {
+            return "识别到 \(model.detectedLinks.count) 个链接，但没有支持的平台"
+        }
+        if model.detectedLinks.count == 1, let link = model.detectedLinks.first {
+            return "已识别为 \(link.platform.displayName)"
+        }
+
+        var result = "已识别 \(model.supportedLinkCount) 个支持链接"
+        if model.unsupportedLinkCount > 0 {
+            result += "，\(model.unsupportedLinkCount) 个不支持"
+        }
+        return result
+    }
+
+    private var downloadButtonTitle: String {
+        model.supportedLinkCount > 1
+            ? "开始下载 \(model.supportedLinkCount) 项"
+            : "开始下载"
     }
 
     private var statusLine: some View {
@@ -136,13 +152,13 @@ struct DownloadView: View {
 
     private var statusSymbol: String {
         if model.statusIsError { return "exclamationmark.triangle.fill" }
-        if model.detectedPlatform == .unknown { return "info.circle" }
+        if !model.hasSupportedLinks { return "info.circle" }
         return model.validatedInput.isEmpty ? "link" : "checkmark.circle.fill"
     }
 
     private var statusColor: Color {
         if model.statusIsError { return DesignSystem.destructive }
-        if model.detectedPlatform == .unknown { return .secondary }
+        if !model.hasSupportedLinks { return .secondary }
         return model.validatedInput.isEmpty ? DesignSystem.accent : DesignSystem.success
     }
 

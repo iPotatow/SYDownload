@@ -21,6 +21,7 @@ private actor RequestRecorder {
     var responseError: Error?
     var validateGate: TestGate?
     var downloadGate: TestGate?
+    var rejectedValidationURLs: Set<String> = []
 
     func handle(_ request: BridgeRequest) async throws -> BridgeResponse {
         requests.append(request)
@@ -31,10 +32,13 @@ private actor RequestRecorder {
             await downloadGate.wait()
         }
         if let responseError { throw responseError }
+
+        let rejected = request.command == "validate"
+            && rejectedValidationURLs.contains(request.url ?? "")
         let payload: [String: Any] = [
-            "ok": true,
+            "ok": !rejected,
             "platform": PlatformDetector.detect(request.url ?? "").rawValue,
-            "message": "ok",
+            "message": rejected ? "rejected" : "ok",
             "details": [:]
         ]
         let data = try! JSONSerialization.data(withJSONObject: payload)
@@ -177,6 +181,56 @@ final class AppModelDownloadTests: XCTestCase {
         XCTAssertFalse(model.statusIsError)
         XCTAssertEqual(model.validatedInput, "")
     }
+
+    func testMixedBatchCreatesOneTaskPerUniqueLink() async {
+        let recorder = RequestRecorder()
+        let (model, defaults, suiteName) = makeModel(recorder: recorder)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let xhs = "https://xhslink.com/abc"
+        let douyin = "https://v.douyin.com/xyz/"
+        let unsupported = "https://example.com/item"
+        let tiktok = "https://www.tiktok.com/@user/video/1"
+        model.input = """
+        小红书 \(xhs)。
+        抖音 \(douyin)
+        重复 \(xhs)
+        其他 \(unsupported);
+        TikTok \(tiktok)
+        """
+
+        await model.runDownload()
+
+        let validations = await recorder.requests(for: "validate")
+        let downloads = await recorder.requests(for: "download")
+        XCTAssertEqual(validations.map(\.url), [xhs, douyin, tiktok])
+        XCTAssertEqual(downloads.map(\.url), [xhs, douyin, tiktok])
+        XCTAssertEqual(model.tasks.map(\.sourceURL), [xhs, douyin, unsupported, tiktok])
+        XCTAssertEqual(model.tasks.count, 4)
+        XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == unsupported })?.state, .failed)
+        XCTAssertEqual(model.history.map(\.sourceURL), [xhs, douyin, tiktok])
+        XCTAssertEqual(model.status, "批量下载完成：3 成功，1 失败")
+    }
+
+    func testValidationFailureDoesNotBlockOtherLinks() async {
+        let recorder = RequestRecorder()
+        let (model, defaults, suiteName) = makeModel(recorder: recorder)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let rejected = "https://xhslink.com/rejected"
+        let accepted = "https://v.douyin.com/accepted/"
+        await recorder.setRejectedValidationURLs([rejected])
+        model.input = "\(rejected)\n\(accepted)"
+
+        await model.runDownload()
+
+        let downloads = await recorder.requests(for: "download")
+        XCTAssertEqual(downloads.map(\.url), [accepted])
+        XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == rejected })?.state, .failed)
+        XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == accepted })?.state, .completed)
+        XCTAssertEqual(model.history.map(\.sourceURL), [accepted])
+        XCTAssertEqual(model.status, "批量下载完成：1 成功，1 失败")
+    }
 }
 
 private extension RequestRecorder {
@@ -190,5 +244,9 @@ private extension RequestRecorder {
 
     func setDownloadGate(_ gate: TestGate) {
         downloadGate = gate
+    }
+
+    func setRejectedValidationURLs(_ urls: Set<String>) {
+        rejectedValidationURLs = urls
     }
 }

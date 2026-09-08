@@ -134,6 +134,17 @@ struct DouyinSettingsForm {
     var liveQualities = ""
 }
 
+private struct LinkValidationResult {
+    let link: DetectedDownloadLink
+    let ok: Bool
+    let message: String
+}
+
+private struct PreparedDownload {
+    let taskID: UUID
+    let validation: LinkValidationResult
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     typealias BridgeSender = @Sendable (BridgeRequest) async throws -> BridgeResponse
@@ -146,6 +157,7 @@ final class AppModel: ObservableObject {
     @Published var status = "粘贴链接后即可开始"
     @Published var statusIsError = false
     @Published var detectedPlatform: DownloadPlatform = .unknown
+    @Published private(set) var detectedLinks: [DetectedDownloadLink] = []
     @Published var isWorking = false
     @Published var isParsing = false
     @Published var lastDetails: [String: String] = [:]
@@ -202,27 +214,52 @@ final class AppModel: ObservableObject {
         }
     }
 
+    var supportedLinkCount: Int {
+        detectedLinks.filter { $0.platform != .unknown }.count
+    }
+
+    var unsupportedLinkCount: Int {
+        detectedLinks.filter { $0.platform == .unknown }.count
+    }
+
+    var hasSupportedLinks: Bool {
+        supportedLinkCount > 0
+    }
+
+    var hasXHSLinks: Bool {
+        detectedLinks.contains { $0.platform == .xiaohongshu }
+    }
+
+    var hasDouyinLinks: Bool {
+        detectedLinks.contains { $0.platform == .douyin || $0.platform == .tiktok }
+    }
+
     func detectLocally() {
         let normalizedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if !validatedInput.isEmpty && normalizedInput != validatedInput {
             lastDetails = [:]
             validatedInput = ""
         }
-        let newPlatform = PlatformDetector.detect(input)
-        if newPlatform != detectedPlatform {
+
+        let newLinks = PlatformDetector.extractLinks(input)
+        if newLinks != detectedLinks {
             lastDetails = [:]
             validatedInput = ""
         }
-        detectedPlatform = newPlatform
+        detectedLinks = newLinks
+        detectedPlatform = newLinks.first(where: { $0.platform != .unknown })?.platform ?? .unknown
 
         if normalizedInput.isEmpty {
             status = "粘贴链接后即可开始"
             statusIsError = false
-        } else if newPlatform == .unknown {
-            status = "暂未识别到支持的平台链接"
+        } else if newLinks.isEmpty {
+            status = "暂未识别到链接"
+            statusIsError = true
+        } else if supportedLinkCount == 0 {
+            status = "识别到 \(newLinks.count) 个链接，但没有支持的平台"
             statusIsError = true
         } else {
-            status = "已识别：\(newPlatform.displayName)"
+            status = detectionSummary
             statusIsError = false
         }
     }
@@ -230,6 +267,7 @@ final class AppModel: ObservableObject {
     func clearInput() {
         input = ""
         detectedPlatform = .unknown
+        detectedLinks = []
         lastDetails = [:]
         validatedInput = ""
         status = "粘贴链接后即可开始"
@@ -238,107 +276,179 @@ final class AppModel: ObservableObject {
 
     func validateEngine() async {
         detectLocally()
-        guard detectedPlatform != .unknown else { return }
-        let sourceURL = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        let expectedPlatform = detectedPlatform
-        isParsing = true
-        defer { isParsing = false }
+        guard hasSupportedLinks else { return }
 
-        do {
-            let response = try await sendBridge(.init(command: "validate", url: sourceURL))
-            guard input.trimmingCharacters(in: .whitespacesAndNewlines) == sourceURL,
-                  detectedPlatform == expectedPlatform else { return }
-            status = response.message
-            statusIsError = !response.ok
-            lastDetails = response.details ?? [:]
-            validatedInput = response.ok ? sourceURL : ""
-        } catch {
-            guard input.trimmingCharacters(in: .whitespacesAndNewlines) == sourceURL else { return }
-            validatedInput = ""
-            status = error.localizedDescription
-            statusIsError = true
+        let expectedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let links = detectedLinks
+        guard let results = await validateLinks(links, expectedInput: expectedInput) else { return }
+
+        let supportedFailures = results.filter {
+            $0.link.platform != .unknown && !$0.ok
         }
+        let unsupported = results.filter { $0.link.platform == .unknown }.count
+        let downloadable = results.filter { $0.link.platform != .unknown && $0.ok }.count
+
+        validatedInput = supportedFailures.isEmpty ? expectedInput : ""
+
+        if supportedFailures.isEmpty && unsupported == 0 {
+            status = results.count == 1
+                ? "链接检查通过"
+                : "已检查 \(results.count) 个链接，均可下载"
+            statusIsError = false
+            return
+        }
+
+        var parts = ["\(downloadable) 个可下载"]
+        if !supportedFailures.isEmpty {
+            parts.append("\(supportedFailures.count) 个检查失败")
+        }
+        if unsupported > 0 {
+            parts.append("\(unsupported) 个不支持")
+        }
+        status = "已检查 \(results.count) 个链接：" + parts.joined(separator: "，")
+        statusIsError = downloadable == 0 || !supportedFailures.isEmpty
     }
 
     func runDownload() async {
         guard !isWorking, !isParsing else { return }
         detectLocally()
-        guard detectedPlatform != .unknown else { return }
+        guard hasSupportedLinks else { return }
+
         let requestedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        let requestedPlatform = detectedPlatform
+        let requestedLinks = detectedLinks
         let destination = outputDirectory
 
         isWorking = true
-        if validatedInput != requestedInput {
-            await validateEngine()
-            guard validatedInput == requestedInput,
-                  input.trimmingCharacters(in: .whitespacesAndNewlines) == requestedInput,
-                  detectedPlatform == requestedPlatform else {
-                isWorking = false
+        defer { isWorking = false }
+
+        let validations: [LinkValidationResult]
+        if validatedInput == requestedInput {
+            validations = requestedLinks.map { link in
+                LinkValidationResult(
+                    link: link,
+                    ok: link.platform != .unknown,
+                    message: link.platform == .unknown ? "不支持此链接平台。" : "链接检查通过"
+                )
+            }
+        } else {
+            guard let results = await validateLinks(requestedLinks, expectedInput: requestedInput) else {
                 return
             }
+            validations = results
+            let supportedFailures = results.contains {
+                $0.link.platform != .unknown && !$0.ok
+            }
+            if !supportedFailures {
+                validatedInput = requestedInput
+            }
         }
 
-        let platform = requestedPlatform
-        let sourceURL = requestedInput
-        let title = "\(platform.displayName)下载任务"
-        let taskID = UUID()
-        let item = DownloadTaskItem(
-            id: taskID,
-            title: title,
-            platform: platform,
-            sourceURL: sourceURL,
-            state: .downloading,
-            progress: nil,
-            detail: "正在调用 \(platform.displayName) 下载引擎…",
-            outputDirectory: destination
-        )
-        tasks.insert(item, at: 0)
-        selection = .tasks
-        status = "正在下载…"
-        statusIsError = false
+        guard input.trimmingCharacters(in: .whitespacesAndNewlines) == requestedInput else {
+            return
+        }
 
-        do {
-            let response = try await sendBridge(.init(
-                command: "download",
-                url: sourceURL,
+        let prepared = validations.map {
+            PreparedDownload(taskID: UUID(), validation: $0)
+        }
+        let newTasks = prepared.map { preparedItem in
+            let validation = preparedItem.validation
+            return DownloadTaskItem(
+                id: preparedItem.taskID,
+                title: taskTitle(for: validation.link),
+                platform: validation.link.platform,
+                sourceURL: validation.link.url,
+                state: validation.ok ? .queued : .failed,
+                progress: nil,
+                detail: validation.ok ? "等待下载…" : validation.message,
                 outputDirectory: destination
-            ))
-            lastDetails = response.details ?? [:]
-            status = response.message
-            statusIsError = !response.ok
-            updateTask(taskID) { task in
-                task.state = response.ok ? .completed : .failed
-                task.progress = response.ok ? 1.0 : nil
-                task.detail = response.ok ? "下载完成" : response.message
+            )
+        }
+
+        tasks.insert(contentsOf: newTasks, at: 0)
+        selection = .tasks
+
+        let downloadable = prepared.filter { $0.validation.ok }
+        var successCount = 0
+        var failedCount = prepared.count - downloadable.count
+        var completedDownloadCount = 0
+        var newHistory: [HistoryItem] = []
+        var lastFailureMessage = validations.first(where: { !$0.ok })?.message
+
+        if downloadable.isEmpty {
+            status = "没有可下载的链接"
+            statusIsError = true
+            return
+        }
+
+        for preparedItem in downloadable {
+            completedDownloadCount += 1
+            let link = preparedItem.validation.link
+            let title = taskTitle(for: link)
+
+            updateTask(preparedItem.taskID) { task in
+                task.state = .downloading
+                task.detail = "正在调用 \(link.platform.displayName) 下载引擎…"
             }
 
-            if response.ok {
-                history.insert(
-                    HistoryItem(
-                        title: title,
-                        platform: platform,
-                        sourceURL: sourceURL,
-                        outputDirectory: destination
-                    ),
-                    at: 0
-                )
-                if history.count > 100 {
-                    history.removeLast(history.count - 100)
-                }
-                persistHistory()
+            if downloadable.count == 1 {
+                status = "正在下载…"
+            } else {
+                status = "正在下载 \(completedDownloadCount)/\(downloadable.count)…"
             }
-        } catch {
-            status = error.localizedDescription
-            statusIsError = true
-            updateTask(taskID) { task in
-                task.state = .failed
-                task.progress = nil
-                task.detail = error.localizedDescription
+            statusIsError = false
+
+            do {
+                let response = try await sendBridge(.init(
+                    command: "download",
+                    url: link.url,
+                    outputDirectory: destination
+                ))
+                lastDetails = response.details ?? [:]
+                updateTask(preparedItem.taskID) { task in
+                    task.state = response.ok ? .completed : .failed
+                    task.progress = response.ok ? 1.0 : nil
+                    task.detail = response.ok ? "下载完成" : response.message
+                }
+
+                if response.ok {
+                    successCount += 1
+                    newHistory.append(
+                        HistoryItem(
+                            title: title,
+                            platform: link.platform,
+                            sourceURL: link.url,
+                            outputDirectory: destination
+                        )
+                    )
+                } else {
+                    failedCount += 1
+                    lastFailureMessage = response.message
+                }
+            } catch {
+                failedCount += 1
+                lastFailureMessage = error.localizedDescription
+                updateTask(preparedItem.taskID) { task in
+                    task.state = .failed
+                    task.progress = nil
+                    task.detail = error.localizedDescription
+                }
             }
         }
 
-        isWorking = false
+        if !newHistory.isEmpty {
+            history.insert(contentsOf: newHistory, at: 0)
+            if history.count > 100 {
+                history.removeLast(history.count - 100)
+            }
+            persistHistory()
+        }
+
+        if prepared.count == 1 {
+            status = successCount == 1 ? "下载完成" : (lastFailureMessage ?? "下载失败")
+        } else {
+            status = "批量下载完成：\(successCount) 成功，\(failedCount) 失败"
+        }
+        statusIsError = failedCount > 0
     }
 
     func loadEngineSettings(force: Bool = false) async {
@@ -447,8 +557,8 @@ final class AppModel: ObservableObject {
     func retryTask(_ task: DownloadTaskItem) {
         guard !isWorking else { return }
         input = task.sourceURL
-        detectedPlatform = task.platform
         validatedInput = ""
+        detectLocally()
         selection = .download
         status = "已载入失败任务，可重新检查后下载"
     }
@@ -461,10 +571,96 @@ final class AppModel: ObservableObject {
     func useHistory(_ item: HistoryItem) {
         input = item.sourceURL
         outputDirectory = item.outputDirectory
-        detectedPlatform = item.platform
         validatedInput = ""
+        detectLocally()
         selection = .download
         status = "已载入历史链接，可重新检查"
+    }
+
+    private var detectionSummary: String {
+        let xhsCount = detectedLinks.filter { $0.platform == .xiaohongshu }.count
+        let douyinCount = detectedLinks.filter {
+            $0.platform == .douyin || $0.platform == .tiktok
+        }.count
+        var parts: [String] = []
+        if xhsCount > 0 { parts.append("小红书 \(xhsCount)") }
+        if douyinCount > 0 { parts.append("抖音/TikTok \(douyinCount)") }
+
+        var result = "已识别 \(supportedLinkCount) 个支持链接"
+        if !parts.isEmpty {
+            result += "：" + parts.joined(separator: " · ")
+        }
+        if unsupportedLinkCount > 0 {
+            result += "，另有 \(unsupportedLinkCount) 个不支持链接"
+        }
+        return result
+    }
+
+    private func validateLinks(
+        _ links: [DetectedDownloadLink],
+        expectedInput: String
+    ) async -> [LinkValidationResult]? {
+        isParsing = true
+        defer { isParsing = false }
+
+        var results: [LinkValidationResult] = []
+        for link in links {
+            guard input.trimmingCharacters(in: .whitespacesAndNewlines) == expectedInput else {
+                return nil
+            }
+
+            if link.platform == .unknown {
+                results.append(
+                    LinkValidationResult(
+                        link: link,
+                        ok: false,
+                        message: "不支持此链接平台。"
+                    )
+                )
+                continue
+            }
+
+            do {
+                let response = try await sendBridge(.init(command: "validate", url: link.url))
+                guard input.trimmingCharacters(in: .whitespacesAndNewlines) == expectedInput else {
+                    return nil
+                }
+                lastDetails = response.details ?? [:]
+                results.append(
+                    LinkValidationResult(
+                        link: link,
+                        ok: response.ok,
+                        message: response.message
+                    )
+                )
+            } catch {
+                guard input.trimmingCharacters(in: .whitespacesAndNewlines) == expectedInput else {
+                    return nil
+                }
+                lastDetails = [:]
+                results.append(
+                    LinkValidationResult(
+                        link: link,
+                        ok: false,
+                        message: error.localizedDescription
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    private func taskTitle(for link: DetectedDownloadLink) -> String {
+        guard let url = URL(string: link.url) else {
+            return "\(link.platform.displayName)下载任务"
+        }
+        let identifier = url.pathComponents
+            .reversed()
+            .first { $0 != "/" && !$0.isEmpty }
+        guard let identifier else {
+            return "\(link.platform.displayName)下载任务"
+        }
+        return "\(link.platform.displayName) · \(identifier)"
     }
 
     private func saveEngineSettings(engine: String, values: [String: Any]) async {
