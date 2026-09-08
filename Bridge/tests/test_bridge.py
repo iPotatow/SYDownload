@@ -60,6 +60,12 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(runtime.classify_error("task timed out"), "timeout")
         self.assertEqual(runtime.classify_error("No space left on device"), "disk")
 
+    def test_progress_reporter_parses_upstream_percentage(self):
+        with tempfile.TemporaryDirectory() as temp:
+            reporter = runtime.ProgressReporter("progress-test", Path(temp), {})
+            reporter.observe_text("Downloading media 42.5%")
+            self.assertAlmostEqual(reporter.last_progress, 0.425)
+
     def test_output_verification_detects_real_file_write(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

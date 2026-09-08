@@ -18,7 +18,7 @@ ARTIFACT_EXTENSIONS = {
     ".mp3", ".m4a", ".aac", ".wav", ".flac",
     ".txt", ".md", ".json", ".csv", ".xlsx", ".sqlite", ".db",
 }
-_PERCENT_RE = re.compile(r"(?<!\\d)(100|[1-9]?\\d)(?:\\.\\d+)?%")
+_PERCENT_RE = re.compile(r"(?<!\d)(100|[1-9]?\d)(?:\.\d+)?%")
 _PRINT_LOCK = threading.Lock()
 _ACTIVE_LOCK = threading.Lock()
 _ACTIVE_PROCESS: subprocess.Popen[str] | None = None
@@ -274,10 +274,12 @@ def run_streaming_subprocess(
     reporter: ProgressReporter,
     timeout_seconds: float,
 ) -> tuple[int, str, bool]:
+    process_env = env.copy()
+    process_env.setdefault("PYTHONUNBUFFERED", "1")
     process = subprocess.Popen(
         cmd,
         cwd=cwd,
-        env=env,
+        env=process_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -318,6 +320,8 @@ def run_streaming_subprocess(
             terminate_process_tree(process)
             process.wait(timeout=2)
     finally:
+        if process.stdout is not None:
+            process.stdout.close()
         _set_active_process(None)
 
     return process.returncode if process.returncode is not None else -1, "".join(log_lines).strip(), timed_out
