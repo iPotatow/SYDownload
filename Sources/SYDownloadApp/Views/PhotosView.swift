@@ -22,7 +22,7 @@ struct PhotosView: View {
             workspace
             if !statusMessage.isEmpty && !isScanning {
                 Label(statusMessage, systemImage: statusIsError ? "exclamationmark.circle" : "info.circle")
-                    .font(DesignSystem.supportingFont)
+                    .font(.callout)
                     .foregroundStyle(statusIsError ? DesignSystem.destructive : .secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .combine)
@@ -104,14 +104,14 @@ struct PhotosView: View {
                 .foregroundStyle(.secondary)
 
             Text("或")
-                .font(DesignSystem.supportingFont)
+                .font(.callout)
                 .foregroundStyle(.tertiary)
 
             Button("选择文件夹…", systemImage: "folder", action: chooseFolder)
                 .buttonStyle(.borderedProminent)
 
             Text("支持 JPG、PNG、HEIC 等常见图片格式")
-                .font(DesignSystem.metadataFont)
+                .font(.caption)
                 .foregroundStyle(.tertiary)
                 .padding(.top, DesignSystem.spaceS)
         }
@@ -124,7 +124,7 @@ struct PhotosView: View {
             RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                 .strokeBorder(
                     isDropTargeted ? DesignSystem.accent.opacity(0.65) : DesignSystem.hairline,
-                    style: StrokeStyle(lineWidth: 1.2, dash: [7, 5])
+                    style: StrokeStyle(lineWidth: 1, dash: [8, 4])
                 )
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -193,20 +193,20 @@ struct PhotosView: View {
         HStack(spacing: DesignSystem.spaceM) {
             if let folderURL {
                 Label(folderURL.lastPathComponent, systemImage: "folder")
-                    .font(DesignSystem.uiFont.weight(.semibold))
+                    .font(.callout.weight(.semibold))
                     .help(folderURL.path)
             }
 
             Text("\(scanResult.totalCount) 张照片")
-                .font(DesignSystem.supportingFont)
+                .font(.callout)
                 .foregroundStyle(.secondary)
             Text("\(scanResult.groups.count) 个日期")
-                .font(DesignSystem.supportingFont)
+                .font(.callout)
                 .foregroundStyle(.secondary)
 
             if !scanResult.ungrouped.isEmpty {
                 Text("\(scanResult.ungrouped.count) 张未识别日期")
-                    .font(DesignSystem.supportingFont)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
@@ -247,7 +247,7 @@ struct PhotosView: View {
                 Spacer()
 
                 Text("\(group.photos.count) 张")
-                    .font(DesignSystem.supportingFont)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
@@ -273,7 +273,7 @@ struct PhotosView: View {
                     .font(.headline)
                 Spacer()
                 Text("\(scanResult.ungrouped.count) 张 · 不参与日期批量删除")
-                    .font(DesignSystem.supportingFont)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
@@ -310,7 +310,7 @@ struct PhotosView: View {
 
     private var deleteBar: some View {
         HStack(spacing: DesignSystem.spaceM) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text("已选择 \(selectedDates.count) 个日期")
                     .font(.subheadline.weight(.semibold))
                 Text("共 \(selectedPhotoURLs.count) 张照片")
@@ -348,7 +348,7 @@ struct PhotosView: View {
         }
         .padding(.horizontal, DesignSystem.spaceS)
         .padding(.bottom, DesignSystem.spaceS)
-        .shadow(color: DesignSystem.shadow, radius: 8, y: 3)
+        .shadow(color: DesignSystem.shadow, radius: DesignSystem.spaceS, y: DesignSystem.spaceXS)
     }
 
     private var selectedPhotoURLs: [URL] {
@@ -462,9 +462,9 @@ private struct LocalPhotoThumbnail: View {
             }
         }
         .frame(width: 68, height: 68)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.07))
         }
         .help(url.lastPathComponent)
