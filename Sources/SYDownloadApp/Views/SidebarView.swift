@@ -24,7 +24,7 @@ struct SidebarView: View {
                     .padding(.horizontal, DesignSystem.spaceM)
                     .padding(.vertical, DesignSystem.spaceS)
 
-                sidebarButton(.settings, title: "引擎配置", systemImage: "slider.horizontal.3")
+                sidebarButton(.settings, title: "设置", systemImage: "slider.horizontal.3")
             }
             .padding(.horizontal, DesignSystem.spaceS)
 
@@ -39,8 +39,12 @@ struct SidebarView: View {
     private var brand: some View {
         HStack(spacing: DesignSystem.spaceS) {
             AppMark(size: 40)
-            Text("SYDownload")
-                .font(.system(size: 15, weight: .semibold))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("SYDownload")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+
             Spacer(minLength: 0)
         }
         .frame(height: DesignSystem.sidebarBrandHeight)
