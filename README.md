@@ -10,6 +10,8 @@
 - Swift ↔ Python JSON Lines IPC
 - XHS 真实 CLI 下载链路
 - DouK 单作品兼容适配器
+- 下载任务最多 3 个并发；Bridge 流式返回上游百分比与真实落盘字节/文件数，支持取消和 15 分钟整任务超时
+- 下载完成前校验实际新增/更新文件，并按网络、Cookie/登录、风控、超时、磁盘和文件校验等类别标记失败
 - GitHub Actions 仅构建 Apple Silicon `.app`
 - Release Artifact 内置 Python 3.12
 - Release Artifact 内置 XHS-Downloader 与 TikTokDownloader/DouK 源码
@@ -72,4 +74,4 @@ BUNDLE_RUNTIME=1 CONFIGURATION=release ./script/package_app.sh
 2. ffmpeg 尚未内嵌；直播下载等依赖 ffmpeg 的能力暂不作为本阶段通过标准。
 3. Artifact 目前使用 ad-hoc 签名，仅用于开发和真机验证；尚未做 Developer ID、Hardened Runtime 与 notarization。
 4. DouK 仍通过内部类完成单链接处理；正式版应继续收敛成稳定 adapter。
-5. 下载执行仍为单任务模型；真正的任务队列、实时进度、暂停/取消与任务恢复仍待完善。
+5. 下载执行已支持最多 3 个并发任务、流式真实写入进度、取消、任务超时、错误分类与落盘验证；暂停/恢复仍待完善。

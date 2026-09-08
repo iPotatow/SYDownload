@@ -94,6 +94,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
 
           test -x "$PYTHON"
+          test -f "$APP/Contents/Resources/bridge/download_runtime.py"
           test -f "$RESOURCE_BUNDLE/SYDownloadIcon.png"
           test -f "$APP/Contents/Resources/SYDownloadIcon.png"
           test -f "$APP/Contents/Resources/engines/XHS-Downloader/main.py"
