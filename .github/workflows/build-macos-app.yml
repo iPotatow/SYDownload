@@ -1,33 +1,59 @@
-name: Build macOS App
+name: Release SYDownload
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
     paths:
       - VERSION
-      - Package.swift
-      - Sources/**
-      - Tests/**
-      - Bridge/**
-      - script/**
-      - .github/workflows/build-macos-app.yml
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Create or update the v<VERSION> GitHub Release"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 concurrency:
-  group: sydownload-macos-${{ github.ref }}
+  group: sydownload-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Tests
+  build:
+    name: Package SYDownload
     runs-on: macos-latest
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout
+      - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must use semantic versioning, for example 0.3.0. Got: $VERSION" >&2
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "$TAG" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match VERSION ($TAG)." >&2
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Toolchain
         run: |
@@ -42,15 +68,6 @@ jobs:
       - name: Python bridge tests
         run: python3 -m unittest discover -s Bridge/tests -p 'test_*.py'
 
-  build:
-    name: Build Apple Silicon
-    needs: test
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
@@ -59,16 +76,10 @@ jobs:
             script/bundle_runtime.sh
             .github/workflows/build-macos-app.yml
 
-      - name: Toolchain
-        run: |
-          uname -m
-          swift --version
-          uv --version
-          xcodebuild -version
-
       - name: Build self-contained app
         env:
           CONFIGURATION: release
+          APP_VERSION: ${{ steps.version.outputs.version }}
           ADHOC_SIGN: 1
           BUNDLE_RUNTIME: 1
           PYTHON_VERSION: "3.12"
@@ -82,12 +93,12 @@ jobs:
         env:
           SYDOWNLOAD_APP_SUPPORT: ${{ runner.temp }}/SYDownload-AppSupport
           SYDOWNLOAD_CACHE: ${{ runner.temp }}/SYDownload-Cache
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           APP="dist/SYDownload.app"
           PYTHON="$APP/Contents/Resources/python/bin/python3"
           BRIDGE="$APP/Contents/Resources/bridge/engine_bridge.py"
           RESOURCE_BUNDLE="$APP/Contents/Resources/SYDownload_SYDownloadApp.bundle"
-          VERSION="$(tr -d '[:space:]' < VERSION)"
 
           file "$APP/Contents/MacOS/SYDownload"
           "$PYTHON" --version
@@ -140,38 +151,40 @@ jobs:
 
           /bin/kill "$PID" || true
 
-      - name: Archive app and generate checksum
+      - name: Package ZIP and checksum
+        shell: bash
         run: |
-          cd dist
-          ditto -c -k --sequesterRsrc --keepParent SYDownload.app SYDownload-macOS-AppleSilicon.zip
-          shasum -a 256 SYDownload-macOS-AppleSilicon.zip > SHA256SUMS
-          cat SHA256SUMS
+          set -euo pipefail
 
-      - name: Upload artifact
+          RELEASE_DIR="$RUNNER_TEMP/release"
+          mkdir -p "$RELEASE_DIR"
+
+          ditto -c -k --sequesterRsrc --keepParent \
+            dist/SYDownload.app \
+            "$RELEASE_DIR/SYDownload-macOS-AppleSilicon.zip"
+
+          (
+            cd "$RELEASE_DIR"
+            shasum -a 256 SYDownload-macOS-AppleSilicon.zip > SHA256SUMS
+          )
+
+      - name: Upload release package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: SYDownload-macOS-AppleSilicon
-          path: |
-            dist/SYDownload-macOS-AppleSilicon.zip
-            dist/SHA256SUMS
+          name: SYDownload-${{ steps.version.outputs.version }}
+          path: ${{ runner.temp }}/release
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish release if this version is new
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="$(tr -d '[:space:]' < VERSION)"
-          TAG="v$VERSION"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; skipping publish."
-            exit 0
-          fi
-          gh release create "$TAG" \
-            dist/SYDownload-macOS-AppleSilicon.zip \
-            dist/SHA256SUMS \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "SYDownload $TAG" \
-            --generate-notes
+      - name: Publish GitHub Release
+        if: github.event_name == 'push' || inputs.publish_release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: SYDownload ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            ${{ runner.temp }}/release/SYDownload-macOS-AppleSilicon.zip
+            ${{ runner.temp }}/release/SHA256SUMS
