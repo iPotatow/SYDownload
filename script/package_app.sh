@@ -10,7 +10,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 CONFIGURATION="${CONFIGURATION:-release}"
-APP_VERSION="${APP_VERSION:-0.2.0}"
+APP_VERSION="${APP_VERSION:-$(tr -d '[:space:]' < "$ROOT/VERSION")}"
 ADHOC_SIGN="${ADHOC_SIGN:-1}"
 BUNDLE_RUNTIME="${BUNDLE_RUNTIME:-1}"
 
