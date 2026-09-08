@@ -99,6 +99,7 @@ jobs:
           PYTHON="$APP/Contents/Resources/python/bin/python3"
           BRIDGE="$APP/Contents/Resources/bridge/engine_bridge.py"
           RESOURCE_BUNDLE="$APP/Contents/Resources/SYDownload_SYDownloadApp.bundle"
+          MODULE_BUNDLE="$APP/SYDownload_SYDownloadApp.bundle"
 
           file "$APP/Contents/MacOS/SYDownload"
           "$PYTHON" --version
@@ -109,6 +110,10 @@ jobs:
           test -x "$PYTHON"
           test -f "$APP/Contents/Resources/bridge/download_runtime.py"
           test -f "$RESOURCE_BUNDLE/SYDownloadIcon.png"
+          test -f "$RESOURCE_BUNDLE/XiaohongshuPlatformIcon.jpg"
+          test -f "$RESOURCE_BUNDLE/DouyinPlatformIcon.jpg"
+          test -f "$MODULE_BUNDLE/XiaohongshuPlatformIcon.jpg"
+          test -f "$MODULE_BUNDLE/DouyinPlatformIcon.jpg"
           test -f "$APP/Contents/Resources/SYDownloadIcon.png"
           test -f "$APP/Contents/Resources/engines/XHS-Downloader/main.py"
           test -f "$APP/Contents/Resources/engines/TikTokDownloader/main.py"
@@ -124,9 +129,14 @@ jobs:
           echo "$VALIDATE" | grep -q '"ok": true'
           test -f "$SYDOWNLOAD_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
 
-      - name: Launch smoke test
+      - name: Launch smoke test without build-directory resources
         run: |
           APP="$PWD/dist/SYDownload.app"
+
+          # Bundle.module otherwise falls back to SwiftPM's absolute build path,
+          # which does not exist after a user installs the packaged app.
+          find .build -type d -name 'SYDownload_SYDownloadApp.bundle' -prune -exec rm -rf {} + || true
+
           /usr/bin/open -n "$APP"
 
           PID=""
@@ -143,9 +153,9 @@ jobs:
             exit 1
           fi
 
-          sleep 2
+          sleep 5
           if ! /bin/kill -0 "$PID" 2>/dev/null; then
-            echo "SYDownload crashed during startup smoke test."
+            echo "SYDownload crashed during installed-app startup smoke test."
             exit 1
           fi
 
@@ -175,6 +185,18 @@ jobs:
           path: ${{ runner.temp }}/release
           if-no-files-found: error
           retention-days: 14
+
+      - name: Withdraw broken v0.3.0 release
+        if: steps.version.outputs.version == '0.3.1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view v0.3.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete v0.3.0 --repo "$GITHUB_REPOSITORY" --cleanup-tag -y
+          else
+            git push origin :refs/tags/v0.3.0 2>/dev/null || true
+          fi
 
       - name: Publish GitHub Release
         if: github.event_name == 'push' || inputs.publish_release

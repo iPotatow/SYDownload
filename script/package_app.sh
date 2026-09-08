@@ -34,8 +34,11 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/bridge"
 cp "$BIN" "$APP/Contents/MacOS/SYDownload"
 chmod +x "$APP/Contents/MacOS/SYDownload"
-# Keep the SwiftPM resource bundle in the standard signed app resources area.
-# AppMark resolves it explicitly instead of using Bundle.module at runtime.
+# SwiftPM's generated Bundle.module accessor for an executable resolves the
+# resource bundle next to Bundle.main.bundleURL. Keep that location available
+# in the manually assembled .app, and also retain the conventional Resources
+# copy for direct bundle/resource inspection.
+cp -R "$RESOURCE_BUNDLE" "$APP/"
 cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
 cp "$RESOURCE" "$APP/Contents/Resources/SYDownloadIcon.png"
 cp "$ROOT/Bridge/engine_bridge.py" "$APP/Contents/Resources/bridge/engine_bridge.py"
