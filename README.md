@@ -6,6 +6,7 @@
 
 - SwiftUI 原生界面（macOS 14+）
 - 自动识别小红书 / 抖音链接；TikTok 链接明确视为不支持
+- 小红书、抖音平台标识使用对应 App Store 应用的真实图标，并作为本地资源随 App 打包
 - Swift ↔ Python JSON Lines IPC
 - XHS 真实 CLI 下载链路
 - DouK 单作品兼容适配器

@@ -1,5 +1,6 @@
 import Foundation
 
+/// Product-supported platforms are intentionally limited to Xiaohongshu and Douyin.
 public enum DownloadPlatform: String, Codable, Sendable, CaseIterable, Hashable {
     case xiaohongshu
     case douyin
