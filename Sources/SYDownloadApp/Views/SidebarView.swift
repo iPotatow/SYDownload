@@ -26,7 +26,6 @@ struct SidebarView: View {
 
                 sidebarButton(.settings, title: "设置", systemImage: "slider.horizontal.3")
             }
-            .padding(.horizontal, DesignSystem.spaceS)
 
             Spacer(minLength: DesignSystem.spaceXL)
             sidebarFooter
@@ -40,15 +39,13 @@ struct SidebarView: View {
         HStack(spacing: DesignSystem.spaceS) {
             AppMark(size: 40)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text("SYDownload")
-                    .font(.system(size: 15, weight: .semibold))
-            }
+            Text("SYDownload")
+                .font(.system(size: 15, weight: .semibold))
 
             Spacer(minLength: 0)
         }
         .frame(height: DesignSystem.sidebarBrandHeight)
-        .padding(.horizontal, DesignSystem.spaceL)
+        .padding(.horizontal, DesignSystem.spaceS)
     }
 
     private var sidebarFooter: some View {
@@ -67,7 +64,7 @@ struct SidebarView: View {
             .buttonStyle(.plain)
             .help("关于 SYDownload")
         }
-        .font(DesignSystem.metadataFont)
+        .font(.caption)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DesignSystem.spaceS)
     }

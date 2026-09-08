@@ -59,41 +59,22 @@ struct TasksView: View {
             }
         }
         .onDeleteCommand(perform: removeSelectedTask)
+        .onChange(of: model.taskFilter) { _, _ in
+            selectedTaskID = nil
+        }
         .tint(DesignSystem.accent)
     }
 
     private var filterBar: some View {
-        HStack(spacing: 0) {
+        Picker("任务状态", selection: $model.taskFilter) {
             ForEach(TaskFilter.allCases) { filter in
-                Button {
-                    model.taskFilter = filter
-                    selectedTaskID = nil
-                } label: {
-                    HStack(spacing: 5) {
-                        Text(filterTitle(filter))
-                        Text("\(count(for: filter))")
-                            .monospacedDigit()
-                            .foregroundStyle(model.taskFilter == filter ? DesignSystem.accent : Color.secondary)
-                    }
-                    .font(DesignSystem.supportingFont.weight(model.taskFilter == filter ? .semibold : .medium))
-                    .padding(.horizontal, DesignSystem.spaceM)
-                    .frame(height: 32)
-                    .background(
-                        model.taskFilter == filter ? DesignSystem.accentTint : Color.clear,
-                        in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(model.taskFilter == filter ? .isSelected : [])
+                Text("\(filterTitle(filter)) \(count(for: filter))")
+                    .tag(filter)
             }
-
-            Spacer(minLength: DesignSystem.spaceM)
         }
-        .padding(2)
-        .background(
-            DesignSystem.rowBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-        )
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityLabel("任务状态")
     }
 
     @ViewBuilder
@@ -183,7 +164,7 @@ private struct TaskRow: View {
         HStack(spacing: DesignSystem.spaceM) {
             PlatformThumbnail(platform: task.platform, size: 42)
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 HStack(spacing: DesignSystem.spaceS) {
                     Text(task.title)
                         .font(.headline.weight(.semibold))
@@ -192,7 +173,7 @@ private struct TaskRow: View {
                 }
 
                 Text("\(task.platform.displayName) · \(task.detail)")
-                    .font(DesignSystem.supportingFont)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 

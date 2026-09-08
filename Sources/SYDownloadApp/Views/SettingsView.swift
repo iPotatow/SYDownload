@@ -33,7 +33,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
     @State private var tab: SettingsTab = .general
     @AppStorage("preferredAppearance") private var preferredAppearance = "跟随系统"
@@ -107,39 +106,15 @@ struct SettingsView: View {
     }
 
     private var settingsTabs: some View {
-        HStack(spacing: 0) {
+        Picker("设置分类", selection: $tab) {
             ForEach(SettingsTab.allCases) { item in
-                Button {
-                    tab = item
-                } label: {
-                    HStack(spacing: DesignSystem.spaceS) {
-                        Image(systemName: item.systemImage)
-                        Text(item.rawValue)
-                    }
-                    .font(DesignSystem.uiFont.weight(tab == item ? .semibold : .medium))
-                    .foregroundStyle(tab == item ? DesignSystem.accent : Color.secondary)
-                    .padding(.horizontal, DesignSystem.spaceM)
-                    .frame(height: 36)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        tab == item ? DesignSystem.accentTint : Color.clear,
-                        in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(tab == item ? .isSelected : [])
-                .help(item.description)
+                Label(item.rawValue, systemImage: item.systemImage)
+                    .tag(item)
             }
         }
-        .padding(3)
-        .background(
-            DesignSystem.rowBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-                .strokeBorder(DesignSystem.hairline, lineWidth: colorSchemeContrast == .increased ? 2 : 1)
-        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityLabel("设置分类")
     }
 
     private var settingsContent: some View {
@@ -187,7 +162,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .font(DesignSystem.supportingFont)
+        .font(.callout)
     }
 
     @ViewBuilder
@@ -345,7 +320,7 @@ struct SettingsView: View {
                     .frame(width: fieldWidth)
             }
             LabeledContent("文件大小限制") {
-                HStack(spacing: 6) {
+                HStack(spacing: DesignSystem.spaceS) {
                     TextField("0", value: $model.douyinSettings.maxSize, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
@@ -382,49 +357,40 @@ struct SettingsView: View {
     @ViewBuilder
     private var advancedSettings: some View {
         Section("抖音高级功能") {
-            VStack(spacing: DesignSystem.spaceM) {
-                LabeledContent("FFmpeg 路径") {
-                    TextField("留空使用上游默认行为", text: $model.douyinSettings.ffmpeg)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: fieldWidth)
-                }
-                LabeledContent("直播画质") {
-                    TextField("留空使用默认画质", text: $model.douyinSettings.liveQualities)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: fieldWidth)
-                }
+            LabeledContent("FFmpeg 路径") {
+                TextField("留空使用上游默认行为", text: $model.douyinSettings.ffmpeg)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: fieldWidth)
+            }
+            LabeledContent("直播画质") {
+                TextField("留空使用默认画质", text: $model.douyinSettings.liveQualities)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: fieldWidth)
             }
         }
 
         Section("原始配置文件") {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-                configRow(title: "小红书 settings.json", path: model.xhsSettingsPath)
-                Divider()
-                configRow(title: "抖音 settings.json", path: model.douyinSettingsPath)
-                Text("App 只修改界面中可见的字段。代理、网络超时、重试、浏览器指纹等未展示字段会原样保留在原始 JSON 中。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            configRow(title: "小红书 settings.json", path: model.xhsSettingsPath)
+            configRow(title: "抖音 settings.json", path: model.douyinSettingsPath)
+            Text("App 只修改界面中可见的字段。代理、网络超时、重试、浏览器指纹等未展示字段会原样保留在原始 JSON 中。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
 
         Section("恢复默认配置") {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: DesignSystem.spaceS) {
-                    Button("恢复小红书默认设置", role: .destructive) { resetTarget = "xiaohongshu" }
-                    Button("恢复抖音默认设置", role: .destructive) { resetTarget = "douyin" }
-                }
+            Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: DesignSystem.spaceS) {
+                Button("恢复小红书默认设置", role: .destructive) { resetTarget = "xiaohongshu" }
+                Button("恢复抖音默认设置", role: .destructive) { resetTarget = "douyin" }
             }
         }
 
         Section("数据目录") {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-                pathRow("应用数据", "~/Library/Application Support/SYDownload/")
-                pathRow("缓存", "~/Library/Caches/SYDownload/")
-                pathRow("下载文件", model.outputDirectory)
-            }
+            pathRow("应用数据", "~/Library/Application Support/SYDownload/")
+            pathRow("缓存", "~/Library/Caches/SYDownload/")
+            pathRow("下载文件", model.outputDirectory)
         }
     }
 
@@ -434,7 +400,7 @@ struct SettingsView: View {
         action: @escaping () -> Void
     ) -> some View {
         HStack(spacing: DesignSystem.spaceM) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Label(
                     isDirty ? "有未保存更改" : "当前配置已保存",
                     systemImage: isDirty ? "circle.fill" : "checkmark.circle"
@@ -493,9 +459,9 @@ struct SettingsView: View {
     }
 
     private func configRow(title: String, path: String) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
             Text(title)
-                .font(.system(size: 13, weight: .medium))
+                .font(.callout.weight(.medium))
             Text(path.isEmpty ? "尚未生成" : path)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(path.isEmpty ? .secondary : .primary)
@@ -510,7 +476,7 @@ struct SettingsView: View {
     }
 
     private func pathRow(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)

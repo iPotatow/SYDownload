@@ -46,36 +46,13 @@ struct DownloadView: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
             Text("下载链接")
-                .font(DesignSystem.uiFont.weight(.semibold))
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $model.input)
-                    .accessibilityLabel("下载链接")
-                    .font(.body)
-                    .scrollContentBackground(.hidden)
-                    .padding(DesignSystem.spaceM)
-                    .frame(minHeight: 190, maxHeight: 240)
-                    .focused($linkEditorFocused)
-                    .background(
-                        DesignSystem.warmSurface,
-                        in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-                            .stroke(
-                                linkEditorFocused ? DesignSystem.accent : DesignSystem.hairline,
-                                lineWidth: linkEditorFocused ? 2 : 1
-                            )
-                    }
+                .font(.headline)
 
-                if model.input.isEmpty {
-                    Text("粘贴链接或完整分享文本…")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, DesignSystem.spaceL)
-                        .padding(.vertical, DesignSystem.spaceL)
-                        .allowsHitTesting(false)
-                }
-            }
+            TextField("粘贴链接或完整分享文本…", text: $model.input, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(8...12)
+                .focused($linkEditorFocused)
+                .accessibilityLabel("下载链接")
 
             HStack(spacing: DesignSystem.spaceS) {
                 PlatformChip(
@@ -100,7 +77,7 @@ struct DownloadView: View {
 
             HStack(spacing: DesignSystem.spaceM) {
                 Label(platformStatus, systemImage: "link")
-                    .font(DesignSystem.supportingFont)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
 
                 Spacer(minLength: DesignSystem.spaceS)
@@ -150,7 +127,7 @@ struct DownloadView: View {
             }
 
             Text(model.status)
-                .font(DesignSystem.supportingFont)
+                .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -158,7 +135,7 @@ struct DownloadView: View {
 
             if let engine = model.lastDetails["engine"] {
                 Text(URL(fileURLWithPath: engine).lastPathComponent)
-                    .font(DesignSystem.metadataFont.monospaced())
+                    .font(.caption.monospaced())
                     .foregroundStyle(.tertiary)
             }
         }
