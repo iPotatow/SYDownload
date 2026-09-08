@@ -26,6 +26,7 @@ struct SidebarView: View {
 
                 sidebarButton(.settings, title: "设置", systemImage: "slider.horizontal.3")
             }
+            .padding(.top, DesignSystem.spaceS)
 
             Spacer(minLength: DesignSystem.spaceXL)
             sidebarFooter
