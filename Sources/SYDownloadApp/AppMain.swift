@@ -30,12 +30,11 @@ struct SYDownloadApp: App {
                     NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
                 }
             }
-            CommandGroup(replacing: .appSettings) {
-                Button("设置…") {
-                    NotificationCenter.default.post(name: .syDownloadShowSettings, object: nil)
-                }
-                .keyboardShortcut(",", modifiers: [.command])
-            }
+        }
+
+        Settings {
+            AppPreferencesView(model: model)
+                .frame(width: 560, height: 340)
         }
     }
 }
@@ -43,7 +42,6 @@ struct SYDownloadApp: App {
 extension Notification.Name {
     static let syDownloadNewDownload = Notification.Name("SYDownload.newDownload")
     static let syDownloadShowAbout = Notification.Name("SYDownload.showAbout")
-    static let syDownloadShowSettings = Notification.Name("SYDownload.showSettings")
 }
 #else
 import Foundation

@@ -5,7 +5,6 @@ struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @FocusState private var focusedSection: AppSection?
     @State private var showsAbout = false
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @AppStorage("preferredAppearance") private var preferredAppearance = "跟随系统"
 
     var body: some View {
@@ -31,37 +30,38 @@ struct ContentView: View {
                     maxHeight: .infinity,
                     alignment: .topLeading
                 )
-                .background(
-                    DesignSystem.mainSurfaceBackground,
-                    in: RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
-                )
-                .clipShape(
-                    RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
-                )
-                .overlay {
-                    if colorSchemeContrast == .increased {
-                        RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
-                            .stroke(DesignSystem.hairline, lineWidth: 1)
-                    }
-                }
-                .padding(DesignSystem.mainSurfaceInsets)
-                .clipped()
+                .background(DesignSystem.mainSurfaceBackground)
         }
         .frame(minWidth: 960, minHeight: 680, alignment: .topLeading)
         .background(DesignSystem.sidebarBackground)
         .ignoresSafeArea(.container, edges: .top)
         .tint(DesignSystem.accent)
         .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                if model.selection != .download {
+                    Button {
+                        startNewDownload()
+                    } label: {
+                        Label("新建下载", systemImage: "plus")
+                    }
+                    .help("新建下载（⌘N）")
+                }
+
+                Button {
+                    showsAbout = true
+                } label: {
+                    Label("关于 SYDownload", systemImage: "info.circle")
+                }
+                .labelStyle(.iconOnly)
+                .help("关于 SYDownload")
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadNewDownload)) { _ in
-            model.selection = .download
-            focusedSection = .download
+            startNewDownload()
         }
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadShowAbout)) { _ in
             showsAbout = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .syDownloadShowSettings)) { _ in
-            model.selection = .settings
-            focusedSection = .settings
         }
         .sheet(isPresented: $showsAbout) {
             AboutView()
@@ -82,6 +82,11 @@ struct ContentView: View {
         case .settings:
             SettingsView(model: model)
         }
+    }
+
+    private func startNewDownload() {
+        model.selection = .download
+        focusedSection = .download
     }
 }
 #endif

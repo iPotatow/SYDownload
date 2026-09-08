@@ -1,8 +1,8 @@
 #if canImport(SwiftUI)
 import AppKit
+import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
-import ImageIO
 
 struct PhotosView: View {
     @State private var folderURL: URL?
@@ -18,18 +18,22 @@ struct PhotosView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-            header
+            PageHeader(
+                title: "照片整理",
+                subtitle: "按文件名中的日期分组，预览后再选择需要处理的日期。"
+            )
+
             workspace
+
             if !statusMessage.isEmpty && !isScanning {
                 Label(statusMessage, systemImage: statusIsError ? "exclamationmark.circle" : "info.circle")
                     .font(DesignSystem.supportingFont)
-                    .foregroundStyle(statusIsError ? DesignSystem.destructive : .secondary)
+                    .foregroundStyle(statusIsError ? DesignSystem.destructive : Color.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .combine)
             }
         }
-        .padding(.horizontal, DesignSystem.contentPadding)
-        .padding(.top, DesignSystem.contentPadding)
+        .padding(DesignSystem.contentPadding)
         .padding(.bottom, DesignSystem.space3XL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -44,6 +48,7 @@ struct PhotosView: View {
                     openFolder(url)
                 }
             case .failure(let error):
+                statusIsError = true
                 statusMessage = error.localizedDescription
             }
         }
@@ -55,27 +60,17 @@ struct PhotosView: View {
         } message: {
             Text("将把 \(selectedPhotoURLs.count) 张照片从当前文件夹移到废纸篓。")
         }
-        .tint(DesignSystem.accent)
-    }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: DesignSystem.spaceL) {
-            PageHeader(
-                title: "照片整理",
-                subtitle: "按文件名中的日期分组，预览后再选择需要处理的日期。"
-            )
-
-            Spacer(minLength: DesignSystem.spaceL)
-
+        .toolbar {
             if folderURL != nil {
-                Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
-                    .buttonStyle(.borderless)
-                    .disabled(isScanning || isDeleting)
-                Button("选择文件夹", systemImage: "folder", action: chooseFolder)
-                    .buttonStyle(.bordered)
-                    .disabled(isScanning || isDeleting)
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
+                        .disabled(isScanning || isDeleting)
+                    Button("选择文件夹", systemImage: "folder", action: chooseFolder)
+                        .disabled(isScanning || isDeleting)
+                }
             }
         }
+        .tint(DesignSystem.accent)
     }
 
     @ViewBuilder
@@ -100,18 +95,14 @@ struct PhotosView: View {
 
             Text("拖入照片文件夹到这里")
                 .font(.title3.weight(.semibold))
-
             Text("会读取文件夹中的图片并按文件名日期分组")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-
             Text("或")
                 .font(DesignSystem.supportingFont)
                 .foregroundStyle(.tertiary)
-
             Button("选择文件夹…", systemImage: "folder", action: chooseFolder)
                 .buttonStyle(.borderedProminent)
-
             Text("支持 JPG、PNG、HEIC 等常见图片格式")
                 .font(DesignSystem.metadataFont)
                 .foregroundStyle(.tertiary)
@@ -131,6 +122,7 @@ struct PhotosView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard let folder = urls.first(where: isDirectory) else {
+                statusIsError = true
                 statusMessage = "请拖入文件夹，而不是单个文件。"
                 return false
             }
@@ -174,7 +166,6 @@ struct PhotosView: View {
                         ForEach(scanResult.groups) { group in
                             dateGroupRow(group)
                         }
-
                         if !scanResult.ungrouped.isEmpty {
                             ungroupedRow
                         }
@@ -197,22 +188,18 @@ struct PhotosView: View {
                     .font(DesignSystem.uiFont.weight(.semibold))
                     .help(folderURL.path)
             }
-
             Text("\(scanResult.totalCount) 张照片")
                 .font(DesignSystem.supportingFont)
                 .foregroundStyle(.secondary)
             Text("\(scanResult.groups.count) 个日期")
                 .font(DesignSystem.supportingFont)
                 .foregroundStyle(.secondary)
-
             if !scanResult.ungrouped.isEmpty {
                 Text("\(scanResult.ungrouped.count) 张未识别日期")
                     .font(DesignSystem.supportingFont)
                     .foregroundStyle(.secondary)
             }
-
             Spacer()
-
             if !scanResult.groups.isEmpty {
                 Button(
                     allDatesSelected ? "取消全选" : "全选日期",
@@ -232,26 +219,19 @@ struct PhotosView: View {
                     isOn: Binding(
                         get: { selectedDates.contains(group.id) },
                         set: { selected in
-                            if selected {
-                                selectedDates.insert(group.id)
-                            } else {
-                                selectedDates.remove(group.id)
-                            }
+                            if selected { selectedDates.insert(group.id) }
+                            else { selectedDates.remove(group.id) }
                         }
                     )
                 ) {
-                    Text(group.dateKey)
-                        .font(.headline)
+                    Text(group.dateKey).font(.headline)
                 }
                 .toggleStyle(.checkbox)
-
                 Spacer()
-
                 Text("\(group.photos.count) 张")
                     .font(DesignSystem.supportingFont)
                     .foregroundStyle(.secondary)
             }
-
             thumbnailStrip(group.photos)
         }
         .padding(DesignSystem.panelPadding)
@@ -261,23 +241,19 @@ struct PhotosView: View {
         )
         .overlay {
             RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                .strokeBorder(
-                    selectedDates.contains(group.id) ? DesignSystem.accent.opacity(0.30) : Color.clear
-                )
+                .strokeBorder(selectedDates.contains(group.id) ? DesignSystem.accent.opacity(0.30) : Color.clear)
         }
     }
 
     private var ungroupedRow: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
             HStack {
-                Label("未识别日期", systemImage: "questionmark.circle")
-                    .font(.headline)
+                Label("未识别日期", systemImage: "questionmark.circle").font(.headline)
                 Spacer()
                 Text("\(scanResult.ungrouped.count) 张 · 不参与日期批量删除")
                     .font(DesignSystem.supportingFont)
                     .foregroundStyle(.secondary)
             }
-
             thumbnailStrip(scanResult.ungrouped)
         }
         .padding(DesignSystem.panelPadding)
@@ -293,7 +269,6 @@ struct PhotosView: View {
                 ForEach(Array(photos.prefix(8))) { photo in
                     LocalPhotoThumbnail(url: photo.url)
                 }
-
                 if photos.count > 8 {
                     ZStack {
                         RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
@@ -318,20 +293,14 @@ struct PhotosView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-
             Spacer()
-
-            Button("取消选择") {
-                selectedDates.removeAll()
-            }
-            .disabled(isDeleting)
-
+            Button("取消选择") { selectedDates.removeAll() }
+                .disabled(isDeleting)
             Button(role: .destructive) {
                 showsDeleteConfirmation = true
             } label: {
                 if isDeleting {
-                    ProgressView()
-                        .controlSize(.small)
+                    ProgressView().controlSize(.small)
                 } else {
                     Label("删除 \(selectedPhotoURLs.count) 张照片", systemImage: "trash")
                 }
@@ -362,9 +331,7 @@ struct PhotosView: View {
         !scanResult.groups.isEmpty && selectedDates.count == scanResult.groups.count
     }
 
-    private func chooseFolder() {
-        showsFolderImporter = true
-    }
+    private func chooseFolder() { showsFolderImporter = true }
 
     private func rescan() {
         guard let folderURL else { return }
@@ -372,11 +339,8 @@ struct PhotosView: View {
     }
 
     private func toggleAllDates() {
-        if allDatesSelected {
-            selectedDates.removeAll()
-        } else {
-            selectedDates = Set(scanResult.groups.map(\.id))
-        }
+        if allDatesSelected { selectedDates.removeAll() }
+        else { selectedDates = Set(scanResult.groups.map(\.id)) }
     }
 
     private func isDirectory(_ url: URL) -> Bool {
@@ -393,11 +357,8 @@ struct PhotosView: View {
 
         Task {
             let outcome = await Task.detached(priority: .userInitiated) {
-                do {
-                    return PhotoScanOutcome.success(try PhotoLibraryService.scan(folder: url))
-                } catch {
-                    return PhotoScanOutcome.failure(error.localizedDescription)
-                }
+                do { return PhotoScanOutcome.success(try PhotoLibraryService.scan(folder: url)) }
+                catch { return PhotoScanOutcome.failure(error.localizedDescription) }
             }.value
 
             isScanning = false
@@ -405,11 +366,7 @@ struct PhotosView: View {
             case .success(let result):
                 scanResult = result
                 let summary = "读取到 \(result.totalCount) 张照片，其中 \(result.recognizedCount) 张已按日期分组。"
-                if let statusPrefix {
-                    statusMessage = "\(statusPrefix) \(summary)"
-                } else {
-                    statusMessage = summary
-                }
+                statusMessage = statusPrefix.map { "\($0) \(summary)" } ?? summary
             case .failure(let message):
                 scanResult = .empty
                 statusMessage = message
@@ -422,25 +379,20 @@ struct PhotosView: View {
     private func deleteSelectedPhotos() {
         let urls = selectedPhotoURLs
         guard !urls.isEmpty else { return }
-
         isDeleting = true
+        statusIsError = false
         statusMessage = "正在删除所选照片…"
 
         Task {
             let result = await Task.detached(priority: .userInitiated) {
                 PhotoLibraryService.moveToTrash(urls)
             }.value
-
             isDeleting = false
             let failedText = result.failedPaths.isEmpty ? "" : " \(result.failedPaths.count) 张删除失败。"
             statusIsError = !result.failedPaths.isEmpty
             let prefix = "已移到废纸篓 \(result.deletedCount) 张照片。\(failedText)"
-
-            if let folderURL {
-                openFolder(folderURL, statusPrefix: prefix)
-            } else {
-                statusMessage = prefix
-            }
+            if let folderURL { openFolder(folderURL, statusPrefix: prefix) }
+            else { statusMessage = prefix }
         }
     }
 }
@@ -451,14 +403,11 @@ private struct LocalPhotoThumbnail: View {
     var body: some View {
         Group {
             if let image = thumbnailImage {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
+                Image(nsImage: image).resizable().scaledToFill()
             } else {
                 ZStack {
                     Color.primary.opacity(0.04)
-                    Image(systemName: "photo")
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "photo").foregroundStyle(.secondary)
                 }
             }
         }

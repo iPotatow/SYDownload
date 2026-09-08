@@ -1,115 +1,102 @@
 #if canImport(SwiftUI)
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct TasksView: View {
     @ObservedObject var model: AppModel
     @State private var searchText = ""
-    @FocusState private var searchFocused: Bool
+    @State private var selection = Set<UUID>()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-                HStack(alignment: .top, spacing: DesignSystem.spaceL) {
-                    PageHeader(
-                        title: "任务",
-                        subtitle: "管理下载任务，查看进度和状态。"
-                    )
+        VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+            PageHeader(
+                title: "任务",
+                subtitle: "管理下载任务，查看进度和状态。"
+            )
 
-                    Spacer(minLength: DesignSystem.spaceL)
+            filterBar
+            Divider()
 
-                    Button("清空已完成", systemImage: "checkmark.circle", action: model.clearCompletedTasks)
-                        .buttonStyle(.borderless)
-                        .disabled(completedCount == 0)
-                }
-
-                toolbar
-                Divider()
-
-                if displayedTasks.isEmpty {
-                    EmptyLibraryView(
-                        systemImage: "tray",
-                        title: hasTaskQuery ? "没有匹配的任务" : "还没有下载任务",
-                        message: hasTaskQuery ? "清除搜索或筛选条件后查看全部任务。" : "粘贴链接并开始下载，任务会显示在这里。",
-                        actionTitle: hasTaskQuery ? "清除筛选" : "新建下载"
-                    ) {
-                        if hasTaskQuery {
-                            model.taskFilter = .all
-                            searchText = ""
-                        } else {
-                            model.selection = .download
-                        }
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 320)
-                } else {
-                    LazyVStack(spacing: 0) {
-                        ForEach(displayedTasks) { task in
-                            TaskRow(model: model, task: task)
-                        }
+            if displayedTasks.isEmpty {
+                EmptyLibraryView(
+                    systemImage: "tray",
+                    title: hasTaskQuery ? "没有匹配的任务" : "还没有下载任务",
+                    message: hasTaskQuery ? "清除搜索或筛选条件后查看全部任务。" : "粘贴链接并开始下载，任务会显示在这里。",
+                    actionTitle: hasTaskQuery ? "清除筛选" : "新建下载"
+                ) {
+                    if hasTaskQuery {
+                        model.taskFilter = .all
+                        searchText = ""
+                    } else {
+                        model.selection = .download
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(selection: $selection) {
+                    ForEach(displayedTasks) { task in
+                        TaskRow(model: model, task: task)
+                            .tag(task.id)
+                            .contextMenu {
+                                taskContextMenu(task)
+                            }
+                            .onTapGesture(count: 2) {
+                                performPrimaryAction(task)
+                            }
+                    }
+                }
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
             }
-            .padding(.horizontal, DesignSystem.contentPadding)
-            .padding(.top, DesignSystem.contentPadding)
-            .padding(.bottom, DesignSystem.space2XL)
-            .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
         }
+        .padding(DesignSystem.contentPadding)
+        .padding(.bottom, DesignSystem.space2XL)
+        .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .searchable(text: $searchText, placement: .toolbar, prompt: "搜索任务")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("清空已完成", systemImage: "checkmark.circle") {
+                    model.clearCompletedTasks()
+                    selection = selection.filter { id in model.tasks.contains { $0.id == id } }
+                }
+                .disabled(completedCount == 0)
+            }
+        }
+        .onDeleteCommand(perform: removeSelectedTasks)
         .tint(DesignSystem.accent)
     }
 
-    private var toolbar: some View {
-        HStack(spacing: DesignSystem.spaceM) {
-            HStack(spacing: 0) {
-                ForEach(TaskFilter.allCases) { filter in
-                    Button {
-                        model.taskFilter = filter
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(filterTitle(filter))
-                            Text("\(count(for: filter))")
-                                .monospacedDigit()
-                                .foregroundStyle(model.taskFilter == filter ? DesignSystem.accent : Color.secondary)
-                        }
-                        .font(DesignSystem.supportingFont.weight(model.taskFilter == filter ? .semibold : .medium))
-                        .padding(.horizontal, DesignSystem.spaceM)
-                        .frame(height: 32)
-                        .background(
-                            model.taskFilter == filter ? DesignSystem.accentTint : Color.clear,
-                            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                        )
+    private var filterBar: some View {
+        HStack(spacing: 0) {
+            ForEach(TaskFilter.allCases) { filter in
+                Button {
+                    model.taskFilter = filter
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(filterTitle(filter))
+                        Text("\(count(for: filter))")
+                            .monospacedDigit()
+                            .foregroundStyle(model.taskFilter == filter ? DesignSystem.accent : Color.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(model.taskFilter == filter ? .isSelected : [])
+                    .font(DesignSystem.supportingFont.weight(model.taskFilter == filter ? .semibold : .medium))
+                    .padding(.horizontal, DesignSystem.spaceM)
+                    .frame(height: 32)
+                    .background(
+                        model.taskFilter == filter ? DesignSystem.accentTint : Color.clear,
+                        in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                    )
                 }
-            }
-            .padding(2)
-            .background(
-                DesignSystem.rowBackground,
-                in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-            )
-
-            Spacer(minLength: DesignSystem.spaceM)
-
-            HStack(spacing: DesignSystem.spaceS) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("搜索任务…", text: $searchText)
-                    .accessibilityLabel("搜索任务")
-                    .focused($searchFocused)
-                    .textFieldStyle(.plain)
-            }
-            .padding(.horizontal, DesignSystem.spaceM)
-            .frame(width: 190, height: 32)
-            .background(
-                DesignSystem.warmSurface,
-                in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
-                    .strokeBorder(searchFocused ? DesignSystem.accent : DesignSystem.hairline, lineWidth: searchFocused ? 2 : 1)
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(model.taskFilter == filter ? .isSelected : [])
             }
         }
+        .padding(2)
+        .background(
+            DesignSystem.rowBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.controlRadius, style: .continuous)
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var hasTaskQuery: Bool {
@@ -125,6 +112,51 @@ struct TasksView: View {
                 || $0.platform.displayName.localizedCaseInsensitiveContains(query)
                 || $0.detail.localizedCaseInsensitiveContains(query)
         }
+    }
+
+    @ViewBuilder
+    private func taskContextMenu(_ task: DownloadTaskItem) -> some View {
+        if task.state == .completed {
+            Button("打开文件夹", systemImage: "folder") {
+                openFolder(task)
+            }
+        }
+        if task.state == .failed {
+            Button("重试", systemImage: "arrow.clockwise") {
+                model.retryTask(task)
+            }
+        }
+        if task.state != .downloading {
+            Divider()
+            Button("移除任务", systemImage: "trash", role: .destructive) {
+                model.removeTask(task.id)
+                selection.remove(task.id)
+            }
+        }
+    }
+
+    private func performPrimaryAction(_ task: DownloadTaskItem) {
+        switch task.state {
+        case .completed:
+            openFolder(task)
+        case .failed:
+            model.retryTask(task)
+        case .queued, .downloading:
+            break
+        }
+    }
+
+    private func removeSelectedTasks() {
+        let ids = selection
+        for id in ids {
+            model.removeTask(id)
+        }
+        selection = selection.filter { id in model.tasks.contains { $0.id == id } }
+    }
+
+    private func openFolder(_ task: DownloadTaskItem) {
+        guard !task.outputDirectory.isEmpty else { return }
+        NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
     }
 
     private func count(for filter: TaskFilter) -> Int {
@@ -161,62 +193,44 @@ private struct TaskRow: View {
     let task: DownloadTaskItem
 
     var body: some View {
-        InsetRow {
-            HStack(spacing: DesignSystem.spaceM) {
-                PlatformThumbnail(platform: task.platform, size: 46)
+        HStack(spacing: DesignSystem.spaceM) {
+            PlatformThumbnail(platform: task.platform, size: 42)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: DesignSystem.spaceS) {
-                        Text(task.title)
-                            .font(.headline.weight(.semibold))
-                            .lineLimit(1)
-                        StatusPill(state: task.state)
-                    }
-
-                    Text("\(task.platform.displayName) · \(task.detail)")
-                        .font(DesignSystem.supportingFont)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if task.state == .downloading || task.state == .queued {
-                        ProgressView()
-                            .progressViewStyle(.linear)
-                            .tint(DesignSystem.accent)
-                            .frame(maxWidth: 460)
-                    } else if let progress = task.progress {
-                        ProgressView(value: progress)
-                            .progressViewStyle(.linear)
-                            .tint(DesignSystem.success)
-                            .frame(maxWidth: 460)
-                    }
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: DesignSystem.spaceS) {
+                    Text(task.title)
+                        .font(.headline.weight(.semibold))
+                        .lineLimit(1)
+                    StatusPill(state: task.state)
                 }
 
-                Spacer(minLength: DesignSystem.spaceM)
+                Text("\(task.platform.displayName) · \(task.detail)")
+                    .font(DesignSystem.supportingFont)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
 
-                if task.state == .completed {
-                    Button("打开文件夹", systemImage: "folder", action: openFolder)
-                        .buttonStyle(.borderless)
-                } else if task.state == .failed {
-                    Button("重试", systemImage: "arrow.clockwise") {
-                        model.retryTask(task)
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                if task.state != .downloading {
-                    Button("移除任务", systemImage: "xmark", action: removeTask)
-                        .buttonStyle(.borderless)
+                if task.state == .downloading || task.state == .queued {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                        .tint(DesignSystem.accent)
+                        .frame(maxWidth: 460)
+                } else {
+                    Text(task.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(DesignSystem.metadataFont)
+                        .foregroundStyle(.tertiary)
                 }
             }
+
+            Spacer(minLength: DesignSystem.spaceM)
+
+            if task.state == .failed {
+                Button("重试", systemImage: "arrow.clockwise") {
+                    model.retryTask(task)
+                }
+                .buttonStyle(.bordered)
+            }
         }
-    }
-
-    private func openFolder() {
-        NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
-    }
-
-    private func removeTask() {
-        model.removeTask(task.id)
+        .padding(.vertical, DesignSystem.spaceS)
     }
 }
 
