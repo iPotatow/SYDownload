@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - VERSION
-      - .github/workflows/build-macos-app.yml
     tags:
       - "v*"
   workflow_dispatch:
@@ -178,18 +177,6 @@ jobs:
           path: ${{ runner.temp }}/release
           if-no-files-found: error
           retention-days: 14
-
-      - name: Withdraw broken v0.3.0 release
-        if: steps.version.outputs.version == '0.3.1'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          if gh release view v0.3.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release delete v0.3.0 --repo "$GITHUB_REPOSITORY" --cleanup-tag -y
-          else
-            git push origin :refs/tags/v0.3.0 2>/dev/null || true
-          fi
 
       - name: Publish GitHub Release
         if: github.event_name == 'push' || inputs.publish_release
