@@ -9,10 +9,7 @@ struct TasksView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-            PageHeader(
-                title: "任务",
-                subtitle: "最多 3 个任务并行下载，可查看实时写入进度、取消任务和处理失败。"
-            )
+            PageHeader(title: "任务")
 
             filterBar
             Divider()
@@ -46,8 +43,8 @@ struct TasksView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(.horizontal, DesignSystem.contentPadding)
-        .padding(.top, DesignSystem.contentPadding)
+        .padding(.horizontal, DesignSystem.contentBodyPadding)
+        .padding(.top, DesignSystem.contentBodyPadding)
         .padding(.bottom, DesignSystem.spaceL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -67,6 +64,8 @@ struct TasksView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        .font(DesignSystem.uiFont)
+        .frame(height: DesignSystem.controlHeightDefault)
         .accessibilityLabel("任务状态")
     }
 
@@ -160,18 +159,18 @@ private struct TaskRow: View {
 
     var body: some View {
         HStack(spacing: DesignSystem.spaceM) {
-            PlatformThumbnail(platform: task.platform, size: 42)
+            PlatformThumbnail(platform: task.platform, size: DesignSystem.controlHeightLarge)
 
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 HStack(spacing: DesignSystem.spaceS) {
                     Text(task.title)
-                        .font(.headline.weight(.semibold))
+                        .font(DesignSystem.uiFont)
                         .lineLimit(1)
                     StatusPill(state: task.state)
                 }
 
                 Text("\(task.platform.displayName) · \(task.detail)")
-                    .font(.callout)
+                    .font(DesignSystem.bodyFont)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -182,9 +181,9 @@ private struct TaskRow: View {
                                 .progressViewStyle(.linear)
                                 .tint(DesignSystem.accent)
                             Text("\(Int(progress * 100))%")
-                                .font(.caption.monospacedDigit())
+                                .font(DesignSystem.metadataFont.monospacedDigit())
                                 .foregroundStyle(.secondary)
-                                .frame(width: 38, alignment: .trailing)
+                                .frame(width: 40, alignment: .trailing)
                         } else {
                             ProgressView()
                                 .progressViewStyle(.linear)
@@ -207,18 +206,25 @@ private struct TaskRow: View {
                     NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
                 }
                 .buttonStyle(.borderless)
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightCompact)
             } else if task.state == .failed || task.state == .cancelled {
                 Button("重试", systemImage: "arrow.clockwise") {
                     model.retryTask(task)
                 }
                 .buttonStyle(.bordered)
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightDefault)
             } else {
                 Button("取消", systemImage: "xmark") {
                     model.cancelTask(task.id)
                 }
                 .buttonStyle(.bordered)
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightDefault)
             }
         }
+        .frame(minHeight: DesignSystem.controlRowMinHeight)
         .padding(.vertical, DesignSystem.spaceXS)
     }
 }
@@ -233,17 +239,19 @@ struct EmptyLibraryView: View {
     var body: some View {
         VStack(spacing: DesignSystem.spaceM) {
             Image(systemName: systemImage)
-                .font(.system(size: 34, weight: .regular))
+                .font(.system(size: DesignSystem.space2XL, weight: .regular))
                 .foregroundStyle(.tertiary)
             Text(title)
-                .font(.title3.weight(.semibold))
+                .font(DesignSystem.sectionTitleFont)
             Text(message)
-                .font(.subheadline)
+                .font(DesignSystem.bodyFont)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
             Button(actionTitle, systemImage: "arrow.right", action: action)
                 .buttonStyle(.borderedProminent)
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightDefault)
         }
         .padding(DesignSystem.space2XL)
         .frame(maxWidth: .infinity)

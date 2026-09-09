@@ -8,20 +8,18 @@ struct HistoryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-            PageHeader(
-                title: "历史记录",
-                subtitle: "保留最近的下载记录，快速回到原始文件夹。"
-            )
+            PageHeader(title: "历史记录")
 
             HStack(alignment: .firstTextBaseline, spacing: DesignSystem.spaceS) {
                 Text("共 \(model.filteredHistory.count) 条记录")
-                    .font(.callout.weight(.semibold))
+                    .font(DesignSystem.uiFont)
                     .monospacedDigit()
                 Spacer()
                 Text("按完成时间排序")
-                    .font(.callout)
+                    .font(DesignSystem.bodyFont)
                     .foregroundStyle(.secondary)
             }
+            .frame(minHeight: DesignSystem.controlRowMinHeight)
 
             Divider()
 
@@ -65,8 +63,8 @@ struct HistoryView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(.horizontal, DesignSystem.contentPadding)
-        .padding(.top, DesignSystem.contentPadding)
+        .padding(.horizontal, DesignSystem.contentBodyPadding)
+        .padding(.top, DesignSystem.contentBodyPadding)
         .padding(.bottom, DesignSystem.spaceL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -103,21 +101,21 @@ private struct HistoryRow: View {
 
     var body: some View {
         HStack(spacing: DesignSystem.spaceM) {
-            PlatformThumbnail(platform: item.platform, size: 42)
+            PlatformThumbnail(platform: item.platform, size: DesignSystem.controlHeightLarge)
 
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text("\(item.platform.displayName) · \(item.title)")
-                    .font(.headline.weight(.semibold))
+                    .font(DesignSystem.uiFont)
                     .lineLimit(1)
 
                 Text(item.sourceURL)
-                    .font(.caption.monospaced())
+                    .font(DesignSystem.metadataFont.monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Text(item.completedAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
+                    .font(DesignSystem.metadataFont)
                     .foregroundStyle(.tertiary)
             }
 
@@ -128,12 +126,14 @@ private struct HistoryRow: View {
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
+            .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
             .help("打开位置")
 
             Button("再次下载", systemImage: "arrow.down") {
                 model.useHistory(item)
             }
             .buttonStyle(.borderless)
+            .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
             .help("再次下载")
 
             Menu {
@@ -151,7 +151,9 @@ private struct HistoryRow: View {
                     .labelStyle(.iconOnly)
             }
             .menuStyle(.borderlessButton)
+            .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
         }
+        .frame(minHeight: DesignSystem.controlRowMinHeight)
         .padding(.vertical, DesignSystem.spaceXS)
     }
 }

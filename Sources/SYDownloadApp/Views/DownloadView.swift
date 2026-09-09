@@ -8,13 +8,13 @@ struct DownloadView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXL) {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
                 header
                 composer
                 statusLine
             }
-            .padding(.horizontal, DesignSystem.contentPadding)
-            .padding(.top, DesignSystem.contentPadding)
+            .padding(.horizontal, DesignSystem.contentBodyPadding)
+            .padding(.top, DesignSystem.contentBodyPadding)
             .padding(.bottom, DesignSystem.space2XL)
             .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .top)
@@ -24,23 +24,17 @@ struct DownloadView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: DesignSystem.spaceL) {
-            PageHeader(
-                title: "下载",
-                subtitle: "可一次粘贴多个链接或分享文本，支持小红书与抖音。"
-            )
-
-            Spacer(minLength: 0)
-        }
+        PageHeader(title: "下载")
     }
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
             Text("下载链接")
-                .font(.headline)
+                .font(DesignSystem.sectionTitleFont)
 
             TextField("粘贴一个或多个链接 / 完整分享文本…", text: $model.input, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
+                .font(DesignSystem.bodyFont)
                 .lineLimit(8...12)
                 .focused($linkEditorFocused)
                 .accessibilityLabel("下载链接")
@@ -60,6 +54,8 @@ struct DownloadView: View {
                 if !model.input.isEmpty {
                     Button("清空", systemImage: "xmark", action: model.clearInput)
                         .buttonStyle(.borderless)
+                        .font(DesignSystem.uiFont)
+                        .frame(height: DesignSystem.controlHeightCompact)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -68,13 +64,15 @@ struct DownloadView: View {
 
             HStack(spacing: DesignSystem.spaceM) {
                 Label(platformStatus, systemImage: "link")
-                    .font(.callout)
+                    .font(DesignSystem.bodyFont)
                     .foregroundStyle(.secondary)
 
                 Spacer(minLength: DesignSystem.spaceS)
 
                 Button("检查链接", systemImage: "checkmark.circle", action: validate)
                     .buttonStyle(.borderless)
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
                     .disabled(
                         !model.hasSupportedLinks
                             || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -88,6 +86,8 @@ struct DownloadView: View {
                 Button(downloadButtonTitle, systemImage: "arrow.down", action: download)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightLarge)
                     .keyboardShortcut(.return, modifiers: [.command])
                     .disabled(
                         !model.hasSupportedLinks
@@ -134,7 +134,7 @@ struct DownloadView: View {
             }
 
             Text(model.status)
-                .font(.callout)
+                .font(DesignSystem.bodyFont)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -142,7 +142,7 @@ struct DownloadView: View {
 
             if let engine = model.lastDetails["engine"] {
                 Text(URL(fileURLWithPath: engine).lastPathComponent)
-                    .font(.caption.monospaced())
+                    .font(DesignSystem.metadataFont.monospaced())
                     .foregroundStyle(.tertiary)
             }
         }

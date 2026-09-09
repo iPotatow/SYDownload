@@ -45,18 +45,15 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-            PageHeader(
-                title: "设置",
-                subtitle: "调整保存位置、下载内容和引擎行为。"
-            )
+            PageHeader(title: "设置")
 
             settingsTabs
             statusBanner
             settingsContent
             saveBarForCurrentTab
         }
-        .padding(.horizontal, DesignSystem.contentPadding)
-        .padding(.top, DesignSystem.contentPadding)
+        .padding(.horizontal, DesignSystem.contentBodyPadding)
+        .padding(.top, DesignSystem.contentBodyPadding)
         .padding(.bottom, DesignSystem.spaceL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -115,6 +112,8 @@ struct SettingsView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        .font(DesignSystem.uiFont)
+        .frame(height: DesignSystem.controlHeightDefault)
         .accessibilityLabel("设置分类")
     }
 
@@ -127,6 +126,8 @@ struct SettingsView: View {
             case .advanced: advancedSettings
             }
         }
+        .environment(\.defaultMinListRowHeight, DesignSystem.settingsRowMinHeight)
+        .font(DesignSystem.bodyFont)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .formStyle(.grouped)
         .disabled(model.settingsLoading)
@@ -160,22 +161,30 @@ struct SettingsView: View {
                         }
                     }
                     .buttonStyle(.bordered)
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
                 }
             }
         }
-        .font(.callout)
+        .font(DesignSystem.bodyFont)
+        .frame(minHeight: DesignSystem.controlRowMinHeight)
     }
 
     @ViewBuilder
     private var generalSettings: some View {
         Section("保存位置") {
-            HStack(spacing: DesignSystem.spaceS) {
-                TextField("下载目录", text: $model.outputDirectory)
-                    .textFieldStyle(.roundedBorder)
-                Button("更改") { chooseFolder() }
+            LabeledContent("下载目录") {
+                HStack(spacing: DesignSystem.spaceS) {
+                    TextField("", text: $model.outputDirectory)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(height: DesignSystem.controlHeightDefault)
+                    Button("更改") { chooseFolder() }
+                        .font(DesignSystem.uiFont)
+                        .frame(height: DesignSystem.controlHeightDefault)
+                }
             }
             Text("下载时会同步到小红书的 work_path 与抖音的 root。")
-                .font(.caption)
+                .font(DesignSystem.metadataFont)
                 .foregroundStyle(.secondary)
         }
 
@@ -187,7 +196,7 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: fieldWidth)
+                .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
         }
 
@@ -205,7 +214,7 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: fieldWidth)
+                .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
 
             HStack(spacing: DesignSystem.spaceS) {
@@ -214,6 +223,8 @@ struct SettingsView: View {
                 Button("检查更新") {
                     updater.checkForUpdates()
                 }
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightDefault)
                 .disabled(updater.isChecking || updater.isUpdating)
 
                 if updater.updateAvailable {
@@ -221,6 +232,8 @@ struct SettingsView: View {
                         updater.downloadUpdate()
                     }
                     .buttonStyle(.borderedProminent)
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
                     .disabled(updater.isUpdating)
                 }
             }
@@ -229,7 +242,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                     ProgressView(value: updater.progressBar.1)
                     Text(updater.progressBar.0)
-                        .font(.caption)
+                        .font(DesignSystem.metadataFont)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -241,17 +254,21 @@ struct SettingsView: View {
                     .monospacedDigit()
             }
             Text("支持小红书与抖音分享链接下载，下载内容写入你选择的文件夹。")
-                .font(.caption)
+                .font(DesignSystem.metadataFont)
                 .foregroundStyle(.secondary)
             HStack(spacing: DesignSystem.spaceS) {
                 Button("关于 SYDownload") {
                     NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
                 }
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightDefault)
                 Button("查看项目主页") {
                     if let url = URL(string: "https://github.com/iPotatow/SYDownload") {
                         NSWorkspace.shared.open(url)
                     }
                 }
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightDefault)
             }
         }
     }
@@ -296,7 +313,7 @@ struct SettingsView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: fieldWidth)
+                .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("视频偏好") {
                 Picker("", selection: $model.xhsSettings.videoPreference) {
@@ -305,7 +322,7 @@ struct SettingsView: View {
                     Text("文件大小优先").tag("size")
                 }
                 .labelsHidden()
-                .frame(width: fieldWidth)
+                .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("作品信息格式") {
                 Picker("", selection: $model.xhsSettings.noteFormat) {
@@ -315,7 +332,7 @@ struct SettingsView: View {
                     Text("全部").tag("all")
                 }
                 .labelsHidden()
-                .frame(width: fieldWidth)
+                .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
         }
 
@@ -324,13 +341,13 @@ struct SettingsView: View {
                 TextField("", text: $model.xhsSettings.folderName)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("文件命名格式") {
                 TextField("发布时间 作者昵称 作品标题", text: $model.xhsSettings.nameFormat)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             Divider()
             Toggle("每个作品使用独立文件夹", isOn: $model.xhsSettings.folderMode)
@@ -348,7 +365,7 @@ struct SettingsView: View {
         Section("Cookie") {
             VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                 Text("小红书网页版 Cookie")
-                    .font(.caption)
+                    .font(DesignSystem.metadataFont)
                     .foregroundStyle(.secondary)
                 plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100)
                     .accessibilityLabel("小红书网页版 Cookie")
@@ -370,52 +387,52 @@ struct SettingsView: View {
                 TextField("", text: $model.douyinSettings.folderName)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("文件命名格式") {
                 TextField("create_time type nickname desc", text: $model.douyinSettings.nameFormat)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("描述最大长度") {
                 TextField("64", value: $model.douyinSettings.descLength, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("文件名最大长度") {
                 TextField("128", value: $model.douyinSettings.nameLength, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("日期格式") {
                 TextField("%Y-%m-%d %H:%M:%S", text: $model.douyinSettings.dateFormat)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("文件名分隔符") {
                 TextField("-", text: $model.douyinSettings.split)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("数据保存格式") {
                 TextField("留空为不保存", text: $model.douyinSettings.storageFormat)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
-                    .frame(width: fieldWidth)
+                    .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
             }
             LabeledContent("文件大小限制") {
                 HStack(spacing: DesignSystem.spaceS) {
                     TextField("0", value: $model.douyinSettings.maxSize, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
-                        .frame(width: fieldWidth)
+                        .frame(width: fieldWidth, height: DesignSystem.controlHeightDefault)
                     Text("0 表示不限制")
-                        .font(.caption)
+                        .font(DesignSystem.metadataFont)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -426,9 +443,9 @@ struct SettingsView: View {
         Section("Cookie") {
             VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
                 Text("抖音网页版 Cookie（douyin.com）")
-                    .font(.caption)
+                    .font(DesignSystem.metadataFont)
                     .foregroundStyle(.secondary)
-                plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 90)
+                plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 92)
                     .accessibilityLabel("抖音网页版 Cookie")
             }
         }
@@ -440,17 +457,21 @@ struct SettingsView: View {
             configRow(title: "小红书 settings.json", path: model.xhsSettingsPath)
             configRow(title: "抖音 settings.json", path: model.douyinSettingsPath)
             Text("App 只修改界面中可见的字段。代理、网络超时、重试、浏览器指纹等未展示字段会原样保留在原始 JSON 中。")
-                .font(.caption)
+                .font(DesignSystem.metadataFont)
                 .foregroundStyle(.secondary)
         }
 
         Section("恢复默认配置") {
             Text("恢复后会重新读取当前内置版本的上游默认 settings.json。")
-                .font(.caption)
+                .font(DesignSystem.metadataFont)
                 .foregroundStyle(.secondary)
             HStack(spacing: DesignSystem.spaceS) {
                 Button("恢复小红书默认设置", role: .destructive) { resetTarget = "xiaohongshu" }
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
                 Button("恢复抖音默认设置", role: .destructive) { resetTarget = "douyin" }
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
             }
         }
 
@@ -472,16 +493,18 @@ struct SettingsView: View {
                     isDirty ? "有未保存更改" : "当前配置已保存",
                     systemImage: isDirty ? "circle.fill" : "checkmark.circle"
                 )
-                .font(.caption.weight(.medium))
+                .font(DesignSystem.groupLabelFont)
                 .foregroundStyle(isDirty ? DesignSystem.accent : .secondary)
 
                 Text("保存时只合并当前页面管理的字段，不会覆盖隐藏配置。")
-                    .font(.caption)
+                    .font(DesignSystem.metadataFont)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: DesignSystem.spaceM)
             Button(title, action: action)
                 .buttonStyle(.borderedProminent)
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightDefault)
                 .disabled(model.settingsLoading || !isDirty)
         }
         .padding(.vertical, DesignSystem.spaceS)
@@ -521,22 +544,26 @@ struct SettingsView: View {
 
     private func plainTextEditor(text: Binding<String>, minHeight: CGFloat) -> some View {
         TextEditor(text: text)
-            .font(.system(size: 12, design: .monospaced))
+            .font(.system(size: 12, weight: .regular, design: .monospaced))
             .frame(minHeight: minHeight)
     }
 
     private func configRow(title: String, path: String) -> some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
             Text(title)
-                .font(.callout.weight(.medium))
+                .font(DesignSystem.uiFont)
             Text(path.isEmpty ? "尚未生成" : path)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
                 .foregroundStyle(path.isEmpty ? .secondary : .primary)
                 .textSelection(.enabled)
             HStack(spacing: DesignSystem.spaceS) {
                 Button("打开") { openConfig(path) }
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
                     .disabled(path.isEmpty)
                 Button("在 Finder 中显示") { revealConfig(path) }
+                    .font(DesignSystem.uiFont)
+                    .frame(height: DesignSystem.controlHeightDefault)
                     .disabled(path.isEmpty)
             }
         }
@@ -545,10 +572,10 @@ struct SettingsView: View {
     private func pathRow(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
             Text(label)
-                .font(.caption)
+                .font(DesignSystem.metadataFont)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
                 .textSelection(.enabled)
         }
     }

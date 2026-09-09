@@ -31,16 +31,16 @@ struct SidebarView: View {
             Spacer(minLength: DesignSystem.spaceXL)
         }
         .padding(.top, DesignSystem.sidebarTitlebarClearance)
-        .padding(.horizontal, DesignSystem.spaceS)
-        .padding(.bottom, DesignSystem.spaceS)
+        .padding(.horizontal, DesignSystem.sidebarPadding)
+        .padding(.bottom, DesignSystem.sidebarPadding)
     }
 
     private var brand: some View {
         HStack(spacing: DesignSystem.spaceS) {
-            AppMark(size: 40)
+            AppMark(size: DesignSystem.sidebarBrandLogoSize)
 
             Text("SYDownload")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
 
             Spacer(minLength: 0)
         }
@@ -61,7 +61,7 @@ struct SidebarView: View {
         } label: {
             HStack(spacing: DesignSystem.spaceS) {
                 Image(systemName: systemImage)
-                    .font(.system(size: DesignSystem.sidebarNavigationIconSize, weight: .semibold))
+                    .font(.system(size: DesignSystem.sidebarNavigationIconSize, weight: .medium))
                     .frame(width: DesignSystem.sidebarNavigationIconSize)
                     .foregroundStyle(selected ? DesignSystem.sidebarAccentForeground : Color.secondary)
 

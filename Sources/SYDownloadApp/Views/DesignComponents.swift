@@ -4,7 +4,6 @@ import SwiftUI
 import SYDownloadCore
 
 /// Shared product-shell geometry and reusable business presentation helpers.
-/// Native controls keep their system-owned metrics and appearance.
 enum DesignSystem {
     static let spaceXS: CGFloat = 4
     static let spaceS: CGFloat = 8
@@ -14,13 +13,25 @@ enum DesignSystem {
     static let space2XL: CGFloat = 32
     static let space3XL: CGFloat = 40
 
-    static let pageInset: CGFloat = 16
+    static let windowWidth: CGFloat = 960
+    static let windowHeight: CGFloat = 680
+
+    static let contentBodyPadding: CGFloat = 16
+    static let pageInset = contentBodyPadding
     static let sectionSpacing: CGFloat = 16
     static let panelPadding: CGFloat = 16
 
+    static let pageHeaderPaddingX: CGFloat = 24
+    static let pageHeaderPaddingTop: CGFloat = 36
+    static let pageHeaderPaddingBottom: CGFloat = 16
+    static let pageHeaderTitleActionGap: CGFloat = 16
+    static let pageHeaderActionGap: CGFloat = 8
+
     static let sidebarWidth: CGFloat = 220
+    static let sidebarPadding: CGFloat = 8
     static let sidebarTitlebarClearance: CGFloat = 32
     static let sidebarBrandHeight: CGFloat = 56
+    static let sidebarBrandLogoSize: CGFloat = 40
     static let sidebarNavigationHeight: CGFloat = 38
     static let sidebarNavigationHorizontalPadding: CGFloat = 10
     static let sidebarNavigationIconSize: CGFloat = 16
@@ -31,15 +42,24 @@ enum DesignSystem {
     static let rowRadius: CGFloat = 8
     static let contentMaxWidth: CGFloat = 1_080
 
-    // Content typography follows macOS semantic text styles.
-    static let pageTitleFont = Font.title2.weight(.semibold)
-    static let sectionTitleFont = Font.headline
-    static let bodyFont = Font.body
-    static let uiFont = Font.callout
-    static let supportingFont = Font.callout
-    static let metadataFont = Font.caption
+    static let controlHeightCompact: CGFloat = 28
+    static let controlHeightSmall: CGFloat = 32
+    static let controlHeightDefault: CGFloat = 36
+    static let controlHeightLarge: CGFloat = 40
 
-    // Product accent / sidebar colors may remain branded.
+    static let dividerWidth: CGFloat = 0.5
+    static let borderWidth: CGFloat = 1
+    static let controlRowMinHeight: CGFloat = 40
+    static let settingsRowMinHeight: CGFloat = 44
+
+    static let pageTitleFont = Font.system(size: 24, weight: .semibold)
+    static let sectionTitleFont = Font.system(size: 16, weight: .semibold)
+    static let bodyFont = Font.system(size: 14, weight: .regular)
+    static let uiFont = Font.system(size: 14, weight: .medium)
+    static let supportingFont = Font.system(size: 12, weight: .regular)
+    static let metadataFont = Font.system(size: 12, weight: .regular)
+    static let groupLabelFont = Font.system(size: 12, weight: .medium)
+
     static let blue = Color(red: 0.039, green: 0.518, blue: 1.0)
     static var accent: Color { blue }
     static var accentSecondary: Color { blue }
@@ -48,7 +68,6 @@ enum DesignSystem {
     static var sidebarAccentForeground: Color { blue }
     static var sidebarHover: Color { Color.primary.opacity(0.055) }
 
-    // Content surfaces use macOS semantic colors rather than copied light/dark RGB values.
     static var sidebarBackground: Color { Color(nsColor: .underPageBackgroundColor) }
     static var mainSurfaceBackground: Color { Color(nsColor: .windowBackgroundColor) }
     static var panelBackground: Color { Color(nsColor: .controlBackgroundColor) }
@@ -56,14 +75,14 @@ enum DesignSystem {
     static var warmSurface: Color { Color(nsColor: .textBackgroundColor) }
     static var raisedSurface: Color { Color(nsColor: .controlBackgroundColor) }
     static var hairline: Color { Color(nsColor: .separatorColor).opacity(0.52) }
-    static var shadow: Color { Color.black.opacity(0.05) }
+    static var shadow: Color { Color.black.opacity(0.10) }
     static var focusRing: Color { Color(nsColor: .keyboardFocusIndicatorColor) }
     static var success: Color { Color(nsColor: .systemGreen) }
     static var warning: Color { Color(nsColor: .systemOrange) }
     static var destructive: Color { Color(nsColor: .systemRed) }
 
     static var pageMaxWidth: CGFloat { contentMaxWidth }
-    static var contentPadding: CGFloat { pageInset }
+    static var contentPadding: CGFloat { contentBodyPadding }
     static var cardRadius: CGFloat { panelRadius }
 }
 
@@ -108,14 +127,14 @@ struct AppMark: View {
 struct IconBadge: View {
     let systemImage: String
     var tint: Color = DesignSystem.accent
-    var size: CGFloat = 42
+    var size: CGFloat = 40
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
                 .fill(tint.opacity(0.10))
             Image(systemName: systemImage)
-                .font(.system(size: size * 0.36, weight: .medium))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(tint)
         }
         .frame(width: size, height: size)
@@ -124,37 +143,34 @@ struct IconBadge: View {
 }
 
 struct PageHeader: View {
-    let eyebrow: String
     let title: String
-    let subtitle: String
-    let systemImage: String
 
+    /// `subtitle`, `eyebrow` and `systemImage` are accepted temporarily so older call sites
+    /// keep compiling. Core v5 deliberately renders only the page title.
     init(
         eyebrow: String = "",
         title: String,
-        subtitle: String,
+        subtitle: String = "",
         systemImage: String = "sparkles"
     ) {
-        self.eyebrow = eyebrow
         self.title = title
-        self.subtitle = subtitle
-        self.systemImage = systemImage
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+        HStack(alignment: .center, spacing: DesignSystem.pageHeaderTitleActionGap) {
             Text(title)
                 .font(DesignSystem.pageTitleFont)
-                .lineLimit(2)
+                .lineLimit(1)
 
-            if !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(DesignSystem.bodyFont)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 620, alignment: .leading)
-            }
+            Spacer(minLength: DesignSystem.pageHeaderTitleActionGap)
         }
+        // Existing pages apply the 16 px Content Body inset to their root stack.
+        // Compensate here so the rendered header resolves to 24 px X / 36 px top,
+        // while the root stack's 16 px spacing supplies the header bottom padding.
+        .padding(.horizontal, DesignSystem.pageHeaderPaddingX)
+        .padding(.top, DesignSystem.pageHeaderPaddingTop)
+        .padding(.horizontal, -DesignSystem.contentBodyPadding)
+        .padding(.top, -DesignSystem.contentBodyPadding)
         .accessibilityElement(children: .combine)
     }
 }
@@ -177,7 +193,7 @@ struct SurfaceCard<Content: View>: View {
             )
             .overlay {
                 RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
-                    .strokeBorder(DesignSystem.hairline, lineWidth: 1)
+                    .strokeBorder(DesignSystem.hairline, lineWidth: DesignSystem.borderWidth)
             }
     }
 }
@@ -199,7 +215,7 @@ struct PlatformBrandIcon: View {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(platform.designColor.opacity(0.09))
                     Image(systemName: platform.fallbackSymbol)
-                        .font(.system(size: size * 0.42, weight: .medium))
+                        .font(DesignSystem.uiFont)
                         .foregroundStyle(platform.designColor)
                 }
             }
@@ -226,10 +242,10 @@ struct PlatformChip: View {
             PlatformBrandIcon(platform: platform, size: 16, cornerRadius: 4)
             Text(platform.displayName)
         }
-        .font(DesignSystem.supportingFont.weight(selected ? .semibold : .medium))
+        .font(DesignSystem.groupLabelFont)
         .foregroundStyle(selected ? platform.designColor : .secondary)
         .padding(.horizontal, DesignSystem.spaceS)
-        .frame(minHeight: 24)
+        .frame(minHeight: DesignSystem.spaceXL)
         .background(
             selected ? platform.designColor.opacity(0.10) : Color(nsColor: .controlBackgroundColor),
             in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
@@ -259,10 +275,9 @@ struct StatusPill: View {
     var body: some View {
         HStack(spacing: DesignSystem.spaceXS) {
             Image(systemName: symbol)
-                .font(.caption2.weight(.semibold))
             Text(state.label)
-                .font(.caption.weight(.semibold))
         }
+        .font(DesignSystem.groupLabelFont)
         .foregroundStyle(color)
         .accessibilityElement(children: .combine)
     }
@@ -304,7 +319,7 @@ struct MetricCard: View {
                     .font(DesignSystem.metadataFont)
                     .foregroundStyle(.secondary)
                 Text(value)
-                    .font(.title3.weight(.semibold))
+                    .font(DesignSystem.sectionTitleFont)
                     .monospacedDigit()
                 Text(detail)
                     .font(DesignSystem.metadataFont)
@@ -355,9 +370,12 @@ struct InsetRow<Content: View>: View {
     var body: some View {
         content
             .padding(.vertical, DesignSystem.spaceM)
+            .frame(minHeight: DesignSystem.controlRowMinHeight)
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) {
-                Divider()
+                Rectangle()
+                    .fill(DesignSystem.hairline)
+                    .frame(height: DesignSystem.dividerWidth)
             }
     }
 }
@@ -369,16 +387,18 @@ struct MetricStrip: View {
         HStack(spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                 if index > 0 {
-                    Divider().frame(height: 34)
+                    Rectangle()
+                        .fill(DesignSystem.hairline)
+                        .frame(width: DesignSystem.dividerWidth, height: DesignSystem.space2XL)
                 }
                 HStack(spacing: DesignSystem.spaceS) {
                     Image(systemName: item.symbol)
-                        .font(.callout.weight(.semibold))
+                        .font(DesignSystem.uiFont)
                         .foregroundStyle(item.tint)
-                        .frame(width: 22)
+                        .frame(width: DesignSystem.spaceXL)
                     VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                         Text(item.value)
-                            .font(.headline)
+                            .font(DesignSystem.sectionTitleFont)
                             .monospacedDigit()
                         Text(item.label)
                             .font(DesignSystem.metadataFont)
@@ -405,7 +425,7 @@ struct SidebarButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: selected ? .semibold : .medium))
+            .font(DesignSystem.uiFont)
             .foregroundStyle(selected ? DesignSystem.sidebarAccentForeground : Color.primary)
             .padding(.horizontal, DesignSystem.sidebarNavigationHorizontalPadding)
             .frame(height: DesignSystem.sidebarNavigationHeight)

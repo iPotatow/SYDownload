@@ -5,7 +5,6 @@ struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @FocusState private var focusedSection: AppSection?
     @State private var showsAbout = false
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @AppStorage("preferredAppearance") private var preferredAppearance = "跟随系统"
 
     var body: some View {
@@ -38,16 +37,16 @@ struct ContentView: View {
                 .clipShape(
                     RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
                 )
-                .overlay {
-                    if colorSchemeContrast == .increased {
-                        RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
-                            .stroke(DesignSystem.hairline, lineWidth: 1)
-                    }
-                }
+                .shadow(color: .black.opacity(0.10), radius: 3, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.10), radius: 2, x: 0, y: 1)
                 .padding(DesignSystem.mainSurfaceInsets)
                 .clipped()
         }
-        .frame(minWidth: 960, minHeight: 680, alignment: .topLeading)
+        .frame(
+            minWidth: DesignSystem.windowWidth,
+            minHeight: DesignSystem.windowHeight,
+            alignment: .topLeading
+        )
         .background(DesignSystem.sidebarBackground)
         .ignoresSafeArea(.container, edges: .top)
         .tint(DesignSystem.accent)

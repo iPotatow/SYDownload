@@ -22,14 +22,14 @@ struct PhotosView: View {
             workspace
             if !statusMessage.isEmpty && !isScanning {
                 Label(statusMessage, systemImage: statusIsError ? "exclamationmark.circle" : "info.circle")
-                    .font(.callout)
+                    .font(DesignSystem.bodyFont)
                     .foregroundStyle(statusIsError ? DesignSystem.destructive : .secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .combine)
             }
         }
-        .padding(.horizontal, DesignSystem.contentPadding)
-        .padding(.top, DesignSystem.contentPadding)
+        .padding(.horizontal, DesignSystem.contentBodyPadding)
+        .padding(.top, DesignSystem.contentBodyPadding)
         .padding(.bottom, DesignSystem.space3XL)
         .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -60,10 +60,7 @@ struct PhotosView: View {
     }
 
     private var header: some View {
-        PageHeader(
-            title: "照片整理",
-            subtitle: "按文件名中的日期分组，预览后再选择需要处理的日期。"
-        )
+        PageHeader(title: "照片整理")
     }
 
     @ViewBuilder
@@ -83,25 +80,27 @@ struct PhotosView: View {
     private var initialDropZone: some View {
         VStack(spacing: DesignSystem.spaceM) {
             Image(systemName: isDropTargeted ? "folder.fill.badge.plus" : "folder")
-                .font(.system(size: 40, weight: .regular))
+                .font(.system(size: DesignSystem.controlHeightLarge, weight: .regular))
                 .foregroundStyle(isDropTargeted ? DesignSystem.accent : Color.secondary)
 
             Text("拖入照片文件夹到这里")
-                .font(.title3.weight(.semibold))
+                .font(DesignSystem.sectionTitleFont)
 
             Text("会读取文件夹中的图片并按文件名日期分组")
-                .font(.subheadline)
+                .font(DesignSystem.bodyFont)
                 .foregroundStyle(.secondary)
 
             Text("或")
-                .font(.callout)
+                .font(DesignSystem.bodyFont)
                 .foregroundStyle(.tertiary)
 
             Button("选择文件夹…", systemImage: "folder", action: chooseFolder)
                 .buttonStyle(.borderedProminent)
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightDefault)
 
             Text("支持 JPG、PNG、HEIC 等常见图片格式")
-                .font(.caption)
+                .font(DesignSystem.metadataFont)
                 .foregroundStyle(.tertiary)
                 .padding(.top, DesignSystem.spaceS)
         }
@@ -114,7 +113,7 @@ struct PhotosView: View {
             RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                 .strokeBorder(
                     isDropTargeted ? DesignSystem.accent.opacity(0.65) : DesignSystem.hairline,
-                    style: StrokeStyle(lineWidth: 1, dash: [8, 4])
+                    style: StrokeStyle(lineWidth: DesignSystem.borderWidth, dash: [8, 4])
                 )
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -136,9 +135,9 @@ struct PhotosView: View {
                 .controlSize(.large)
                 .tint(DesignSystem.accent)
             Text("正在读取图片并解析文件名日期…")
-                .font(.headline)
+                .font(DesignSystem.sectionTitleFont)
             Text(statusMessage)
-                .font(.subheadline)
+                .font(DesignSystem.bodyFont)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -183,20 +182,20 @@ struct PhotosView: View {
         HStack(spacing: DesignSystem.spaceM) {
             if let folderURL {
                 Label(folderURL.lastPathComponent, systemImage: "folder")
-                    .font(.callout.weight(.semibold))
+                    .font(DesignSystem.uiFont)
                     .help(folderURL.path)
             }
 
             Text("\(scanResult.totalCount) 张照片")
-                .font(.callout)
+                .font(DesignSystem.bodyFont)
                 .foregroundStyle(.secondary)
             Text("\(scanResult.groups.count) 个日期")
-                .font(.callout)
+                .font(DesignSystem.bodyFont)
                 .foregroundStyle(.secondary)
 
             if !scanResult.ungrouped.isEmpty {
                 Text("\(scanResult.ungrouped.count) 张未识别日期")
-                    .font(.callout)
+                    .font(DesignSystem.bodyFont)
                     .foregroundStyle(.secondary)
             }
 
@@ -209,9 +208,12 @@ struct PhotosView: View {
                     action: toggleAllDates
                 )
                 .buttonStyle(.borderless)
+                .font(DesignSystem.uiFont)
+                .frame(height: DesignSystem.controlHeightCompact)
                 .disabled(isDeleting)
             }
         }
+        .frame(minHeight: DesignSystem.controlRowMinHeight)
     }
 
     private func dateGroupRow(_ group: PhotoDateGroup) -> some View {
@@ -230,14 +232,14 @@ struct PhotosView: View {
                     )
                 ) {
                     Text(group.dateKey)
-                        .font(.headline)
+                        .font(DesignSystem.sectionTitleFont)
                 }
                 .toggleStyle(.checkbox)
 
                 Spacer()
 
                 Text("\(group.photos.count) 张")
-                    .font(.callout)
+                    .font(DesignSystem.bodyFont)
                     .foregroundStyle(.secondary)
             }
 
@@ -251,7 +253,8 @@ struct PhotosView: View {
         .overlay {
             RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
                 .strokeBorder(
-                    selectedDates.contains(group.id) ? DesignSystem.accent.opacity(0.30) : Color.clear
+                    selectedDates.contains(group.id) ? DesignSystem.accent.opacity(0.30) : Color.clear,
+                    lineWidth: DesignSystem.borderWidth
                 )
         }
     }
@@ -260,10 +263,10 @@ struct PhotosView: View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
             HStack {
                 Label("未识别日期", systemImage: "questionmark.circle")
-                    .font(.headline)
+                    .font(DesignSystem.sectionTitleFont)
                 Spacer()
                 Text("\(scanResult.ungrouped.count) 张 · 不参与日期批量删除")
-                    .font(.callout)
+                    .font(DesignSystem.bodyFont)
                     .foregroundStyle(.secondary)
             }
 
@@ -288,7 +291,7 @@ struct PhotosView: View {
                         RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
                             .fill(DesignSystem.raisedSurface)
                         Text("+\(photos.count - 8)")
-                            .font(.caption.weight(.semibold))
+                            .font(DesignSystem.groupLabelFont)
                             .foregroundStyle(.secondary)
                     }
                     .frame(width: 68, height: 68)
@@ -302,9 +305,9 @@ struct PhotosView: View {
         HStack(spacing: DesignSystem.spaceM) {
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text("已选择 \(selectedDates.count) 个日期")
-                    .font(.subheadline.weight(.semibold))
+                    .font(DesignSystem.uiFont)
                 Text("共 \(selectedPhotoURLs.count) 张照片")
-                    .font(.caption)
+                    .font(DesignSystem.metadataFont)
                     .foregroundStyle(.secondary)
             }
 
@@ -313,6 +316,8 @@ struct PhotosView: View {
             Button("取消选择") {
                 selectedDates.removeAll()
             }
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
             .disabled(isDeleting)
 
             Button(role: .destructive) {
@@ -325,6 +330,8 @@ struct PhotosView: View {
                     Label("删除 \(selectedPhotoURLs.count) 张照片", systemImage: "trash")
                 }
             }
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
             .disabled(isDeleting || selectedPhotoURLs.isEmpty)
         }
         .padding(DesignSystem.panelPadding)
@@ -334,7 +341,7 @@ struct PhotosView: View {
         )
         .overlay {
             RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
-                .strokeBorder(DesignSystem.hairline)
+                .strokeBorder(DesignSystem.hairline, lineWidth: DesignSystem.borderWidth)
         }
         .padding(.horizontal, DesignSystem.spaceS)
         .padding(.bottom, DesignSystem.spaceS)
@@ -455,7 +462,7 @@ private struct LocalPhotoThumbnail: View {
         .clipShape(RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.07))
+                .strokeBorder(Color.primary.opacity(0.07), lineWidth: DesignSystem.borderWidth)
         }
         .help(url.lastPathComponent)
         .accessibilityLabel(url.lastPathComponent)

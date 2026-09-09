@@ -21,7 +21,7 @@ struct SYDownloadApp: App {
                 }
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 960, height: 680)
+        .defaultSize(width: DesignSystem.windowWidth, height: DesignSystem.windowHeight)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {
