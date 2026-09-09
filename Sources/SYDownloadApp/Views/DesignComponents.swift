@@ -152,7 +152,7 @@ enum DesignSystem {
 
     // MARK: - Colors
 
-    static let accent = adaptiveColor(light: (0, 122, 255), dark: (10, 132, 255))
+    static let accent = adaptiveColor(light: (175, 82, 222), dark: (191, 90, 242))
     static let onAccent = adaptiveColor(light: (255, 255, 255), dark: (255, 255, 255))
     static let windowBackground = adaptiveColor(light: (244, 244, 245), dark: (28, 28, 30))
     static let sidebarBackground = adaptiveColor(light: (242, 242, 243), dark: (32, 32, 34))
@@ -182,14 +182,14 @@ enum DesignSystem {
         darkAlpha: 0.10
     )
     static let selectionBackground = adaptiveColor(
-        light: (0, 122, 255),
-        dark: (10, 132, 255),
+        light: (175, 82, 222),
+        dark: (191, 90, 242),
         lightAlpha: 0.14,
         darkAlpha: 0.20
     )
     static let focusRing = adaptiveColor(
-        light: (0, 122, 255),
-        dark: (10, 132, 255),
+        light: (175, 82, 222),
+        dark: (191, 90, 242),
         lightAlpha: 0.35,
         darkAlpha: 0.45
     )

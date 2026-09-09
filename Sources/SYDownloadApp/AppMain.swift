@@ -10,6 +10,7 @@ struct SYDownloadApp: App {
     var body: some Scene {
         WindowGroup("SYDownload", id: "main") {
             ContentView()
+                .tint(DesignSystem.accent)
                 .environmentObject(model)
                 .environmentObject(updater)
                 .sheet(isPresented: $updater.sheet) {
