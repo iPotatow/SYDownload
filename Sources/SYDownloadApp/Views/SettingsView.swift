@@ -167,7 +167,8 @@ struct SettingsView: View {
                         TextField("下载目录", text: $model.outputDirectory)
                             .textFieldStyle(.roundedBorder)
                             .labelsHidden()
-                            .frame(minWidth: DesignSystem.settingsFieldWidth, height: DesignSystem.controlHeightDefault)
+                            .frame(minWidth: DesignSystem.settingsFieldWidth)
+                            .frame(height: DesignSystem.controlHeightDefault)
                         Button("更改") { chooseFolder() }
                             .font(DesignSystem.uiFont)
                             .frame(height: DesignSystem.controlHeightDefault)
