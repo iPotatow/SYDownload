@@ -30,17 +30,28 @@ struct SYDownloadApp: App {
                 }
                 .keyboardShortcut("n", modifiers: [.command])
             }
+
+            CommandGroup(after: .pasteboard) {
+                Button("搜索任务或历史记录") {
+                    NotificationCenter.default.post(name: .syDownloadFocusSearch, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command])
+                .disabled(model.selection != .tasks && model.selection != .history)
+            }
+
             CommandGroup(replacing: .appInfo) {
                 Button("关于 SYDownload") {
                     NotificationCenter.default.post(name: .syDownloadShowAbout, object: nil)
                 }
             }
+
             CommandGroup(after: .appInfo) {
                 Button("检查更新…") {
                     updater.checkForUpdates(sheet: true, force: true)
                 }
                 .keyboardShortcut("u", modifiers: [.command, .shift])
             }
+
             CommandGroup(replacing: .appSettings) {
                 Button("设置…") {
                     NotificationCenter.default.post(name: .syDownloadShowSettings, object: nil)
@@ -55,6 +66,8 @@ extension Notification.Name {
     static let syDownloadNewDownload = Notification.Name("SYDownload.newDownload")
     static let syDownloadShowAbout = Notification.Name("SYDownload.showAbout")
     static let syDownloadShowSettings = Notification.Name("SYDownload.showSettings")
+    static let syDownloadFocusDownloadInput = Notification.Name("SYDownload.focusDownloadInput")
+    static let syDownloadFocusSearch = Notification.Name("SYDownload.focusSearch")
 }
 #else
 import Foundation

@@ -5,71 +5,99 @@ import AppKit
 struct HistoryView: View {
     @ObservedObject var model: AppModel
     @State private var selectedHistoryID: UUID?
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-            PageHeader(title: "历史记录")
+        PageContainer(title: "历史记录") {
+            TextField("搜索历史（标题、链接、平台）", text: $model.historySearch)
+                .textFieldStyle(.roundedBorder)
+                .font(DesignSystem.bodyFont)
+                .frame(width: DesignSystem.pageHeaderSearchWidth, height: DesignSystem.controlHeightSmall)
+                .focused($searchFocused)
+                .accessibilityLabel("搜索历史记录")
+        } content: {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                summaryBar
+                Divider()
 
-            HStack(alignment: .firstTextBaseline, spacing: DesignSystem.spaceS) {
-                Text("共 \(model.filteredHistory.count) 条记录")
-                    .font(DesignSystem.uiFont)
-                    .monospacedDigit()
-                Spacer()
-                Text("按完成时间排序")
-                    .font(DesignSystem.bodyFont)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(minHeight: DesignSystem.controlRowMinHeight)
-
-            Divider()
-
-            if model.filteredHistory.isEmpty {
-                EmptyLibraryView(
-                    systemImage: "clock.arrow.circlepath",
-                    title: model.history.isEmpty ? "还没有下载历史" : "没有匹配的记录",
-                    message: model.history.isEmpty ? "下载成功的内容会自动保存在这里。" : "尝试更换搜索关键词。",
-                    actionTitle: model.historySearch.isEmpty ? "去下载" : "清除搜索"
-                ) {
-                    if model.historySearch.isEmpty {
-                        model.selection = .download
-                    } else {
-                        model.historySearch = ""
+                if model.filteredHistory.isEmpty {
+                    EmptyLibraryView(
+                        systemImage: "clock.arrow.circlepath",
+                        title: model.history.isEmpty ? "还没有下载历史" : "没有匹配的记录",
+                        message: model.history.isEmpty ? "下载成功的内容会自动保存在这里。" : "清除搜索后查看全部历史记录。",
+                        actionTitle: model.historySearch.isEmpty ? "去下载" : "清除搜索"
+                    ) {
+                        if model.historySearch.isEmpty {
+                            model.selection = .download
+                            DispatchQueue.main.async {
+                                NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+                            }
+                        } else {
+                            model.historySearch = ""
+                            searchFocused = true
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(selection: $selectedHistoryID) {
-                    ForEach(model.filteredHistory) { item in
-                        HistoryRow(model: model, item: item)
-                            .tag(item.id)
-                            .contextMenu {
-                                Button("打开位置", systemImage: "folder") {
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(selection: $selectedHistoryID) {
+                        ForEach(model.filteredHistory) { item in
+                            HistoryRow(model: model, item: item)
+                                .tag(item.id)
+                                .listRowInsets(
+                                    EdgeInsets(
+                                        top: DesignSystem.spaceXS,
+                                        leading: 0,
+                                        bottom: DesignSystem.spaceXS,
+                                        trailing: 0
+                                    )
+                                )
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .contextMenu {
+                                    Button("在 Finder 中显示", systemImage: "folder") {
+                                        openFolder(item)
+                                    }
+                                    Button("打开原链接", systemImage: "safari") {
+                                        openSource(item)
+                                    }
+                                    Button("再次下载", systemImage: "arrow.down") {
+                                        prepareRedownload(item)
+                                    }
+                                    Divider()
+                                    Button("从历史中删除", systemImage: "trash", role: .destructive) {
+                                        removeHistory(item.id)
+                                    }
+                                }
+                                .onTapGesture(count: 2) {
                                     openFolder(item)
                                 }
-                                Button("打开原链接", systemImage: "safari") {
-                                    openSource(item)
-                                }
-                                Divider()
-                                Button("从历史中删除", systemImage: "trash", role: .destructive) {
-                                    removeHistory(item.id)
-                                }
-                            }
-                            .onTapGesture(count: 2) {
-                                openFolder(item)
-                            }
+                        }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .listStyle(.inset)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(.horizontal, DesignSystem.contentBodyPadding)
-        .padding(.top, DesignSystem.contentBodyPadding)
-        .padding(.bottom, DesignSystem.spaceL)
-        .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onDeleteCommand(perform: removeSelectedHistory)
+        .onReceive(NotificationCenter.default.publisher(for: .syDownloadFocusSearch)) { _ in
+            guard model.selection == .history else { return }
+            searchFocused = true
+        }
         .tint(DesignSystem.accent)
+    }
+
+    private var summaryBar: some View {
+        HStack(alignment: .center, spacing: DesignSystem.spaceS) {
+            Text("共 \(model.filteredHistory.count) 条记录")
+                .font(DesignSystem.uiFont)
+                .monospacedDigit()
+            Spacer()
+            Text("按完成时间排序")
+                .font(DesignSystem.bodyFont)
+                .foregroundStyle(.secondary)
+        }
+        .frame(minHeight: DesignSystem.controlRowMinHeight)
     }
 
     private func openFolder(_ item: HistoryItem) {
@@ -79,6 +107,13 @@ struct HistoryView: View {
     private func openSource(_ item: HistoryItem) {
         if let url = URL(string: item.sourceURL) {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func prepareRedownload(_ item: HistoryItem) {
+        model.prepareHistoryRedownload(item)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
         }
     }
 
@@ -121,20 +156,23 @@ private struct HistoryRow: View {
 
             Spacer(minLength: DesignSystem.spaceM)
 
-            Button("打开位置", systemImage: "folder") {
+            Button("在 Finder 中显示", systemImage: "folder") {
                 NSWorkspace.shared.open(URL(fileURLWithPath: item.outputDirectory))
             }
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
             .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
-            .help("打开位置")
+            .help("在 Finder 中显示")
 
             Button("再次下载", systemImage: "arrow.down") {
-                model.useHistory(item)
+                model.prepareHistoryRedownload(item)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+                }
             }
             .buttonStyle(.borderless)
-            .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
-            .help("再次下载")
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightCompact)
 
             Menu {
                 Button("打开原链接", systemImage: "safari") {
@@ -153,8 +191,16 @@ private struct HistoryRow: View {
             .menuStyle(.borderlessButton)
             .frame(width: DesignSystem.controlHeightCompact, height: DesignSystem.controlHeightCompact)
         }
+        .padding(DesignSystem.spaceM)
         .frame(minHeight: DesignSystem.controlRowMinHeight)
-        .padding(.vertical, DesignSystem.spaceXS)
+        .background(
+            DesignSystem.rowBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                .strokeBorder(DesignSystem.hairline, lineWidth: DesignSystem.borderWidth)
+        }
     }
 }
 #endif

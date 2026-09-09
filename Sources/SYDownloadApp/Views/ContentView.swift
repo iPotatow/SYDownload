@@ -54,6 +54,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadNewDownload)) { _ in
             model.selection = .download
             focusedSection = .download
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadShowAbout)) { _ in
             showsAbout = true

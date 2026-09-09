@@ -26,6 +26,7 @@ enum DesignSystem {
     static let pageHeaderPaddingBottom: CGFloat = 16
     static let pageHeaderTitleActionGap: CGFloat = 16
     static let pageHeaderActionGap: CGFloat = 8
+    static let pageHeaderSearchWidth: CGFloat = 224
 
     static let sidebarWidth: CGFloat = 220
     static let sidebarPadding: CGFloat = 8
@@ -51,6 +52,11 @@ enum DesignSystem {
     static let borderWidth: CGFloat = 1
     static let controlRowMinHeight: CGFloat = 40
     static let settingsRowMinHeight: CGFloat = 44
+
+    /// Named business-component dimensions; all remain on the Core v5 4 px grid.
+    static let downloadComposerHeight: CGFloat = 160
+    static let photoThumbnailSize: CGFloat = 68
+    static let settingsFieldWidth: CGFloat = 240
 
     static let pageTitleFont = Font.system(size: 24, weight: .semibold)
     static let sectionTitleFont = Font.system(size: 16, weight: .semibold)
@@ -142,18 +148,13 @@ struct IconBadge: View {
     }
 }
 
-struct PageHeader: View {
+struct PageHeader<Actions: View>: View {
     let title: String
+    private let actions: Actions
 
-    /// `subtitle`, `eyebrow` and `systemImage` are accepted temporarily so older call sites
-    /// keep compiling. Core v5 deliberately renders only the page title.
-    init(
-        eyebrow: String = "",
-        title: String,
-        subtitle: String = "",
-        systemImage: String = "sparkles"
-    ) {
+    init(title: String, @ViewBuilder actions: () -> Actions) {
         self.title = title
+        self.actions = actions()
     }
 
     var body: some View {
@@ -163,15 +164,57 @@ struct PageHeader: View {
                 .lineLimit(1)
 
             Spacer(minLength: DesignSystem.pageHeaderTitleActionGap)
+
+            HStack(spacing: DesignSystem.pageHeaderActionGap) {
+                actions
+            }
         }
-        // Existing pages apply the 16 px Content Body inset to their root stack.
-        // Compensate here so the rendered header resolves to 24 px X / 36 px top,
-        // while the root stack's 16 px spacing supplies the header bottom padding.
         .padding(.horizontal, DesignSystem.pageHeaderPaddingX)
         .padding(.top, DesignSystem.pageHeaderPaddingTop)
-        .padding(.horizontal, -DesignSystem.contentBodyPadding)
-        .padding(.top, -DesignSystem.contentBodyPadding)
-        .accessibilityElement(children: .combine)
+        .padding(.bottom, DesignSystem.pageHeaderPaddingBottom)
+    }
+}
+
+extension PageHeader where Actions == EmptyView {
+    init(title: String) {
+        self.init(title: title) { EmptyView() }
+    }
+}
+
+struct PageContainer<Actions: View, Content: View>: View {
+    let title: String
+    private let actions: Actions
+    private let content: Content
+
+    init(
+        title: String,
+        @ViewBuilder actions: () -> Actions,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.actions = actions()
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PageHeader(title: title) {
+                actions
+            }
+
+            content
+                .padding(.horizontal, DesignSystem.contentBodyPadding)
+                .padding(.bottom, DesignSystem.contentBodyPadding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: DesignSystem.pageMaxWidth, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+extension PageContainer where Actions == EmptyView {
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.init(title: title, actions: { EmptyView() }, content: content)
     }
 }
 
@@ -194,6 +237,59 @@ struct SurfaceCard<Content: View>: View {
             .overlay {
                 RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
                     .strokeBorder(DesignSystem.hairline, lineWidth: DesignSystem.borderWidth)
+            }
+    }
+}
+
+struct SettingsSection<Content: View>: View {
+    let title: String
+    private let content: Content
+
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+            Text(title)
+                .font(DesignSystem.sectionTitleFont)
+
+            VStack(spacing: 0) {
+                content
+            }
+            .padding(DesignSystem.panelPadding)
+            .background(
+                DesignSystem.panelBackground,
+                in: RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+                    .strokeBorder(DesignSystem.hairline, lineWidth: DesignSystem.borderWidth)
+            }
+        }
+    }
+}
+
+struct SettingsRow<Content: View>: View {
+    var showsDivider = true
+    private let content: Content
+
+    init(showsDivider: Bool = true, @ViewBuilder content: () -> Content) {
+        self.showsDivider = showsDivider
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .frame(minHeight: DesignSystem.settingsRowMinHeight)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottom) {
+                if showsDivider {
+                    Rectangle()
+                        .fill(DesignSystem.hairline)
+                        .frame(height: DesignSystem.dividerWidth)
+                }
             }
     }
 }

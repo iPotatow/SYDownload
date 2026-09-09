@@ -7,24 +7,20 @@ struct DownloadView: View {
     @FocusState private var linkEditorFocused: Bool
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-                header
-                composer
-                statusLine
+        PageContainer(title: "下载") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                    composer
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, DesignSystem.spaceL)
             }
-            .padding(.horizontal, DesignSystem.contentBodyPadding)
-            .padding(.top, DesignSystem.contentBodyPadding)
-            .padding(.bottom, DesignSystem.space2XL)
-            .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
         }
         .onChange(of: model.input) { _, _ in model.detectLocally() }
+        .onReceive(NotificationCenter.default.publisher(for: .syDownloadFocusDownloadInput)) { _ in
+            linkEditorFocused = true
+        }
         .tint(DesignSystem.accent)
-    }
-
-    private var header: some View {
-        PageHeader(title: "下载")
     }
 
     private var composer: some View {
@@ -36,6 +32,7 @@ struct DownloadView: View {
                 .textFieldStyle(.roundedBorder)
                 .font(DesignSystem.bodyFont)
                 .lineLimit(8...12)
+                .frame(height: DesignSystem.downloadComposerHeight, alignment: .topLeading)
                 .focused($linkEditorFocused)
                 .accessibilityLabel("下载链接")
 
@@ -60,48 +57,48 @@ struct DownloadView: View {
                 }
             }
 
-            Divider()
-
             HStack(spacing: DesignSystem.spaceM) {
-                Label(platformStatus, systemImage: "link")
-                    .font(DesignSystem.bodyFont)
-                    .foregroundStyle(.secondary)
+                if shouldShowStatus {
+                    statusIndicator
+                }
 
-                Spacer(minLength: DesignSystem.spaceS)
+                Spacer(minLength: DesignSystem.spaceM)
 
                 Button("检查链接", systemImage: "checkmark.circle", action: validate)
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.bordered)
                     .font(DesignSystem.uiFont)
                     .frame(height: DesignSystem.controlHeightDefault)
-                    .disabled(
-                        !model.hasSupportedLinks
-                            || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            || model.isWorking
-                            || model.isParsing
-                    )
-            }
+                    .disabled(actionsDisabled)
 
-            HStack {
-                Spacer()
                 Button(downloadButtonTitle, systemImage: "arrow.down", action: download)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .font(DesignSystem.uiFont)
                     .frame(height: DesignSystem.controlHeightLarge)
                     .keyboardShortcut(.return, modifiers: [.command])
-                    .disabled(
-                        !model.hasSupportedLinks
-                            || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            || model.isWorking
-                            || model.isParsing
-                    )
+                    .disabled(actionsDisabled)
             }
         }
     }
 
+    private var shouldShowStatus: Bool {
+        !model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || model.isParsing
+            || model.isWorking
+            || !model.validatedInput.isEmpty
+            || model.statusIsError
+    }
+
+    private var actionsDisabled: Bool {
+        !model.hasSupportedLinks
+            || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || model.isWorking
+            || model.isParsing
+    }
+
     private var platformStatus: String {
         if model.detectedLinks.isEmpty {
-            return model.input.isEmpty ? "等待识别平台" : "暂未识别到链接"
+            return "暂未识别到链接"
         }
         if model.supportedLinkCount == 0 {
             return "识别到 \(model.detectedLinks.count) 个链接，但没有支持的平台"
@@ -117,13 +114,26 @@ struct DownloadView: View {
         return result
     }
 
+    private var visibleStatus: String {
+        if model.isParsing {
+            return "正在检查链接…"
+        }
+        if model.isWorking {
+            return model.status
+        }
+        if model.statusIsError || !model.validatedInput.isEmpty {
+            return model.status
+        }
+        return platformStatus
+    }
+
     private var downloadButtonTitle: String {
         model.supportedLinkCount > 1
             ? "开始下载 \(model.supportedLinkCount) 项"
             : "开始下载"
     }
 
-    private var statusLine: some View {
+    private var statusIndicator: some View {
         HStack(spacing: DesignSystem.spaceS) {
             if model.isParsing || model.isWorking {
                 ProgressView()
@@ -133,33 +143,30 @@ struct DownloadView: View {
                     .foregroundStyle(statusColor)
             }
 
-            Text(model.status)
+            Text(visibleStatus)
                 .font(DesignSystem.bodyFont)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(model.statusIsError ? DesignSystem.destructive : Color.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: DesignSystem.spaceS)
-
-            if let engine = model.lastDetails["engine"] {
+            if let engine = model.lastDetails["engine"], !model.isParsing {
                 Text(URL(fileURLWithPath: engine).lastPathComponent)
                     .font(DesignSystem.metadataFont.monospaced())
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.horizontal, DesignSystem.spaceXS)
         .accessibilityElement(children: .combine)
     }
 
     private var statusSymbol: String {
         if model.statusIsError { return "exclamationmark.triangle.fill" }
-        if !model.hasSupportedLinks { return "info.circle" }
-        return model.validatedInput.isEmpty ? "link" : "checkmark.circle.fill"
+        if !model.validatedInput.isEmpty { return "checkmark.circle.fill" }
+        return "link"
     }
 
     private var statusColor: Color {
         if model.statusIsError { return DesignSystem.destructive }
-        if !model.hasSupportedLinks { return .secondary }
-        return model.validatedInput.isEmpty ? DesignSystem.accent : DesignSystem.success
+        if !model.validatedInput.isEmpty { return DesignSystem.success }
+        return DesignSystem.accent
     }
 
     private func validate() {

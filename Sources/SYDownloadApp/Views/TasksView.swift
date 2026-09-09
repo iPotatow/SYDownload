@@ -6,51 +6,72 @@ struct TasksView: View {
     @ObservedObject var model: AppModel
     @State private var searchText = ""
     @State private var selectedTaskID: UUID?
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-            PageHeader(title: "任务")
+        PageContainer(title: "任务") {
+            TextField("搜索任务（标题、链接、平台）", text: $searchText)
+                .textFieldStyle(.roundedBorder)
+                .font(DesignSystem.bodyFont)
+                .frame(width: DesignSystem.pageHeaderSearchWidth, height: DesignSystem.controlHeightSmall)
+                .focused($searchFocused)
+                .accessibilityLabel("搜索任务")
+        } content: {
+            VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+                filterBar
+                Divider()
 
-            filterBar
-            Divider()
-
-            if displayedTasks.isEmpty {
-                EmptyLibraryView(
-                    systemImage: "tray",
-                    title: hasTaskQuery ? "没有匹配的任务" : "还没有下载任务",
-                    message: hasTaskQuery ? "清除搜索或筛选条件后查看全部任务。" : "粘贴链接并开始下载，任务会显示在这里。",
-                    actionTitle: hasTaskQuery ? "清除筛选" : "新建下载"
-                ) {
-                    if hasTaskQuery {
-                        model.taskFilter = .all
-                        searchText = ""
-                    } else {
-                        model.selection = .download
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(selection: $selectedTaskID) {
-                    ForEach(displayedTasks) { task in
-                        TaskRow(model: model, task: task)
-                            .tag(task.id)
-                            .contextMenu {
-                                taskContextMenu(task)
+                if displayedTasks.isEmpty {
+                    EmptyLibraryView(
+                        systemImage: "tray",
+                        title: hasTaskQuery ? "没有匹配的任务" : "还没有下载任务",
+                        message: hasTaskQuery ? "清除搜索或筛选条件后查看全部任务。" : "粘贴链接并开始下载，任务会显示在这里。",
+                        actionTitle: hasTaskQuery ? "清除筛选" : "新建下载"
+                    ) {
+                        if hasTaskQuery {
+                            model.taskFilter = .all
+                            searchText = ""
+                        } else {
+                            model.selection = .download
+                            DispatchQueue.main.async {
+                                NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
                             }
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(selection: $selectedTaskID) {
+                        ForEach(displayedTasks) { task in
+                            TaskRow(model: model, task: task)
+                                .tag(task.id)
+                                .listRowInsets(
+                                    EdgeInsets(
+                                        top: DesignSystem.spaceXS,
+                                        leading: 0,
+                                        bottom: DesignSystem.spaceXS,
+                                        trailing: 0
+                                    )
+                                )
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .contextMenu {
+                                    taskContextMenu(task)
+                                }
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .listStyle(.inset)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(.horizontal, DesignSystem.contentBodyPadding)
-        .padding(.top, DesignSystem.contentBodyPadding)
-        .padding(.bottom, DesignSystem.spaceL)
-        .frame(maxWidth: DesignSystem.pageMaxWidth, alignment: .leading)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onDeleteCommand(perform: removeSelectedTask)
         .onChange(of: model.taskFilter) { _, _ in
             selectedTaskID = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .syDownloadFocusSearch)) { _ in
+            guard model.selection == .tasks else { return }
+            searchFocused = true
         }
         .tint(DesignSystem.accent)
     }
@@ -72,15 +93,19 @@ struct TasksView: View {
     @ViewBuilder
     private func taskContextMenu(_ task: DownloadTaskItem) -> some View {
         if task.state == .completed {
-            Button("打开文件夹", systemImage: "folder") {
+            Button("在 Finder 中显示", systemImage: "folder") {
                 openFolder(task)
             }
         }
+
         if task.state == .failed || task.state == .cancelled {
-            Button("重试", systemImage: "arrow.clockwise") {
-                model.retryTask(task)
+            if let recovery = recoveryAction(for: task) {
+                Button(recovery.title, systemImage: recovery.symbol) {
+                    performRecovery(for: task)
+                }
             }
         }
+
         if task.state == .queued || task.state == .downloading {
             Button("取消任务", systemImage: "xmark.circle", role: .destructive) {
                 model.cancelTask(task.id)
@@ -108,6 +133,7 @@ struct TasksView: View {
                 || $0.sourceURL.localizedCaseInsensitiveContains(query)
                 || $0.platform.displayName.localizedCaseInsensitiveContains(query)
                 || $0.detail.localizedCaseInsensitiveContains(query)
+                || ($0.failureKind?.label.localizedCaseInsensitiveContains(query) ?? false)
         }
     }
 
@@ -143,6 +169,41 @@ struct TasksView: View {
         NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
     }
 
+    private func recoveryAction(for task: DownloadTaskItem) -> (title: String, symbol: String)? {
+        switch task.failureKind {
+        case .unsupported:
+            return nil
+        case .auth:
+            return ("打开设置", "gearshape")
+        case .disk:
+            return ("更改保存位置", "folder")
+        case .notFound:
+            return ("打开原链接", "safari")
+        case .rateLimited:
+            return ("重试", "arrow.clockwise")
+        case .validation, .timeout, .cancelled, .network, .verification, .engine, .unknown, .none:
+            return ("重试", "arrow.clockwise")
+        }
+    }
+
+    private func performRecovery(for task: DownloadTaskItem) {
+        switch task.failureKind {
+        case .auth, .disk:
+            model.selection = .settings
+        case .notFound:
+            if let url = URL(string: task.sourceURL) {
+                NSWorkspace.shared.open(url)
+            }
+        case .unsupported:
+            break
+        default:
+            model.retryTask(task)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+            }
+        }
+    }
+
     private func removeSelectedTask() {
         guard let selectedTaskID,
               let task = model.tasks.first(where: { $0.id == selectedTaskID }),
@@ -169,9 +230,9 @@ private struct TaskRow: View {
                     StatusPill(state: task.state)
                 }
 
-                Text("\(task.platform.displayName) · \(task.detail)")
+                Text(detailText)
                     .font(DesignSystem.bodyFont)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(task.state == .failed ? DesignSystem.destructive : Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if task.state == .downloading {
@@ -183,7 +244,7 @@ private struct TaskRow: View {
                             Text("\(Int(progress * 100))%")
                                 .font(DesignSystem.metadataFont.monospacedDigit())
                                 .foregroundStyle(.secondary)
-                                .frame(width: 40, alignment: .trailing)
+                                .frame(width: DesignSystem.controlHeightLarge, alignment: .trailing)
                         } else {
                             ProgressView()
                                 .progressViewStyle(.linear)
@@ -201,31 +262,89 @@ private struct TaskRow: View {
 
             Spacer(minLength: DesignSystem.spaceM)
 
-            if task.state == .completed {
-                Button("打开文件夹", systemImage: "folder") {
-                    NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
-                }
-                .buttonStyle(.borderless)
-                .font(DesignSystem.uiFont)
-                .frame(height: DesignSystem.controlHeightCompact)
-            } else if task.state == .failed || task.state == .cancelled {
-                Button("重试", systemImage: "arrow.clockwise") {
-                    model.retryTask(task)
-                }
-                .buttonStyle(.bordered)
-                .font(DesignSystem.uiFont)
-                .frame(height: DesignSystem.controlHeightDefault)
-            } else {
-                Button("取消", systemImage: "xmark") {
-                    model.cancelTask(task.id)
-                }
-                .buttonStyle(.bordered)
-                .font(DesignSystem.uiFont)
-                .frame(height: DesignSystem.controlHeightDefault)
-            }
+            taskAction
         }
+        .padding(DesignSystem.spaceM)
         .frame(minHeight: DesignSystem.controlRowMinHeight)
-        .padding(.vertical, DesignSystem.spaceXS)
+        .background(
+            DesignSystem.rowBackground,
+            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                .strokeBorder(DesignSystem.hairline, lineWidth: DesignSystem.borderWidth)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var detailText: String {
+        if let failureKind = task.failureKind,
+           task.state == .failed || task.state == .cancelled {
+            return "\(failureKind.label) · \(task.detail)"
+        }
+        return "\(task.platform.displayName) · \(task.detail)"
+    }
+
+    @ViewBuilder
+    private var taskAction: some View {
+        if task.state == .completed {
+            Button("在 Finder 中显示", systemImage: "folder") {
+                NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
+            }
+            .buttonStyle(.bordered)
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
+        } else if task.state == .failed || task.state == .cancelled {
+            recoveryButton
+        } else {
+            Button("取消", systemImage: "xmark") {
+                model.cancelTask(task.id)
+            }
+            .buttonStyle(.bordered)
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
+        }
+    }
+
+    @ViewBuilder
+    private var recoveryButton: some View {
+        switch task.failureKind {
+        case .unsupported:
+            EmptyView()
+        case .auth:
+            Button("打开设置", systemImage: "gearshape") {
+                model.selection = .settings
+            }
+            .buttonStyle(.borderedProminent)
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
+        case .disk:
+            Button("更改保存位置", systemImage: "folder") {
+                model.selection = .settings
+            }
+            .buttonStyle(.borderedProminent)
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
+        case .notFound:
+            Button("打开原链接", systemImage: "safari") {
+                if let url = URL(string: task.sourceURL) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .buttonStyle(.bordered)
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
+        default:
+            Button("重试", systemImage: "arrow.clockwise") {
+                model.retryTask(task)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
+        }
     }
 }
 
