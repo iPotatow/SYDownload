@@ -15,12 +15,14 @@ struct SidebarView: View {
                 sidebarButton(.history, title: "历史记录", systemImage: "clock.arrow.circlepath")
 
                 Divider()
+                    .overlay(DesignSystem.divider)
                     .padding(.horizontal, DesignSystem.spaceM)
                     .padding(.vertical, DesignSystem.spaceS)
 
                 sidebarButton(.photos, title: "照片整理", systemImage: "photo.on.rectangle.angled")
 
                 Divider()
+                    .overlay(DesignSystem.divider)
                     .padding(.horizontal, DesignSystem.spaceM)
                     .padding(.vertical, DesignSystem.spaceS)
 
@@ -40,7 +42,8 @@ struct SidebarView: View {
             AppMark(size: DesignSystem.sidebarBrandLogoSize)
 
             Text("SYDownload")
-                .font(.system(size: 16, weight: .semibold))
+                .syTypography(DesignSystem.typographyBrand)
+                .foregroundStyle(DesignSystem.textPrimary)
 
             Spacer(minLength: 0)
         }
@@ -63,10 +66,11 @@ struct SidebarView: View {
                 Image(systemName: systemImage)
                     .font(.system(size: DesignSystem.sidebarNavigationIconSize, weight: .medium))
                     .frame(width: DesignSystem.sidebarNavigationIconSize)
-                    .foregroundStyle(selected ? DesignSystem.sidebarAccentForeground : Color.secondary)
+                    .foregroundStyle(selected ? DesignSystem.accent : DesignSystem.textSecondary)
 
                 Text(title)
-                    .foregroundStyle(selected ? DesignSystem.sidebarAccentForeground : Color.primary)
+                    .syTypography(DesignSystem.typographyControl)
+                    .foregroundStyle(DesignSystem.textPrimary)
 
                 Spacer(minLength: 0)
             }

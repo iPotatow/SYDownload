@@ -13,7 +13,7 @@ struct SYDownloadApp: App {
                 .environmentObject(model)
                 .environmentObject(updater)
                 .sheet(isPresented: $updater.sheet) {
-                    SYDownloadUpdateSheet(updater: updater)
+                    SYDownloadStyledUpdateSheet(updater: updater)
                 }
                 .onAppear {
                     NSApplication.shared.setActivationPolicy(.regular)

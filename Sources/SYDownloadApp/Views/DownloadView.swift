@@ -26,7 +26,8 @@ struct DownloadView: View {
     private var composer: some View {
         VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
             Text("下载链接")
-                .font(DesignSystem.sectionTitleFont)
+                .syTypography(DesignSystem.typographySectionTitle)
+                .foregroundStyle(DesignSystem.textPrimary)
 
             TextField("粘贴一个或多个链接 / 完整分享文本…", text: $model.input, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
@@ -53,7 +54,7 @@ struct DownloadView: View {
                         .buttonStyle(.borderless)
                         .font(DesignSystem.uiFont)
                         .frame(height: DesignSystem.controlHeightCompact)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignSystem.textSecondary)
                 }
             }
 
@@ -144,14 +145,14 @@ struct DownloadView: View {
             }
 
             Text(visibleStatus)
-                .font(DesignSystem.bodyFont)
-                .foregroundStyle(model.statusIsError ? DesignSystem.destructive : Color.secondary)
+                .syTypography(DesignSystem.typographyBody)
+                .foregroundStyle(model.statusIsError ? DesignSystem.semanticDanger : DesignSystem.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if let engine = model.lastDetails["engine"], !model.isParsing {
                 Text(URL(fileURLWithPath: engine).lastPathComponent)
                     .font(DesignSystem.metadataFont.monospaced())
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(DesignSystem.textTertiary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -164,8 +165,8 @@ struct DownloadView: View {
     }
 
     private var statusColor: Color {
-        if model.statusIsError { return DesignSystem.destructive }
-        if !model.validatedInput.isEmpty { return DesignSystem.success }
+        if model.statusIsError { return DesignSystem.semanticDanger }
+        if !model.validatedInput.isEmpty { return DesignSystem.semanticSuccess }
         return DesignSystem.accent
     }
 

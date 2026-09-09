@@ -37,17 +37,15 @@ struct ContentView: View {
                 .clipShape(
                     RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
                 )
-                .shadow(color: .black.opacity(0.10), radius: 3, x: 0, y: 1)
-                .shadow(color: .black.opacity(0.10), radius: 2, x: 0, y: 1)
+                .syContentSurfaceShadow()
                 .padding(DesignSystem.mainSurfaceInsets)
-                .clipped()
         }
         .frame(
             minWidth: DesignSystem.windowWidth,
             minHeight: DesignSystem.windowHeight,
             alignment: .topLeading
         )
-        .background(DesignSystem.sidebarBackground)
+        .background(DesignSystem.windowBackground)
         .ignoresSafeArea(.container, edges: .top)
         .tint(DesignSystem.accent)
         .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)

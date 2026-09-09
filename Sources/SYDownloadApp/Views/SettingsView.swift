@@ -44,7 +44,7 @@ struct SettingsView: View {
         }
         .tint(DesignSystem.accent)
         .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: tab)
+        .animation(reduceMotion ? nil : DesignSystem.motionStandard, value: tab)
         .task {
             let isInitialLoad = !model.hasLoadedEngineSettings
             observingEngineSettingsChanges = false
@@ -155,7 +155,7 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .disabled(model.settingsLoading)
-        .opacity(model.settingsLoading ? 0.68 : 1)
+        .opacity(model.settingsLoading ? DesignSystem.disabledOpacity : 1)
     }
 
     @ViewBuilder
