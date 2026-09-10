@@ -263,14 +263,15 @@ struct PhotosView: View {
 
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text(group.dateKey)
-                    .font(DesignSystem.uiFont)
+                    .syTypography(DesignSystem.typographyControl)
+                    .foregroundStyle(DesignSystem.textPrimary)
                 Text("\(group.photos.count) 张照片")
-                    .font(DesignSystem.metadataFont)
+                    .syTypography(DesignSystem.typographyCaption)
                     .foregroundStyle(DesignSystem.textSecondary)
             }
-            .frame(width: 104, alignment: .leading)
+            .frame(width: RefinementLayout.photoDateColumnWidth, alignment: .leading)
 
-            thumbnailStrip(group.photos)
+            photoPreview(group.photos)
 
             Spacer(minLength: 0)
         }
@@ -296,14 +297,15 @@ struct PhotosView: View {
 
             VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
                 Text("未识别日期")
-                    .font(DesignSystem.uiFont)
+                    .syTypography(DesignSystem.typographyControl)
+                    .foregroundStyle(DesignSystem.textPrimary)
                 Text("\(scanResult.ungrouped.count) 张照片 · 不参与批量删除")
-                    .font(DesignSystem.metadataFont)
+                    .syTypography(DesignSystem.typographyCaption)
                     .foregroundStyle(DesignSystem.textSecondary)
             }
-            .frame(width: 160, alignment: .leading)
+            .frame(width: RefinementLayout.photoUngroupedColumnWidth, alignment: .leading)
 
-            thumbnailStrip(scanResult.ungrouped)
+            photoPreview(scanResult.ungrouped)
             Spacer(minLength: 0)
         }
         .padding(DesignSystem.spaceM)
@@ -317,26 +319,66 @@ struct PhotosView: View {
         }
     }
 
-    private func thumbnailStrip(_ photos: [PhotoFileItem]) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: DesignSystem.spaceS) {
-                ForEach(Array(photos.prefix(8))) { photo in
-                    LocalPhotoThumbnail(url: photo.url)
-                }
+    private func photoPreview(_ photos: [PhotoFileItem]) -> some View {
+        let supportingPhotos = Array(photos.dropFirst().prefix(4))
+        let columns = [
+            GridItem(.fixed(RefinementLayout.photoSecondaryThumbnailSize), spacing: RefinementLayout.photoPreviewSpacing),
+            GridItem(.fixed(RefinementLayout.photoSecondaryThumbnailSize), spacing: RefinementLayout.photoPreviewSpacing)
+        ]
 
-                if photos.count > 8 {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                            .fill(DesignSystem.raisedSurface)
-                        Text("+\(photos.count - 8)")
-                            .font(DesignSystem.groupLabelFont)
-                            .foregroundStyle(DesignSystem.textSecondary)
+        return HStack(alignment: .top, spacing: RefinementLayout.photoPreviewSpacing) {
+            if let cover = photos.first {
+                LocalPhotoThumbnail(
+                    url: cover.url,
+                    width: RefinementLayout.photoCoverWidth,
+                    height: RefinementLayout.photoCoverHeight,
+                    cornerRadius: DesignSystem.panelRadius
+                )
+            }
+
+            if !supportingPhotos.isEmpty {
+                LazyVGrid(columns: columns, spacing: RefinementLayout.photoPreviewSpacing) {
+                    ForEach(Array(supportingPhotos.enumerated()), id: \.element.id) { index, photo in
+                        if index == 3 && photos.count > 5 {
+                            photoOverflowTile(count: photos.count - 4)
+                        } else {
+                            LocalPhotoThumbnail(
+                                url: photo.url,
+                                width: RefinementLayout.photoSecondaryThumbnailSize,
+                                height: RefinementLayout.photoSecondaryThumbnailSize,
+                                cornerRadius: DesignSystem.rowRadius
+                            )
+                        }
                     }
-                    .frame(width: DesignSystem.photoThumbnailSize, height: DesignSystem.photoThumbnailSize)
                 }
+                .frame(
+                    width: RefinementLayout.photoSecondaryThumbnailSize * 2 + RefinementLayout.photoPreviewSpacing,
+                    height: RefinementLayout.photoCoverHeight,
+                    alignment: .top
+                )
             }
         }
-        .scrollIndicators(.hidden)
+        .frame(height: RefinementLayout.photoCoverHeight, alignment: .leading)
+    }
+
+    private func photoOverflowTile(count: Int) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                .fill(DesignSystem.panelBackground)
+            Text("+\(count)")
+                .syTypography(DesignSystem.typographyGroupLabel)
+                .foregroundStyle(DesignSystem.textSecondary)
+                .monospacedDigit()
+        }
+        .frame(
+            width: RefinementLayout.photoSecondaryThumbnailSize,
+            height: RefinementLayout.photoSecondaryThumbnailSize
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+                .strokeBorder(DesignSystem.divider, lineWidth: DesignSystem.dividerWidth)
+        }
+        .accessibilityLabel("还有 \(count) 张照片")
     }
 
     private var deleteBar: some View {
@@ -469,6 +511,9 @@ struct PhotosView: View {
 
 private struct LocalPhotoThumbnail: View {
     let url: URL
+    var width: CGFloat = DesignSystem.photoThumbnailSize
+    var height: CGFloat = DesignSystem.photoThumbnailSize
+    var cornerRadius: CGFloat = DesignSystem.panelRadius
 
     var body: some View {
         Group {
@@ -484,10 +529,10 @@ private struct LocalPhotoThumbnail: View {
                 }
             }
         }
-        .frame(width: DesignSystem.photoThumbnailSize, height: DesignSystem.photoThumbnailSize)
-        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous))
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: DesignSystem.panelRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.07), lineWidth: DesignSystem.borderWidth)
         }
         .help(url.lastPathComponent)
@@ -501,13 +546,13 @@ private struct LocalPhotoThumbnail: View {
                 0,
                 [
                     kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 136,
+                    kCGImageSourceThumbnailMaxPixelSize: Int(max(width, height) * 2),
                     kCGImageSourceCreateThumbnailWithTransform: true
                 ] as CFDictionary
               ) else { return nil }
         return NSImage(
             cgImage: cgImage,
-            size: NSSize(width: DesignSystem.photoThumbnailSize, height: DesignSystem.photoThumbnailSize)
+            size: NSSize(width: width, height: height)
         )
     }
 }
