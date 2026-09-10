@@ -581,7 +581,7 @@ private struct LocalPhotoThumbnail: View {
 }
 
 @MainActor
-private final class PhotoQuickLookPresenter: NSObject, QLPreviewPanelDataSource {
+private final class PhotoQuickLookPresenter: NSObject, @MainActor QLPreviewPanelDataSource {
     static let shared = PhotoQuickLookPresenter()
 
     private var previewURL: URL?
