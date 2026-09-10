@@ -3,6 +3,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import QuickLookThumbnailing
+import QuickLookUI
 
 struct PhotosView: View {
     @State private var folderURL: URL?
@@ -537,11 +538,19 @@ private struct LocalPhotoThumbnail: View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.07), lineWidth: DesignSystem.borderWidth)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            PhotoQuickLookPresenter.shared.open(url)
+        }
         .task(id: url) {
             await loadThumbnail()
         }
-        .help(url.lastPathComponent)
+        .help("点按使用快速查看预览 \(url.lastPathComponent)")
         .accessibilityLabel(url.lastPathComponent)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            PhotoQuickLookPresenter.shared.open(url)
+        }
     }
 
     @MainActor
@@ -568,6 +577,31 @@ private struct LocalPhotoThumbnail: View {
             }
             thumbnailImage = nil
         }
+    }
+}
+
+@MainActor
+private final class PhotoQuickLookPresenter: NSObject, QLPreviewPanelDataSource {
+    static let shared = PhotoQuickLookPresenter()
+
+    private var previewURL: URL?
+
+    func open(_ url: URL) {
+        previewURL = url
+        guard let panel = QLPreviewPanel.shared() else { return }
+        panel.dataSource = self
+        panel.currentPreviewItemIndex = 0
+        panel.reloadData()
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+        previewURL == nil ? 0 : 1
+    }
+
+    func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
+        guard index == 0, let previewURL else { return nil }
+        return previewURL as NSURL
     }
 }
 #endif
