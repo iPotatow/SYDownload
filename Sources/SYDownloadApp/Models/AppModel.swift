@@ -193,6 +193,11 @@ private struct DownloadExecutionResult: Sendable {
     let failureMessage: String?
 }
 
+private struct DownloadOutputContext: Sendable {
+    let bridgeDirectory: String
+    let folderName: String
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     typealias BridgeSender = @Sendable (BridgeRequest) async throws -> BridgeResponse
@@ -339,7 +344,11 @@ final class AppModel: ObservableObject {
 
         let expectedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
         let links = detectedLinks
-        guard let results = await validateLinks(links, expectedInput: expectedInput) else { return }
+        guard let results = await validateLinks(
+            links,
+            expectedInput: expectedInput,
+            abortOnInputChange: true
+        ) else { return }
 
         let supportedFailures = results.filter {
             $0.link.platform != .unknown && !$0.ok
@@ -351,15 +360,15 @@ final class AppModel: ObservableObject {
 
         if supportedFailures.isEmpty && unsupported == 0 {
             status = results.count == 1
-                ? "链接检查通过"
-                : "已检查 \(results.count) 个链接，均可下载"
+                ? "下载环境检查通过"
+                : "已检查 \(results.count) 个链接涉及的下载环境，均可用"
             statusIsError = false
             return
         }
 
         var parts = ["\(downloadable) 个可下载"]
         if !supportedFailures.isEmpty {
-            parts.append("\(supportedFailures.count) 个检查失败")
+            parts.append("\(supportedFailures.count) 个环境检查失败")
         }
         if unsupported > 0 {
             parts.append("\(unsupported) 个不支持")
@@ -376,9 +385,42 @@ final class AppModel: ObservableObject {
         let requestedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestedLinks = detectedLinks
         let destination = outputDirectory
+        let taskIDs = requestedLinks.map { _ in UUID() }
 
         isWorking = true
         defer { isWorking = false }
+
+        let newTasks = zip(taskIDs, requestedLinks).map { pair in
+            let (taskID, link) = pair
+            let supported = link.platform != .unknown
+            return DownloadTaskItem(
+                id: taskID,
+                title: taskTitle(for: link),
+                platform: link.platform,
+                sourceURL: link.url,
+                state: supported ? .queued : .failed,
+                progress: nil,
+                detail: supported ? "等待下载环境检查…" : "不支持此链接平台。",
+                outputDirectory: destination,
+                failureKind: supported ? nil : .unsupported
+            )
+        }
+        tasks.insert(contentsOf: newTasks, at: 0)
+        selection = .tasks
+
+        guard let outputContext = downloadOutputContext(for: destination) else {
+            for taskID in taskIDs {
+                updateTask(taskID) { task in
+                    guard task.state == .queued else { return }
+                    task.state = .failed
+                    task.failureKind = .disk
+                    task.detail = "下载目录必须是具体文件夹，不能直接使用磁盘根目录。"
+                }
+            }
+            status = "下载目录无效"
+            statusIsError = true
+            return
+        }
 
         let validations: [LinkValidationResult]
         if validatedInput == requestedInput {
@@ -386,51 +428,79 @@ final class AppModel: ObservableObject {
                 LinkValidationResult(
                     link: link,
                     ok: link.platform != .unknown,
-                    message: link.platform == .unknown ? "不支持此链接平台。" : "链接检查通过"
+                    message: link.platform == .unknown ? "不支持此链接平台。" : "下载环境检查通过"
                 )
             }
-        } else {
-            guard let results = await validateLinks(requestedLinks, expectedInput: requestedInput) else {
-                return
-            }
+        } else if let results = await validateLinks(
+            requestedLinks,
+            expectedInput: requestedInput,
+            abortOnInputChange: false
+        ) {
             validations = results
             let supportedFailures = results.contains {
                 $0.link.platform != .unknown && !$0.ok
             }
-            if !supportedFailures {
+            if !supportedFailures,
+               input.trimmingCharacters(in: .whitespacesAndNewlines) == requestedInput {
                 validatedInput = requestedInput
             }
-        }
-
-        guard input.trimmingCharacters(in: .whitespacesAndNewlines) == requestedInput else {
+        } else {
+            for taskID in taskIDs {
+                updateTask(taskID) { task in
+                    guard task.state == .queued else { return }
+                    task.state = .failed
+                    task.failureKind = .validation
+                    task.detail = "下载环境检查已取消。"
+                }
+            }
+            status = "下载环境检查已取消"
+            statusIsError = true
             return
         }
 
         let prepared = validations.enumerated().map { index, validation in
-            PreparedDownload(taskID: UUID(), validation: validation, batchIndex: index)
-        }
-        let newTasks = prepared.map { preparedItem in
-            let validation = preparedItem.validation
-            let failureKind: DownloadFailureKind? = validation.ok
-                ? nil
-                : (validation.link.platform == .unknown ? .unsupported : .validation)
-            return DownloadTaskItem(
-                id: preparedItem.taskID,
-                title: taskTitle(for: validation.link),
-                platform: validation.link.platform,
-                sourceURL: validation.link.url,
-                state: validation.ok ? .queued : .failed,
-                progress: nil,
-                detail: validation.ok ? "等待下载…" : validation.message,
-                outputDirectory: destination,
-                failureKind: failureKind
+            PreparedDownload(
+                taskID: taskIDs[index],
+                validation: validation,
+                batchIndex: index
             )
         }
 
-        tasks.insert(contentsOf: newTasks, at: 0)
-        selection = .tasks
+        for preparedItem in prepared where !preparedItem.validation.ok {
+            updateTask(preparedItem.taskID) { task in
+                guard task.state == .queued else { return }
+                task.state = .failed
+                task.progress = nil
+                task.failureKind = preparedItem.validation.link.platform == .unknown
+                    ? .unsupported
+                    : .validation
+                task.detail = preparedItem.validation.message
+            }
+        }
 
-        let downloadable = prepared.filter { $0.validation.ok }
+        let preflightDownloadable = prepared.filter { $0.validation.ok }
+        let preparationFailures = await prepareDownloadFolders(
+            platforms: Set(preflightDownloadable.map { $0.validation.link.platform }),
+            folderName: outputContext.folderName
+        )
+
+        if !preparationFailures.isEmpty {
+            for preparedItem in preflightDownloadable {
+                if let message = preparationFailures[preparedItem.validation.link.platform] {
+                    updateTask(preparedItem.taskID) { task in
+                        guard task.state == .queued else { return }
+                        task.state = .failed
+                        task.progress = nil
+                        task.failureKind = .validation
+                        task.detail = "下载目录准备失败：\(message)"
+                    }
+                }
+            }
+        }
+
+        let downloadable = preflightDownloadable.filter {
+            preparationFailures[$0.validation.link.platform] == nil
+        }
         if downloadable.isEmpty {
             status = "没有可下载的链接"
             statusIsError = true
@@ -445,6 +515,7 @@ final class AppModel: ObservableObject {
         let limiter = AsyncSemaphore(value: maxConcurrentDownloads)
         let streamingSender = sendBridgeStreaming
         let timeoutSeconds = downloadTimeoutSeconds
+        let bridgeDirectory = outputContext.bridgeDirectory
         var results: [DownloadExecutionResult] = []
 
         await withTaskGroup(of: DownloadExecutionResult.self) { group in
@@ -479,7 +550,7 @@ final class AppModel: ObservableObject {
                         id: preparedItem.taskID,
                         command: "download",
                         url: preparedItem.validation.link.url,
-                        outputDirectory: destination,
+                        outputDirectory: bridgeDirectory,
                         timeoutSeconds: timeoutSeconds
                     )
                     do {
@@ -603,14 +674,12 @@ final class AppModel: ObservableObject {
 
     func saveXHSSettings() async {
         let values: [String: Any] = [
-            "work_path": outputDirectory,
             "image_download": xhsSettings.imageDownload,
             "video_download": xhsSettings.videoDownload,
             "live_download": xhsSettings.liveDownload,
             "image_format": xhsSettings.imageFormat,
             "video_preference": xhsSettings.videoPreference,
             "note_format": xhsSettings.noteFormat,
-            "folder_name": xhsSettings.folderName,
             "name_format": xhsSettings.nameFormat,
             "folder_mode": xhsSettings.folderMode,
             "author_archive": xhsSettings.authorArchive,
@@ -624,12 +693,10 @@ final class AppModel: ObservableObject {
 
     func saveDouyinSettings() async {
         let values: [String: Any] = [
-            "root": outputDirectory,
             "music": douyinSettings.music,
             "dynamic_cover": douyinSettings.dynamicCover,
             "static_cover": douyinSettings.staticCover,
             "original_quality": douyinSettings.originalQuality,
-            "folder_name": douyinSettings.folderName,
             "folder_mode": douyinSettings.folderMode,
             "name_format": douyinSettings.nameFormat,
             "desc_length": douyinSettings.descLength,
@@ -814,56 +881,114 @@ final class AppModel: ObservableObject {
 
     private func validateLinks(
         _ links: [DetectedDownloadLink],
-        expectedInput: String
+        expectedInput: String,
+        abortOnInputChange: Bool = true
     ) async -> [LinkValidationResult]? {
         isParsing = true
         defer { isParsing = false }
 
-        var results: [LinkValidationResult] = []
-        for link in links {
-            guard input.trimmingCharacters(in: .whitespacesAndNewlines) == expectedInput else {
-                return nil
-            }
+        var platformChecks: [DownloadPlatform: (ok: Bool, message: String)] = [:]
 
-            if link.platform == .unknown {
-                results.append(
-                    LinkValidationResult(
-                        link: link,
-                        ok: false,
-                        message: "不支持此链接平台。"
-                    )
-                )
-                continue
+        for link in links where link.platform != .unknown {
+            if platformChecks[link.platform] != nil { continue }
+
+            if abortOnInputChange,
+               input.trimmingCharacters(in: .whitespacesAndNewlines) != expectedInput {
+                return nil
             }
 
             do {
                 let response = try await sendBridge(.init(command: "validate", url: link.url))
-                guard input.trimmingCharacters(in: .whitespacesAndNewlines) == expectedInput else {
+                if abortOnInputChange,
+                   input.trimmingCharacters(in: .whitespacesAndNewlines) != expectedInput {
                     return nil
                 }
-                lastDetails = response.details ?? [:]
-                results.append(
-                    LinkValidationResult(
-                        link: link,
-                        ok: response.ok,
-                        message: response.message
-                    )
-                )
+
+                platformChecks[link.platform] = (response.ok, response.message)
+                if input.trimmingCharacters(in: .whitespacesAndNewlines) == expectedInput {
+                    lastDetails = response.details ?? [:]
+                }
             } catch {
-                guard input.trimmingCharacters(in: .whitespacesAndNewlines) == expectedInput else {
+                if abortOnInputChange,
+                   input.trimmingCharacters(in: .whitespacesAndNewlines) != expectedInput {
                     return nil
                 }
-                lastDetails = [:]
-                results.append(
-                    LinkValidationResult(
-                        link: link,
-                        ok: false,
-                        message: error.localizedDescription
-                    )
-                )
+
+                platformChecks[link.platform] = (false, error.localizedDescription)
+                if input.trimmingCharacters(in: .whitespacesAndNewlines) == expectedInput {
+                    lastDetails = [:]
+                }
             }
         }
-        return results
+
+        return links.map { link in
+            guard link.platform != .unknown else {
+                return LinkValidationResult(
+                    link: link,
+                    ok: false,
+                    message: "不支持此链接平台。"
+                )
+            }
+            let check = platformChecks[link.platform]
+            return LinkValidationResult(
+                link: link,
+                ok: check?.ok == true,
+                message: check?.message ?? "下载环境检查失败。"
+            )
+        }
+    }
+
+    private func downloadOutputContext(for destination: String) -> DownloadOutputContext? {
+        let expanded = NSString(string: destination).expandingTildeInPath
+        let target = URL(fileURLWithPath: expanded, isDirectory: true).standardizedFileURL
+        let folderName = target.lastPathComponent
+        guard !folderName.isEmpty, folderName != "/" else { return nil }
+        return DownloadOutputContext(
+            bridgeDirectory: target.deletingLastPathComponent().path,
+            folderName: folderName
+        )
+    }
+
+    private func prepareDownloadFolders(
+        platforms: Set<DownloadPlatform>,
+        folderName: String
+    ) async -> [DownloadPlatform: String] {
+        var failures: [DownloadPlatform: String] = [:]
+        guard JSONSerialization.isValidJSONObject(["folder_name": folderName]),
+              let data = try? JSONSerialization.data(
+                withJSONObject: ["folder_name": folderName],
+                options: [.sortedKeys]
+              ),
+              let json = String(data: data, encoding: .utf8)
+        else {
+            for platform in platforms {
+                failures[platform] = "下载目录名称无法写入引擎配置。"
+            }
+            return failures
+        }
+
+        for platform in platforms {
+            let engine: String
+            switch platform {
+            case .xiaohongshu: engine = "xiaohongshu"
+            case .douyin: engine = "douyin"
+            case .unknown: continue
+            }
+
+            do {
+                let response = try await sendBridge(.init(
+                    command: "settings_update",
+                    engine: engine,
+                    settingsJSON: json
+                ))
+                if !response.ok {
+                    failures[platform] = response.message
+                }
+            } catch {
+                failures[platform] = error.localizedDescription
+            }
+        }
+        return failures
     }
 
     private func taskTitle(for link: DetectedDownloadLink) -> String {
@@ -969,7 +1094,6 @@ final class AppModel: ObservableObject {
             history = decoded
             return
         }
-
         history = []
     }
 }

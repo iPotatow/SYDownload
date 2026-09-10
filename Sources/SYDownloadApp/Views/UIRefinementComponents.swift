@@ -5,7 +5,7 @@ import SwiftUI
 /// Core v5 geometry remains defined by `DesignSystem`; these values only name
 /// business-layout widths that were previously implicit in individual views.
 enum RefinementLayout {
-    static let settingsTabsWidth: CGFloat = 360
+    static let settingsTabsWidth: CGFloat = 600
     static let taskFilterWidth: CGFloat = 440
     static let settingsPathFieldWidth: CGFloat = 360
     static let taskProgressMaxWidth: CGFloat = 420

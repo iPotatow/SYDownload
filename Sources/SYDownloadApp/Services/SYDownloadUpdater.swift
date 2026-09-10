@@ -120,11 +120,32 @@ struct SYDownloadUpdateInstaller {
         let candidate = destination.deletingLastPathComponent()
             .appendingPathComponent(".SYDownload-install-\(UUID().uuidString)", isDirectory: true)
         let status = updateRoot.appendingPathComponent(statusFileName)
-        let waitForParent = parentProcessID.map { """
+        let stopParent = parentProcessID.map { """
         parent_pid=\($0)
-        while /bin/kill -0 "$parent_pid" >/dev/null 2>&1; do
-            /bin/sleep 1
-        done
+
+        wait_for_parent_exit() {
+            local seconds="$1"
+            local waited=0
+            while /bin/kill -0 "$parent_pid" >/dev/null 2>&1; do
+                if (( waited >= seconds )); then
+                    return 1
+                fi
+                /bin/sleep 1
+                waited=$((waited + 1))
+            done
+            return 0
+        }
+
+        if ! wait_for_parent_exit 6; then
+            /bin/kill -TERM "$parent_pid" >/dev/null 2>&1 || true
+            if ! wait_for_parent_exit 3; then
+                /bin/kill -KILL "$parent_pid" >/dev/null 2>&1 || true
+                if ! wait_for_parent_exit 2; then
+                    write_status "failed_parent_exit"
+                    exit 1
+                fi
+            fi
+        fi
         """ } ?? ""
 
         return """
@@ -140,6 +161,12 @@ struct SYDownloadUpdateInstaller {
 
         write_status() {
             /usr/bin/printf '%s\\n' "$1" > "$status_path" 2>/dev/null || true
+        }
+
+        remove_candidate() {
+            if [[ -e "$candidate" ]]; then
+                /bin/rm -rf "$candidate" >/dev/null 2>&1 || true
+            fi
         }
 
         verify_bundle() {
@@ -159,20 +186,20 @@ struct SYDownloadUpdateInstaller {
             verify_bundle "$old"
         }
 
-        \(waitForParent)
+        \(stopParent)
 
         if ! /usr/bin/ditto "$new" "$candidate" >/dev/null 2>&1; then
-            /bin/rm -rf "$candidate" >/dev/null 2>&1 || true
+            remove_candidate
             write_status "failed_preflight"
             exit 1
         fi
         if ! verify_bundle "$candidate"; then
-            /bin/rm -rf "$candidate" >/dev/null 2>&1 || true
+            remove_candidate
             write_status "failed_preflight"
             exit 1
         fi
         if ! /bin/mv "$old" "$backup" >/dev/null 2>&1; then
-            /bin/rm -rf "$candidate" >/dev/null 2>&1 || true
+            remove_candidate
             write_status "failed_swap"
             exit 1
         fi
@@ -182,6 +209,7 @@ struct SYDownloadUpdateInstaller {
             else
                 write_status "failed_restore"
             fi
+            remove_candidate
             exit 1
         fi
         if ! verify_bundle "$old"; then
@@ -274,6 +302,8 @@ struct SYDownloadUpdateInstaller {
 
             let message: String
             switch status {
+            case "failed_parent_exit":
+                message = "无法自动关闭当前 SYDownload，未执行覆盖安装。"
             case "failed_restore":
                 message = "更新失败，且无法恢复旧版本；回滚副本已保留。"
             case "failed_swap_restored", "failed_post_install_restored":
@@ -570,7 +600,7 @@ final class SYDownloadUpdater: ObservableObject {
             throw SYDownloadUpdateError.invalidArchive
         }
 
-        progressBar = ("准备安装…", 0.7)
+        progressBar = ("正在准备安装…", 0.7)
         try launchInstaller(
             stagedApp: stagedApp,
             updateRoot: updateRoot,
@@ -578,8 +608,7 @@ final class SYDownloadUpdater: ObservableObject {
             expectedVersion: stagedShortVersion
         )
         installerLaunched = true
-        progressBar = ("正在重启 SYDownload…", 1)
-        isUpdating = false
+        progressBar = ("正在关闭 SYDownload…", 1)
         NSApp.terminate(nil)
     }
 

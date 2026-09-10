@@ -38,13 +38,38 @@ final class UpdaterTests: XCTestCase {
             updateRoot: root,
             backupName: ".SYDownload-backup-test",
             expectedBundleIdentifier: "com.sydownload.app",
-            expectedVersion: "0.3.0"
+            expectedVersion: "0.3.5"
         )
 
         XCTAssertTrue(script.contains("verify_bundle \"$candidate\""))
         XCTAssertTrue(script.contains("/bin/mv \"$old\" \"$backup\""))
         XCTAssertTrue(script.contains("restore_backup"))
         XCTAssertTrue(script.contains("write_status \"installed\""))
+    }
+
+    func testInstallerScriptBoundsParentWaitAndEscalatesTermination() throws {
+        let staged = URL(fileURLWithPath: "/tmp/Staged/SYDownload.app")
+        let destination = URL(fileURLWithPath: "/Applications/SYDownload.app")
+        let root = URL(fileURLWithPath: "/tmp/SYDownload/Updates/test")
+        let script = SYDownloadUpdateInstaller.installScript(
+            stagedApp: staged,
+            destination: destination,
+            updateRoot: root,
+            backupName: ".SYDownload-backup-test",
+            expectedBundleIdentifier: "com.sydownload.app",
+            expectedVersion: "0.3.5",
+            parentProcessID: 4321
+        )
+
+        XCTAssertTrue(script.contains("wait_for_parent_exit 6"))
+        XCTAssertTrue(script.contains("/bin/kill -TERM \"$parent_pid\""))
+        XCTAssertTrue(script.contains("wait_for_parent_exit 3"))
+        XCTAssertTrue(script.contains("/bin/kill -KILL \"$parent_pid\""))
+        XCTAssertTrue(script.contains("write_status \"failed_parent_exit\""))
+        XCTAssertLessThan(
+            try XCTUnwrap(script.range(of: "failed_parent_exit")?.lowerBound),
+            try XCTUnwrap(script.range(of: "/usr/bin/ditto \"$new\" \"$candidate\"")?.lowerBound)
+        )
     }
 }
 #endif
