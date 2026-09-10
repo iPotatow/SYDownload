@@ -2,7 +2,7 @@
 import SwiftUI
 
 /// Page-level alignment helpers used by the desktop refinement pass.
-/// Core v5 geometry remains defined by `DesignSystem`; these values only name
+/// Core v6 geometry remains defined by `DesignSystem`; these values only name
 /// business-layout widths that were previously implicit in individual views.
 enum RefinementLayout {
     static let settingsTabsWidth: CGFloat = 600
@@ -32,7 +32,7 @@ struct CenteredControl<Content: View>: View {
     }
 }
 
-/// Full-width Settings section. The existing Core v5 section styling is kept,
+/// Full-width Settings section. The existing Core v6 section styling is kept,
 /// while the panel is prevented from shrinking to the intrinsic width of its content.
 struct AlignedSettingsSection<Content: View>: View {
     let title: String
@@ -109,13 +109,6 @@ private struct SYInputSurfaceModifier: ViewModifier {
             .overlay {
                 RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
                     .strokeBorder(borderColor, lineWidth: DesignSystem.borderWidth)
-            }
-            .overlay {
-                if isFocused {
-                    RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
-                        .stroke(DesignSystem.focusRing, lineWidth: DesignSystem.focusRingWidth)
-                        .padding(-DesignSystem.focusRingOffset)
-                }
             }
     }
 

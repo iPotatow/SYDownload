@@ -57,6 +57,8 @@ struct SidebarView: View {
         systemImage: String
     ) -> some View {
         let selected = model.selection == section
+        let focused = focusedSection.wrappedValue == section
+        let visuallyActive = selected || focused
 
         return Button {
             model.selection = section
@@ -66,7 +68,7 @@ struct SidebarView: View {
                 Image(systemName: systemImage)
                     .font(.system(size: DesignSystem.sidebarNavigationIconSize, weight: .medium))
                     .frame(width: DesignSystem.sidebarNavigationIconSize)
-                    .foregroundStyle(selected ? DesignSystem.accent : DesignSystem.textSecondary)
+                    .foregroundStyle(visuallyActive ? DesignSystem.accent : DesignSystem.textSecondary)
 
                 Text(title)
                     .syTypography(DesignSystem.typographyControl)
@@ -79,8 +81,8 @@ struct SidebarView: View {
         .focused(focusedSection, equals: section)
         .buttonStyle(
             SidebarButtonStyle(
-                selected: selected,
-                isFocused: focusedSection.wrappedValue == section
+                selected: visuallyActive,
+                isFocused: false
             )
         )
         .accessibilityAddTraits(selected ? .isSelected : [])
