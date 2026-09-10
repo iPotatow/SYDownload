@@ -20,6 +20,7 @@ struct TasksView: View {
             VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
                 filterBar
                 Divider()
+                    .overlay(DesignSystem.divider)
 
                 if displayedTasks.isEmpty {
                     EmptyLibraryView(
@@ -77,17 +78,19 @@ struct TasksView: View {
     }
 
     private var filterBar: some View {
-        Picker("任务状态", selection: $model.taskFilter) {
-            ForEach(TaskFilter.allCases) { filter in
-                Text("\(filterTitle(filter)) \(count(for: filter))")
-                    .tag(filter)
+        CenteredControl(width: RefinementLayout.taskFilterWidth) {
+            Picker("任务状态", selection: $model.taskFilter) {
+                ForEach(TaskFilter.allCases) { filter in
+                    Text("\(filterTitle(filter)) \(count(for: filter))")
+                        .tag(filter)
+                }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .font(DesignSystem.uiFont)
+            .frame(height: DesignSystem.controlHeightDefault)
+            .accessibilityLabel("任务状态")
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .font(DesignSystem.uiFont)
-        .frame(height: DesignSystem.controlHeightDefault)
-        .accessibilityLabel("任务状态")
     }
 
     @ViewBuilder
@@ -251,12 +254,12 @@ private struct TaskRow: View {
                                 .tint(DesignSystem.accent)
                         }
                     }
-                    .frame(maxWidth: 460)
+                    .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
                 } else if task.state == .queued {
                     ProgressView(value: 0)
                         .progressViewStyle(.linear)
                         .tint(DesignSystem.accent)
-                        .frame(maxWidth: 460)
+                        .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
                 }
             }
 
