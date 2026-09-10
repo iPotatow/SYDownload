@@ -2,7 +2,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
-import ImageIO
+import QuickLookThumbnailing
 
 struct PhotosView: View {
     @State private var folderURL: URL?
@@ -515,10 +515,12 @@ private struct LocalPhotoThumbnail: View {
     var height: CGFloat = DesignSystem.photoThumbnailSize
     var cornerRadius: CGFloat = DesignSystem.panelRadius
 
+    @State private var thumbnailImage: NSImage?
+
     var body: some View {
         Group {
-            if let image = thumbnailImage {
-                Image(nsImage: image)
+            if let thumbnailImage {
+                Image(nsImage: thumbnailImage)
                     .resizable()
                     .scaledToFill()
             } else {
@@ -535,25 +537,37 @@ private struct LocalPhotoThumbnail: View {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.07), lineWidth: DesignSystem.borderWidth)
         }
+        .task(id: url) {
+            await loadThumbnail()
+        }
         .help(url.lastPathComponent)
         .accessibilityLabel(url.lastPathComponent)
     }
 
-    private var thumbnailImage: NSImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let cgImage = CGImageSourceCreateThumbnailAtIndex(
-                source,
-                0,
-                [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceThumbnailMaxPixelSize: Int(max(width, height) * 2),
-                    kCGImageSourceCreateThumbnailWithTransform: true
-                ] as CFDictionary
-              ) else { return nil }
-        return NSImage(
-            cgImage: cgImage,
-            size: NSSize(width: width, height: height)
+    @MainActor
+    private func loadThumbnail() async {
+        thumbnailImage = nil
+
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url,
+            size: CGSize(width: width, height: height),
+            scale: NSScreen.main?.backingScaleFactor ?? 2,
+            representationTypes: .thumbnail
         )
+
+        do {
+            let representation = try await QLThumbnailGenerator.shared.generateBestRepresentation(for: request)
+            guard !Task.isCancelled else {
+                QLThumbnailGenerator.shared.cancel(request)
+                return
+            }
+            thumbnailImage = representation.nsImage
+        } catch {
+            if Task.isCancelled {
+                QLThumbnailGenerator.shared.cancel(request)
+            }
+            thumbnailImage = nil
+        }
     }
 }
 #endif
