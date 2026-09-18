@@ -14,12 +14,12 @@ struct ContentView: View {
                 focusedSection: $focusedSection
             )
             .frame(
-                minWidth: DesignSystem.sidebarWidth,
-                maxWidth: DesignSystem.sidebarWidth,
+                minWidth: SYDownloadLayout.sidebarWidth,
+                maxWidth: SYDownloadLayout.sidebarWidth,
                 maxHeight: .infinity,
                 alignment: .topLeading
             )
-            .background(DesignSystem.sidebarBackground)
+            .background(CoreColor.sidebarBackground)
             .clipped()
             .layoutPriority(1)
 
@@ -31,23 +31,23 @@ struct ContentView: View {
                     alignment: .topLeading
                 )
                 .background(
-                    DesignSystem.mainSurfaceBackground,
-                    in: RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
+                    CoreColor.contentBackground,
+                    in: RoundedRectangle(cornerRadius: CoreRadius.content, style: .continuous)
                 )
                 .clipShape(
-                    RoundedRectangle(cornerRadius: DesignSystem.contentRadius, style: .continuous)
+                    RoundedRectangle(cornerRadius: CoreRadius.content, style: .continuous)
                 )
-                .syContentSurfaceShadow()
-                .padding(DesignSystem.mainSurfaceInsets)
+                .coreContentSurfaceShadow()
+                .padding(SYDownloadLayout.contentSurfaceInsets)
         }
         .frame(
-            minWidth: DesignSystem.windowWidth,
-            minHeight: DesignSystem.windowHeight,
+            minWidth: SYDownloadLayout.windowWidth,
+            minHeight: SYDownloadLayout.windowHeight,
             alignment: .topLeading
         )
-        .background(DesignSystem.windowBackground)
+        .background(CoreColor.windowBackground)
         .ignoresSafeArea(.container, edges: .top)
-        .tint(DesignSystem.accent)
+        .tint(CoreColor.accent)
         .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadNewDownload)) { _ in
             model.selection = .download

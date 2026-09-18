@@ -10,23 +10,23 @@ struct AboutView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
+        VStack(alignment: .leading, spacing: CoreSpacing.l) {
             header
 
             Text("自动识别分享链接，并调用内置下载引擎。轻量、直接，内容始终写入你选择的文件夹。")
-                .syTypography(DesignSystem.typographyBody)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.body)
+                .foregroundStyle(CoreColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             capabilityRow
 
-            VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
+            VStack(alignment: .leading, spacing: CoreSpacing.m) {
                 Button("打开 GitHub 仓库", systemImage: "arrow.up.right", action: openRepository)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .font(DesignSystem.uiFont)
+                    .font(CoreTypography.controlFont)
 
-                HStack(spacing: DesignSystem.spaceL) {
+                HStack(spacing: CoreSpacing.l) {
                     linkButton("问题反馈", symbol: "bubble.left.and.exclamationmark.bubble.right", url: "https://github.com/iPotatow/SYdownload/issues")
                     linkButton("使用文档", symbol: "doc.text", url: "https://github.com/iPotatow/SYdownload#readme")
                 }
@@ -35,49 +35,49 @@ struct AboutView: View {
             Spacer(minLength: 0)
 
             Divider()
-                .overlay(DesignSystem.divider)
+                .overlay(CoreColor.divider)
 
             HStack {
                 Text("基于 XHS-Downloader 和 TikTokDownloader 构建")
-                    .syTypography(DesignSystem.typographyCaption)
+                    .coreTypography(CoreTypography.caption)
                 Spacer()
                 Text("GPL-3.0")
-                    .syTypography(DesignSystem.typographyCaption)
+                    .coreTypography(CoreTypography.caption)
             }
-            .foregroundStyle(DesignSystem.textTertiary)
+            .foregroundStyle(CoreColor.textTertiary)
         }
-        .padding(DesignSystem.spaceXL)
+        .padding(CoreSpacing.xl)
         .frame(width: 500)
         .frame(minHeight: 380)
         .onExitCommand { dismiss() }
-        .background(DesignSystem.mainSurfaceBackground)
-        .tint(DesignSystem.accent)
+        .background(CoreColor.contentBackground)
+        .tint(CoreColor.accent)
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: DesignSystem.spaceL) {
+        HStack(alignment: .top, spacing: CoreSpacing.l) {
             AppMark(size: 56)
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+            VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                 Text("SYDownload")
-                    .syTypography(DesignSystem.typographySectionTitle)
-                    .foregroundStyle(DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.sectionTitle)
+                    .foregroundStyle(CoreColor.textPrimary)
                 Text("小红书与抖音下载工具 · v\(version)")
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textSecondary)
             }
-            Spacer(minLength: DesignSystem.spaceL)
+            Spacer(minLength: CoreSpacing.l)
             Button("关闭", systemImage: "xmark", action: dismiss.callAsFunction)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .foregroundStyle(CoreColor.textSecondary)
                 .help("关闭")
         }
     }
 
     private var capabilityRow: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
-            capability("本地优先", "链接和配置通过本机 Bridge 处理。", systemImage: "lock.shield", tint: DesignSystem.accent)
-            capability("自包含", "Release 内置 Python 运行时与下载引擎。", systemImage: "shippingbox", tint: DesignSystem.accent)
+        VStack(alignment: .leading, spacing: CoreSpacing.s) {
+            capability("本地优先", "链接和配置通过本机 Bridge 处理。", systemImage: "lock.shield", tint: CoreColor.accent)
+            capability("自包含", "Release 内置 Python 运行时与下载引擎。", systemImage: "shippingbox", tint: CoreColor.accent)
         }
     }
 
@@ -87,23 +87,23 @@ struct AboutView: View {
         systemImage: String,
         tint: Color
     ) -> some View {
-        HStack(spacing: DesignSystem.spaceM) {
+        HStack(spacing: CoreSpacing.m) {
             IconBadge(systemImage: systemImage, tint: tint, size: 36)
-            VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+            VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                 Text(title)
-                    .syTypography(DesignSystem.typographyControl)
-                    .foregroundStyle(DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.control)
+                    .foregroundStyle(CoreColor.textPrimary)
                 Text(message)
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(DesignSystem.spaceM)
+        .padding(CoreSpacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            DesignSystem.controlBackground,
-            in: RoundedRectangle(cornerRadius: DesignSystem.rowRadius, style: .continuous)
+            CoreColor.controlBackground,
+            in: RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
         )
     }
 
@@ -112,8 +112,8 @@ struct AboutView: View {
             open(url)
         }
         .buttonStyle(.plain)
-        .font(DesignSystem.uiFont)
-        .foregroundStyle(DesignSystem.textPrimary)
+        .font(CoreTypography.controlFont)
+        .foregroundStyle(CoreColor.textPrimary)
     }
 
     private func openRepository() {

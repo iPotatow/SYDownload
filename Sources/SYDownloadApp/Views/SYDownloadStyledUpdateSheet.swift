@@ -7,15 +7,15 @@ struct SYDownloadStyledUpdateSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DesignSystem.spaceL) {
-            HStack(alignment: .top, spacing: DesignSystem.spaceL) {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceXS) {
+        VStack(alignment: .leading, spacing: CoreSpacing.l) {
+            HStack(alignment: .top, spacing: CoreSpacing.l) {
+                VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                     Text("SYDownload 更新")
-                        .syTypography(DesignSystem.typographySectionTitle)
-                        .foregroundStyle(DesignSystem.textPrimary)
+                        .coreTypography(CoreTypography.sectionTitle)
+                        .foregroundStyle(CoreColor.textPrimary)
                     Text("当前版本：\(updater.displayVersion)")
-                        .syTypography(DesignSystem.typographyCaption)
-                        .foregroundStyle(DesignSystem.textSecondary)
+                        .coreTypography(CoreTypography.caption)
+                        .foregroundStyle(CoreColor.textSecondary)
                 }
                 Spacer()
                 if updater.isChecking {
@@ -24,10 +24,10 @@ struct SYDownloadStyledUpdateSheet: View {
                 }
             }
 
-            HStack(spacing: DesignSystem.spaceM) {
+            HStack(spacing: CoreSpacing.m) {
                 Text("更新来源")
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textPrimary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textPrimary)
                 Spacer()
                 Picker("更新来源", selection: $updater.updateSource) {
                     ForEach(SYDownloadUpdateSource.allCases) { source in
@@ -35,119 +35,119 @@ struct SYDownloadStyledUpdateSheet: View {
                     }
                 }
                 .labelsHidden()
-                .font(DesignSystem.uiFont)
-                .frame(width: 168, height: DesignSystem.controlHeightDefault)
+                .font(CoreTypography.controlFont)
+                .frame(width: 168, height: CoreMetrics.controlHeightDefault)
 
                 Button("重新检查") {
                     updater.checkForUpdates(sheet: true, force: true)
                 }
-                .font(DesignSystem.uiFont)
-                .frame(height: DesignSystem.controlHeightDefault)
+                .font(CoreTypography.controlFont)
+                .frame(height: CoreMetrics.controlHeightDefault)
                 .disabled(updater.isChecking || updater.isUpdating)
             }
 
-            SurfaceCard {
+            CorePanel {
                 updateContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .frame(maxHeight: .infinity)
 
             if updater.isUpdating {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+                VStack(alignment: .leading, spacing: CoreSpacing.s) {
                     ProgressView(value: updater.progressBar.1)
                     Text(updater.progressBar.0)
-                        .syTypography(DesignSystem.typographyCaption)
-                        .foregroundStyle(DesignSystem.textSecondary)
+                        .coreTypography(CoreTypography.caption)
+                        .foregroundStyle(CoreColor.textSecondary)
                 }
             }
 
-            HStack(spacing: DesignSystem.spaceM) {
+            HStack(spacing: CoreSpacing.m) {
                 Button("关闭") { dismiss() }
-                    .font(DesignSystem.uiFont)
+                    .font(CoreTypography.controlFont)
                 Spacer()
                 if let url = URL(string: "https://github.com/\(updater.owner)/\(updater.repo)/releases") {
                     Button("Release 页面") { NSWorkspace.shared.open(url) }
-                        .font(DesignSystem.uiFont)
+                        .font(CoreTypography.controlFont)
                 }
                 Button("更新并重启") {
                     updater.downloadUpdate()
                 }
-                .font(DesignSystem.uiFont)
+                .font(CoreTypography.controlFont)
                 .buttonStyle(.borderedProminent)
-                .tint(DesignSystem.accent)
+                .tint(CoreColor.accent)
                 .disabled(!updater.hasNewerRelease || updater.isChecking || updater.isUpdating)
             }
         }
-        .padding(DesignSystem.spaceXL)
+        .padding(CoreSpacing.xl)
         .frame(width: 600, height: 460)
-        .background(DesignSystem.mainSurfaceBackground)
-        .tint(DesignSystem.accent)
+        .background(CoreColor.contentBackground)
+        .tint(CoreColor.accent)
     }
 
     @ViewBuilder
     private var updateContent: some View {
         if let error = updater.updateError {
-            VStack(alignment: .leading, spacing: DesignSystem.spaceS) {
+            VStack(alignment: .leading, spacing: CoreSpacing.s) {
                 Label {
                     Text("更新检查失败")
-                        .syTypography(DesignSystem.typographyControl)
+                        .coreTypography(CoreTypography.control)
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(DesignSystem.semanticWarning)
+                        .foregroundStyle(CoreColor.warning)
                 }
                 Text(error)
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textSecondary)
                     .textSelection(.enabled)
             }
         } else if let release = updater.latestRelease {
             ScrollView {
-                VStack(alignment: .leading, spacing: DesignSystem.spaceM) {
-                    HStack(alignment: .firstTextBaseline, spacing: DesignSystem.spaceM) {
+                VStack(alignment: .leading, spacing: CoreSpacing.m) {
+                    HStack(alignment: .firstTextBaseline, spacing: CoreSpacing.m) {
                         Text(release.name.isEmpty ? release.tagName : release.name)
-                            .syTypography(DesignSystem.typographySectionTitle)
-                            .foregroundStyle(DesignSystem.textPrimary)
+                            .coreTypography(CoreTypography.sectionTitle)
+                            .foregroundStyle(CoreColor.textPrimary)
                         Spacer()
                         Text(release.tagName)
-                            .syTypography(DesignSystem.typographyCaption)
-                            .foregroundStyle(DesignSystem.textSecondary)
+                            .coreTypography(CoreTypography.caption)
+                            .foregroundStyle(CoreColor.textSecondary)
                             .monospaced()
                     }
 
                     if updater.hasNewerRelease {
                         Label("发现新版本", systemImage: "arrow.down.circle.fill")
-                            .font(DesignSystem.uiFont)
-                            .foregroundStyle(DesignSystem.accent)
+                            .font(CoreTypography.controlFont)
+                            .foregroundStyle(CoreColor.accent)
                     } else {
                         Label("已是最新版本", systemImage: "checkmark.circle.fill")
-                            .font(DesignSystem.uiFont)
-                            .foregroundStyle(DesignSystem.semanticSuccess)
+                            .font(CoreTypography.controlFont)
+                            .foregroundStyle(CoreColor.success)
                     }
 
                     if release.body.isEmpty {
                         Text("该版本没有发布说明。")
-                            .syTypography(DesignSystem.typographyBody)
-                            .foregroundStyle(DesignSystem.textSecondary)
+                            .coreTypography(CoreTypography.body)
+                            .foregroundStyle(CoreColor.textSecondary)
                     } else {
                         Text(release.body)
-                            .syTypography(DesignSystem.typographyBody)
-                            .foregroundStyle(DesignSystem.textSecondary)
+                            .coreTypography(CoreTypography.body)
+                            .foregroundStyle(CoreColor.textSecondary)
                             .textSelection(.enabled)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         } else if updater.isChecking {
-            HStack(spacing: DesignSystem.spaceS) {
+            HStack(spacing: CoreSpacing.s) {
                 ProgressView().controlSize(.small)
                 Text("正在检查更新…")
-                    .syTypography(DesignSystem.typographyBody)
-                    .foregroundStyle(DesignSystem.textSecondary)
+                    .coreTypography(CoreTypography.body)
+                    .foregroundStyle(CoreColor.textSecondary)
             }
         } else {
             Text("暂无 Release 信息。")
-                .syTypography(DesignSystem.typographyBody)
-                .foregroundStyle(DesignSystem.textSecondary)
+                .coreTypography(CoreTypography.body)
+                .foregroundStyle(CoreColor.textSecondary)
         }
     }
 }
