@@ -45,6 +45,23 @@ ENGINE_PLATFORMS = {
     "XHS-Downloader": "xiaohongshu",
     "TikTokDownloader": "douyin",
 }
+BROWSER_COOKIE_SOURCES = {
+    "Arc": "arc",
+    "Brave": "brave",
+    "Chrome": "chrome",
+    "Chromium": "chromium",
+    "Edge": "edge",
+    "Firefox": "firefox",
+    "LibreWolf": "librewolf",
+    "Opera": "opera",
+    "OperaGX": "opera_gx",
+    "Safari": "safari",
+    "Vivaldi": "vivaldi",
+}
+COOKIE_DOMAINS = {
+    "xiaohongshu": ["xiaohongshu.com"],
+    "douyin": ["douyin.com"],
+}
 VISIBLE_SETTINGS = {
     "XHS-Downloader": (
         "image_download",
@@ -473,6 +490,78 @@ def settings_path(req: dict[str, Any]) -> dict[str, Any]:
     return response(req.get("id"), True, None, "配置文件已就绪。", config_path=stable_settings_path(name))
 
 
+def browser_cookie(req: dict[str, Any]) -> dict[str, Any]:
+    resolved = settings_engine(req)
+    if resolved is None:
+        return response(req.get("id"), False, None, "找不到对应下载引擎。")
+    platform, name, engine = resolved
+
+    raw = req.get("settingsJSON") or "{}"
+    try:
+        values = json.loads(raw)
+    except json.JSONDecodeError:
+        return response(req.get("id"), False, platform, "浏览器 Cookie 参数不是有效 JSON。")
+    if not isinstance(values, dict):
+        return response(req.get("id"), False, platform, "浏览器 Cookie 参数必须是 JSON 对象。")
+
+    browser_name = str(values.get("browser") or "").strip()
+    reader_name = BROWSER_COOKIE_SOURCES.get(browser_name)
+    if reader_name is None:
+        return response(req.get("id"), False, platform, f"不支持的浏览器：{browser_name or '未选择'}")
+
+    if browser_name == "Safari" and sys.platform != "darwin":
+        return response(req.get("id"), False, platform, "Safari Cookie 读取仅支持 macOS。")
+
+    try:
+        import rookiepy  # type: ignore
+    except ImportError:
+        return response(req.get("id"), False, platform, "浏览器 Cookie 组件未安装，请重新安装最新版 SYDownload。")
+
+    try:
+        reader = getattr(rookiepy, reader_name)
+        cookies = reader(domains=COOKIE_DOMAINS[platform])
+    except Exception as exc:
+        return response(
+            req.get("id"),
+            False,
+            platform,
+            f"从 {browser_name} 读取 Cookie 失败：{exc}",
+            error_kind="auth",
+        )
+
+    pairs: list[str] = []
+    for item in cookies:
+        if not isinstance(item, dict):
+            continue
+        cookie_name = str(item.get("name") or "").strip()
+        cookie_value = str(item.get("value") or "")
+        if cookie_name:
+            pairs.append(f"{cookie_name}={cookie_value}")
+
+    cookie_header = "; ".join(pairs)
+    if not cookie_header:
+        return response(
+            req.get("id"),
+            False,
+            platform,
+            f"{browser_name} 中未找到 {COOKIE_DOMAINS[platform][0]} 的 Cookie。",
+            error_kind="auth",
+        )
+
+    update_engine_settings(name, engine, {"cookie": cookie_header})
+    platform_name = "小红书" if platform == "xiaohongshu" else "抖音"
+    return response(
+        req.get("id"),
+        True,
+        platform,
+        f"已从 {browser_name} 读取并保存{platform_name} Cookie。",
+        cookie=cookie_header,
+        browser=browser_name,
+        cookie_count=len(pairs),
+        config_path=stable_settings_path(name),
+    )
+
+
 def validate(req: dict[str, Any]) -> dict[str, Any]:
     url = req.get("url") or ""
     platform = detect_platform(url)
@@ -769,6 +858,8 @@ def handle(req: dict[str, Any]) -> dict[str, Any]:
         return settings_reset(req)
     if command == "settings_path":
         return settings_path(req)
+    if command == "browser_cookie":
+        return browser_cookie(req)
     return response(req.get("id"), False, None, f"未知命令：{command}")
 
 
