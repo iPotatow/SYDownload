@@ -268,6 +268,7 @@ struct SettingsView: View {
 
     @State private var tab: SettingsTab = .general
     @AppStorage("preferredAppearance") private var preferredAppearance = "跟随系统"
+    @AppStorage("browserCookieSource") private var browserCookieSource = "Chrome"
     @State private var resetTarget: String?
     @State private var observingEngineSettingsChanges = false
     @SceneStorage("SYDownload.settings.xhsDirty") private var xhsSettingsDirty = false
@@ -288,6 +289,20 @@ struct SettingsView: View {
         NameFormatOption(rawValue: "最后更新时间", title: "最后更新时间"),
         NameFormatOption(rawValue: "作者昵称", title: "作者昵称"),
         NameFormatOption(rawValue: "作者ID", title: "作者 ID"),
+    ]
+
+    private let browserCookieChoices = [
+        SettingsChoice("chrome", value: "Chrome", title: "Chrome"),
+        SettingsChoice("safari", value: "Safari", title: "Safari"),
+        SettingsChoice("arc", value: "Arc", title: "Arc"),
+        SettingsChoice("edge", value: "Edge", title: "Edge"),
+        SettingsChoice("brave", value: "Brave", title: "Brave"),
+        SettingsChoice("chromium", value: "Chromium", title: "Chromium"),
+        SettingsChoice("firefox", value: "Firefox", title: "Firefox"),
+        SettingsChoice("librewolf", value: "LibreWolf", title: "LibreWolf"),
+        SettingsChoice("opera", value: "Opera", title: "Opera"),
+        SettingsChoice("operagx", value: "OperaGX", title: "Opera GX"),
+        SettingsChoice("vivaldi", value: "Vivaldi", title: "Vivaldi"),
     ]
 
     private let douyinNameOptions = [
@@ -677,11 +692,14 @@ struct SettingsView: View {
         }
 
         CoreSettingsSection("Cookie") {
+            browserCookieRow(engine: "xiaohongshu")
+
             VStack(alignment: .leading, spacing: CoreSpacing.s) {
                 Text("小红书网页版 Cookie")
                     .coreTypography(CoreTypography.body)
                 plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100, field: .xhsCookie)
                     .accessibilityLabel("小红书网页版 Cookie")
+                browserCookieHelp
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -757,11 +775,14 @@ struct SettingsView: View {
         }
 
         CoreSettingsSection("Cookie") {
+            browserCookieRow(engine: "douyin")
+
             VStack(alignment: .leading, spacing: CoreSpacing.s) {
                 Text("抖音网页版 Cookie（douyin.com）")
                     .coreTypography(CoreTypography.body)
                 plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 92, field: .douyinCookie)
                     .accessibilityLabel("抖音网页版 Cookie")
+                browserCookieHelp
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -803,6 +824,38 @@ struct SettingsView: View {
             pathRow("缓存", "~/Library/Caches/SYDownload/", showsDivider: true)
             pathRow("下载文件", model.outputDirectory, showsDivider: false)
         }
+    }
+
+    private func browserCookieRow(engine: String) -> some View {
+        SettingsControlRow("从浏览器读取") {
+            HStack(spacing: CoreSpacing.s) {
+                SettingsPopupSelector(
+                    title: "浏览器",
+                    selection: $browserCookieSource,
+                    choices: browserCookieChoices
+                )
+
+                Button("读取并保存") {
+                    Task {
+                        await model.importBrowserCookie(
+                            engine: engine,
+                            browser: browserCookieSource
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .font(CoreTypography.controlFont)
+                .frame(height: CoreMetrics.controlHeightDefault)
+                .disabled(model.settingsLoading)
+            }
+        }
+    }
+
+    private var browserCookieHelp: some View {
+        Text("读取成功后会直接保存到对应引擎配置。首次读取 Chrome、Arc、Edge、Brave 等 Chromium 浏览器时，macOS 可能请求钥匙串授权。")
+            .coreTypography(CoreTypography.caption)
+            .foregroundStyle(CoreColor.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func settingsToggleRow(
