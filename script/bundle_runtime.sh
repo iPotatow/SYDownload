@@ -131,6 +131,11 @@ for raw in sys.argv[1:]:
         if requirement not in seen:
             seen.add(requirement)
             print(requirement)
+
+# XHS-Downloader keeps its browser-cookie integration source but no longer
+# declares rookiepy because the upstream CLI entry point is disabled. SYDownload
+# calls the integration directly, so pin it explicitly for reproducible bundles.
+print("rookiepy==0.5.6")
 PY
 
 echo "Installing Python dependencies into staged runtime..."
@@ -150,6 +155,7 @@ import lxml
 import openpyxl
 import pydantic
 import pyperclip
+import rookiepy
 import rich
 import uvicorn
 import webview
@@ -176,6 +182,7 @@ import gmssl
 import javascript
 import lxml
 import pydantic
+import rookiepy
 import webview
 print("Bundled relocated runtime smoke test passed")
 PY
