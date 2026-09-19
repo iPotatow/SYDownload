@@ -710,6 +710,47 @@ final class AppModel: ObservableObject {
         await saveEngineSettings(engine: "douyin", values: values)
     }
 
+    func importBrowserCookie(engine: String, browser: String) async {
+        settingsLoading = true
+        defer { settingsLoading = false }
+
+        do {
+            let payload = try JSONSerialization.data(
+                withJSONObject: ["browser": browser],
+                options: []
+            )
+            let settingsJSON = String(decoding: payload, as: UTF8.self)
+            let response = try await sendBridge(
+                .init(
+                    command: "browser_cookie",
+                    engine: engine,
+                    settingsJSON: settingsJSON
+                )
+            )
+            settingsStatus = response.message
+            guard response.ok, let cookie = response.details?["cookie"] else {
+                settingsStatusIsError = true
+                return
+            }
+
+            if engine == "xiaohongshu" {
+                xhsSettings.cookie = cookie
+                if let path = response.details?["config_path"] {
+                    xhsSettingsPath = path
+                }
+            } else if engine == "douyin" {
+                douyinSettings.cookie = cookie
+                if let path = response.details?["config_path"] {
+                    douyinSettingsPath = path
+                }
+            }
+            settingsStatusIsError = false
+        } catch {
+            settingsStatus = error.localizedDescription
+            settingsStatusIsError = true
+        }
+    }
+
     func resetEngineSettings(_ engine: String) async {
         settingsLoading = true
         defer { settingsLoading = false }
