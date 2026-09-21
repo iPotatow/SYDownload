@@ -6,8 +6,8 @@ APP="${1:-$ROOT/dist/SYDownload.app}"
 RESOURCES="$APP/Contents/Resources"
 PYTHON_VERSION="${PYTHON_VERSION:-3.12}"
 
-XHS_REVISION="${XHS_REVISION:-cc7c78088afc09082f54ea6263a9fd07c2fa510f}"
-DOUK_REVISION="${DOUK_REVISION:-43e1abc4ab401b31560423450d01648e83c9b48a}"
+XHS_REVISION="${XHS_REVISION:-47840a1bee8438324ff10753c4291148c46071c8}"
+DOUK_REVISION="${DOUK_REVISION:-207e2184e1004f4f5bf87fb69231f3bb5731adbb}"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "Bundling the macOS Python runtime requires macOS."
@@ -59,7 +59,10 @@ fetch_revision "https://github.com/JoeanAmier/TikTokDownloader.git" "$DOUK_REVIS
 echo "Applying SYDownload engine data-path adapters..."
 /usr/bin/python3 - \
   "$ENGINES_ROOT/XHS-Downloader/source/module/recorder.py" \
-  "$ENGINES_ROOT/TikTokDownloader/src/storage/manager.py" <<'PY'
+  "$ENGINES_ROOT/TikTokDownloader/src/storage/manager.py" \
+  "$ENGINES_ROOT/XHS-Downloader/source/application/download.py" \
+  "$ENGINES_ROOT/XHS-Downloader/source/application/app.py" \
+  "$ENGINES_ROOT/TikTokDownloader/src/downloader/download.py" <<'PY'
 from pathlib import Path
 import sys
 
@@ -102,6 +105,70 @@ douk = replace_once(
     "DouK data migration root",
 )
 douk_path.write_text(douk, encoding="utf-8")
+
+# SYDownload exposes an explicit "overwrite existing files" preference. The
+# upstream engines normally skip when either an ID record or the target file
+# already exists, so teach the bundled copies to honor the per-task environment
+# override without changing upstream defaults.
+xhs_download_path = Path(sys.argv[3])
+xhs_download = xhs_download_path.read_text(encoding="utf-8")
+xhs_download = replace_once(
+    xhs_download,
+    "from pathlib import Path\n",
+    "from os import getenv\nfrom pathlib import Path\n",
+    "XHS overwrite getenv import",
+)
+xhs_download = replace_once(
+    xhs_download,
+    "    def __check_exists_glob(\n        self,\n        path: Path,\n        name: str,\n    ) -> bool:\n        if any(path.glob(name)):",
+    "    def __check_exists_glob(\n        self,\n        path: Path,\n        name: str,\n    ) -> bool:\n        if getenv(\"SYDOWNLOAD_OVERWRITE_EXISTING\") == \"1\":\n            return False\n        if any(path.glob(name)):",
+    "XHS overwrite glob",
+)
+xhs_download = replace_once(
+    xhs_download,
+    "    def __check_exists_path(\n        self,\n        path: Path,\n        name: str,\n    ) -> bool:\n        if path.joinpath(name).exists():",
+    "    def __check_exists_path(\n        self,\n        path: Path,\n        name: str,\n    ) -> bool:\n        if getenv(\"SYDOWNLOAD_OVERWRITE_EXISTING\") == \"1\":\n            return False\n        if path.joinpath(name).exists():",
+    "XHS overwrite path",
+)
+xhs_download_path.write_text(xhs_download, encoding="utf-8")
+
+xhs_app_path = Path(sys.argv[4])
+xhs_app = xhs_app_path.read_text(encoding="utf-8")
+xhs_app = replace_once(
+    xhs_app,
+    "from datetime import datetime\n",
+    "from datetime import datetime\nfrom os import getenv\n",
+    "XHS app getenv import",
+)
+xhs_app = replace_once(
+    xhs_app,
+    "    async def has_download_record(self, id_: str) -> bool:\n        return bool(await self.id_recorder.select(id_))",
+    "    async def has_download_record(self, id_: str) -> bool:\n        if getenv(\"SYDOWNLOAD_OVERWRITE_EXISTING\") == \"1\":\n            return False\n        return bool(await self.id_recorder.select(id_))",
+    "XHS overwrite download record",
+)
+xhs_app_path.write_text(xhs_app, encoding="utf-8")
+
+douk_download_path = Path(sys.argv[5])
+douk_download = douk_download_path.read_text(encoding="utf-8")
+douk_download = replace_once(
+    douk_download,
+    "from datetime import datetime\n",
+    "from datetime import datetime\nfrom os import getenv\n",
+    "DouK overwrite getenv import",
+)
+douk_download = replace_once(
+    douk_download,
+    "    async def is_downloaded(self, id_: str) -> bool:\n        return await self.recorder.has_id(id_)",
+    "    async def is_downloaded(self, id_: str) -> bool:\n        if getenv(\"SYDOWNLOAD_OVERWRITE_EXISTING\") == \"1\":\n            return False\n        return await self.recorder.has_id(id_)",
+    "DouK overwrite record",
+)
+douk_download = replace_once(
+    douk_download,
+    "    @staticmethod\n    def is_exists(path: Path) -> bool:\n        return path.exists()",
+    "    @staticmethod\n    def is_exists(path: Path) -> bool:\n        if getenv(\"SYDOWNLOAD_OVERWRITE_EXISTING\") == \"1\":\n            return False\n        return path.exists()",
+    "DouK overwrite path",
+)
+douk_download_path.write_text(douk_download, encoding="utf-8")
 PY
 
 echo "Installing portable Python $PYTHON_VERSION into build staging..."
@@ -119,18 +186,27 @@ PYTHON_INSTALL_NAME="$(basename "$PYTHON_INSTALL_DIR")"
 PYTHON_EXE="$(basename "$PYTHON_BIN")"
 
 REQUIREMENTS="$WORK/requirements.txt"
-"$PYTHON_BIN" - "$SOURCES/XHS-Downloader/pyproject.toml" "$SOURCES/TikTokDownloader/pyproject.toml" > "$REQUIREMENTS" <<'PY'
+"$PYTHON_BIN" - "$SOURCES/XHS-Downloader/requirements.txt" "$SOURCES/TikTokDownloader/requirements.txt" > "$REQUIREMENTS" <<'PY'
 from pathlib import Path
 import sys
-import tomllib
 
+# Both engines publish exact direct-dependency pins for their release commits.
+# Merge those instead of resolving the broader >= ranges from pyproject.toml so
+# a fixed engine revision does not silently change its direct dependency set.
 seen = set()
 for raw in sys.argv[1:]:
-    data = tomllib.loads(Path(raw).read_text(encoding="utf-8"))
-    for requirement in data.get("project", {}).get("dependencies", []):
+    for line in Path(raw).read_text(encoding="utf-8").splitlines():
+        requirement = line.strip()
+        if not requirement or requirement.startswith("#"):
+            continue
         if requirement not in seen:
             seen.add(requirement)
             print(requirement)
+
+# XHS-Downloader keeps its browser-cookie integration source but no longer
+# declares rookiepy because the upstream CLI entry point is disabled. SYDownload
+# calls the integration directly, so pin it explicitly.
+print("rookiepy==0.5.6")
 PY
 
 echo "Installing Python dependencies into staged runtime..."
@@ -144,12 +220,12 @@ import aiofiles
 import aiosqlite
 import curl_cffi
 import fastapi
-import gmssl
 import javascript
 import lxml
 import openpyxl
 import pydantic
 import pyperclip
+import rookiepy
 import rich
 import uvicorn
 import webview
@@ -172,10 +248,10 @@ chmod +x "$PYTHON_ROOT/bin/python3"
 # Validate the copied, relocatable runtime rather than only the staging copy.
 "$PYTHON_ROOT/bin/python3" - <<'PY'
 import curl_cffi
-import gmssl
 import javascript
 import lxml
 import pydantic
+import rookiepy
 import webview
 print("Bundled relocated runtime smoke test passed")
 PY

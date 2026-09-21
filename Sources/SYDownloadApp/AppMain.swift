@@ -4,6 +4,7 @@ import AppKit
 
 @main
 struct SYDownloadApp: App {
+    @NSApplicationDelegateAdaptor(SYDownloadAppDelegate.self) private var appDelegate
     @StateObject private var model = AppModel()
     @StateObject private var updater = SYDownloadUpdater(owner: "iPotatow", repo: "SYDownload")
 
@@ -27,9 +28,20 @@ struct SYDownloadApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("新建下载") {
-                    NotificationCenter.default.post(name: .syDownloadNewDownload, object: nil)
+                    model.requestSelection(.download)
+                    if model.selection == .download {
+                        NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+                    }
                 }
                 .keyboardShortcut("n", modifiers: [.command])
+            }
+
+            CommandMenu("导航") {
+                navigationCommand("下载", section: .download, key: "1")
+                navigationCommand("任务", section: .tasks, key: "2")
+                navigationCommand("历史记录", section: .history, key: "3")
+                navigationCommand("照片整理", section: .photos, key: "4")
+                navigationCommand("设置", section: .settings, key: "5")
             }
 
             CommandGroup(after: .pasteboard) {
@@ -55,11 +67,29 @@ struct SYDownloadApp: App {
 
             CommandGroup(replacing: .appSettings) {
                 Button("设置…") {
-                    NotificationCenter.default.post(name: .syDownloadShowSettings, object: nil)
+                    model.openSettings(.general)
                 }
                 .keyboardShortcut(",", modifiers: [.command])
             }
         }
+    }
+
+    private func navigationCommand(_ title: String, section: AppSection, key: KeyEquivalent) -> some View {
+        Button(title) {
+            if section == .settings {
+                model.openSettings(.general)
+            } else {
+                model.requestSelection(section)
+            }
+        }
+        .keyboardShortcut(key, modifiers: [.command])
+    }
+}
+
+final class SYDownloadAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        NotificationCenter.default.post(name: .syDownloadRequestTermination, object: nil)
+        return .terminateLater
     }
 }
 
@@ -69,6 +99,7 @@ extension Notification.Name {
     static let syDownloadShowSettings = Notification.Name("SYDownload.showSettings")
     static let syDownloadFocusDownloadInput = Notification.Name("SYDownload.focusDownloadInput")
     static let syDownloadFocusSearch = Notification.Name("SYDownload.focusSearch")
+    static let syDownloadRequestTermination = Notification.Name("SYDownload.requestTermination")
 }
 #else
 import Foundation

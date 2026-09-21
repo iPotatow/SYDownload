@@ -58,23 +58,45 @@ struct SidebarView: View {
     ) -> some View {
         let selected = model.selection == section
         let focused = focusedSection.wrappedValue == section
-        let visuallyActive = selected || focused
 
         return Button {
-            model.selection = section
-            focusedSection.wrappedValue = section
+            model.requestSelection(section)
+            if model.selection == section {
+                focusedSection.wrappedValue = section
+            }
         } label: {
             HStack(spacing: CoreSpacing.s) {
-                Image(systemName: systemImage)
-                    .font(.system(size: CoreMetrics.controlIconSize, weight: .medium))
+                RemixIcon(systemName: systemImage, size: CoreMetrics.controlIconSize)
                     .frame(width: CoreMetrics.controlIconSize)
-                    .foregroundStyle(visuallyActive ? CoreColor.accent : CoreColor.textSecondary)
+                    .foregroundStyle(selected ? CoreColor.accent : CoreColor.textSecondary)
 
                 Text(title)
                     .coreTypography(CoreTypography.control)
                     .foregroundStyle(CoreColor.textPrimary)
 
                 Spacer(minLength: 0)
+
+                if section == .tasks {
+                    if model.activeTaskCount > 0 {
+                        Text("\(model.activeTaskCount)")
+                            .coreTypography(CoreTypography.groupLabel)
+                            .monospacedDigit()
+                            .foregroundStyle(CoreColor.accent)
+                            .padding(.horizontal, CoreSpacing.s)
+                            .frame(minHeight: 20)
+                            .background(CoreColor.selectionBackground, in: Capsule())
+                            .accessibilityLabel("\(model.activeTaskCount) 个进行中任务")
+                    } else if model.failedTaskCount > 0 {
+                        Text("\(model.failedTaskCount)")
+                            .coreTypography(CoreTypography.groupLabel)
+                            .monospacedDigit()
+                            .foregroundStyle(CoreColor.danger)
+                            .padding(.horizontal, CoreSpacing.s)
+                            .frame(minHeight: 20)
+                            .background(CoreColor.danger.opacity(0.10), in: Capsule())
+                            .accessibilityLabel("\(model.failedTaskCount) 个失败任务")
+                    }
+                }
             }
             .contentShape(Rectangle())
         }

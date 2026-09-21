@@ -18,12 +18,20 @@ struct CoreSidebarButtonStyle: ButtonStyle {
             .frame(height: height)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                (isSelected || isFocused) ? CoreColor.selectionBackground : Color.clear,
+                isSelected
+                    ? CoreColor.selectionBackground
+                    : (isFocused ? CoreColor.controlHoverBackground : Color.clear),
                 in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(stateOverlay(isPressed: configuration.isPressed))
+            }
+            .overlay {
+                if isFocused && !isSelected {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .strokeBorder(CoreColor.accent.opacity(0.45), lineWidth: CoreMetrics.borderWidth)
+                }
             }
             .opacity(isEnabled ? 1 : CoreState.disabledOpacity)
             .animation(reduceMotion ? nil : CoreMotion.fast, value: configuration.isPressed)
@@ -52,8 +60,7 @@ struct CoreFilterChip: View {
                     .coreTypography(CoreTypography.groupLabel)
                     .foregroundStyle(CoreColor.textPrimary)
             } icon: {
-                Image(systemName: systemImage)
-                    .font(CoreTypography.groupLabelFont)
+                RemixIcon(systemName: systemImage, size: 12)
                     .foregroundStyle(isSelected ? CoreColor.accent : CoreColor.textSecondary)
             }
             .padding(.horizontal, CoreSpacing.m)
@@ -80,8 +87,7 @@ struct CoreBadge: View {
     var body: some View {
         HStack(spacing: CoreSpacing.xs) {
             if let systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: CoreSpacing.xs))
+                RemixIcon(systemName: systemImage, size: CoreSpacing.xs)
                     .foregroundStyle(color)
                     .accessibilityHidden(true)
             }
@@ -110,8 +116,7 @@ struct CoreEmptyStateView: View {
                 ProgressView()
                     .controlSize(.regular)
             } else {
-                Image(systemName: systemImage)
-                    .font(.system(size: 24, weight: .medium))
+                RemixIcon(systemName: systemImage, size: 24)
                     .foregroundStyle(CoreColor.textSecondary)
                     .accessibilityHidden(true)
             }

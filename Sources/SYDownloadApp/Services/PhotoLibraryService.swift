@@ -62,6 +62,7 @@ enum PhotoLibraryService {
         var ungrouped: [PhotoFileItem] = []
 
         for case let fileURL as URL in enumerator {
+            try Task.checkCancellation()
             guard isImageFile(fileURL) else { continue }
             guard (try? fileURL.resourceValues(forKeys: keys).isRegularFile) == true else { continue }
 

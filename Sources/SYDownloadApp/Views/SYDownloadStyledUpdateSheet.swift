@@ -92,7 +92,7 @@ struct SYDownloadStyledUpdateSheet: View {
                     Text("更新检查失败")
                         .coreTypography(CoreTypography.control)
                 } icon: {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    RemixIcon(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(CoreColor.warning)
                 }
                 Text(error)
@@ -115,11 +115,11 @@ struct SYDownloadStyledUpdateSheet: View {
                     }
 
                     if updater.hasNewerRelease {
-                        Label("发现新版本", systemImage: "arrow.down.circle.fill")
+                        Label("发现新版本", remixSystemImage: "arrow.down.circle.fill")
                             .font(CoreTypography.controlFont)
                             .foregroundStyle(CoreColor.accent)
                     } else {
-                        Label("已是最新版本", systemImage: "checkmark.circle.fill")
+                        Label("已是最新版本", remixSystemImage: "checkmark.circle.fill")
                             .font(CoreTypography.controlFont)
                             .foregroundStyle(CoreColor.success)
                     }

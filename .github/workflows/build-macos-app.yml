@@ -115,7 +115,7 @@ jobs:
         run: python3 -m unittest discover -s Bridge/tests -p 'test_*.py'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
           cache-dependency-glob: |
@@ -132,8 +132,8 @@ jobs:
           ADHOC_SIGN: 1
           BUNDLE_RUNTIME: 1
           PYTHON_VERSION: "3.12"
-          XHS_REVISION: cc7c78088afc09082f54ea6263a9fd07c2fa510f
-          DOUK_REVISION: 43e1abc4ab401b31560423450d01648e83c9b48a
+          XHS_REVISION: 47840a1bee8438324ff10753c4291148c46071c8
+          DOUK_REVISION: 207e2184e1004f4f5bf87fb69231f3bb5731adbb
         run: |
           chmod +x script/*.sh
           ./script/package_app.sh
@@ -174,7 +174,7 @@ jobs:
           VALIDATE="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000002","command":"validate","url":"https://xhslink.com/ci-smoke-test"}' | "$PYTHON" -B "$BRIDGE" --once)"
           echo "$VALIDATE"
           echo "$VALIDATE" | grep -q '"ok": true'
-          test -f "$SYDOWNLOAD_APP_SUPPORT/engines/XHS-Downloader/cc7c78088afc09082f54ea6263a9fd07c2fa510f/main.py"
+          test -f "$SYDOWNLOAD_APP_SUPPORT/engines/XHS-Downloader/47840a1bee8438324ff10753c4291148c46071c8/main.py"
 
       - name: Installed-app launch smoke test
         env:

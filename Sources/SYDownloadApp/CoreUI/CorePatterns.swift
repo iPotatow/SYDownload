@@ -127,8 +127,7 @@ struct CoreStatusPill: View {
                 .coreTypography(CoreTypography.groupLabel)
                 .foregroundStyle(CoreColor.textPrimary)
         } icon: {
-            Image(systemName: systemImage)
-                .font(CoreTypography.groupLabelFont)
+            RemixIcon(systemName: systemImage, size: 12)
                 .foregroundStyle(color)
         }
         .padding(.horizontal, CoreSpacing.m)
