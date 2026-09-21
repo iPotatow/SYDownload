@@ -98,14 +98,40 @@ def verify_output(
         )
 
     normalized = log.lower()
+    disabled_markers = (
+        "下载功能已关闭，跳过下载",
+        "download feature is disabled",
+        "download disabled",
+    )
+    if any(marker in normalized for marker in disabled_markers):
+        return (
+            False,
+            "当前下载内容类型已在引擎设置中关闭，未写入文件。",
+            {"verification": "disabled", "verified_files": 0, "verified_bytes": 0},
+        )
+
+    record_markers = (
+        "存在下载记录，跳过",
+        "存在下载记录或文件已存在",
+        "already downloaded",
+        "download record",
+    )
+    if any(marker in normalized for marker in record_markers):
+        return (
+            True,
+            "上游下载记录命中，未重新下载文件。",
+            {"verification": "skipped_record", "verified_files": 0, "verified_bytes": 0},
+        )
+
     existing_markers = (
-        "已下载", "已经下载", "跳过", "重复", "已存在",
-        "already downloaded", "already exists", "skip", "download record",
+        "文件已存在，跳过下载",
+        "already exists",
+        "file exists",
     )
     if any(marker in normalized for marker in existing_markers):
         return (
             True,
-            "引擎确认文件已存在，未重复写入。",
+            "同名文件已存在，未重复写入。",
             {"verification": "existing", "verified_files": 0, "verified_bytes": 0},
         )
 

@@ -51,7 +51,7 @@ extension Text {
     }
 }
 
-extension Label where Title == Text, Icon == Image {
+extension Label where Title == Text {
     func coreTypography(_ style: CoreTextStyle) -> some View {
         font(style.font)
     }

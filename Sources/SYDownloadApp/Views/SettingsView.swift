@@ -8,8 +8,6 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case xhs = "小红书"
     case douyin = "抖音"
     case advanced = "高级"
-    case update = "更新"
-    case about = "关于"
 
     var id: String { rawValue }
 
@@ -19,13 +17,12 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .xhs: return "book.pages"
         case .douyin: return "music.note"
         case .advanced: return "wrench.and.screwdriver"
-        case .update: return "arrow.triangle.2.circlepath"
-        case .about: return "info.circle"
         }
     }
 }
 
 private enum SettingsFocusField: Hashable {
+    case downloadDirectory
     case xhsCookie
     case douyinCookie
 }
@@ -58,7 +55,7 @@ private struct SettingsPopupSelector<Value: Hashable>: View {
                     selection = choice.value
                 } label: {
                     if choice.value == selection {
-                        Label(choice.title, systemImage: "checkmark")
+                        Label(choice.title, remixSystemImage: "checkmark")
                     } else {
                         Text(choice.title)
                     }
@@ -72,8 +69,7 @@ private struct SettingsPopupSelector<Value: Hashable>: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: CoreSpacing.s)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(CoreTypography.captionFont)
+                RemixIcon(systemName: "chevron.up.chevron.down", size: 12)
                     .foregroundStyle(CoreColor.textSecondary)
             }
             .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
@@ -136,8 +132,7 @@ private struct NameFormatSelector: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: CoreSpacing.s)
-                Image(systemName: "chevron.down")
-                    .font(CoreTypography.captionFont)
+                RemixIcon(systemName: "chevron.down", size: 12)
                     .foregroundStyle(CoreColor.textSecondary)
             }
             .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
@@ -195,7 +190,7 @@ private struct NameFormatSelector: View {
                 toggle(option.rawValue)
             } label: {
                 HStack(spacing: CoreSpacing.s) {
-                    Image(systemName: selected ? "checkmark.square.fill" : "square")
+                    RemixIcon(systemName: selected ? "checkmark.square.fill" : "square")
                         .foregroundStyle(selected ? CoreColor.accent : CoreColor.textSecondary)
                     Text(option.title)
                         .coreTypography(CoreTypography.body)
@@ -211,7 +206,7 @@ private struct NameFormatSelector: View {
                 Button {
                     move(option.rawValue, offset: -1)
                 } label: {
-                    Image(systemName: "chevron.up")
+                    RemixIcon(systemName: "chevron.up")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(CoreColor.textSecondary)
@@ -221,7 +216,7 @@ private struct NameFormatSelector: View {
                 Button {
                     move(option.rawValue, offset: 1)
                 } label: {
-                    Image(systemName: "chevron.down")
+                    RemixIcon(systemName: "chevron.down")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(CoreColor.textSecondary)
@@ -268,10 +263,11 @@ struct SettingsView: View {
 
     @State private var tab: SettingsTab = .general
     @AppStorage("preferredAppearance") private var preferredAppearance = "跟随系统"
+    @AppStorage("browserCookieSource") private var browserCookieSource = "Chrome"
     @State private var resetTarget: String?
     @State private var observingEngineSettingsChanges = false
-    @SceneStorage("SYDownload.settings.xhsDirty") private var xhsSettingsDirty = false
-    @SceneStorage("SYDownload.settings.douyinDirty") private var douyinSettingsDirty = false
+    @State private var revealsXHSCookie = false
+    @State private var revealsDouyinCookie = false
     @FocusState private var focusedField: SettingsFocusField?
 
     private let xhsNameOptions = [
@@ -288,6 +284,20 @@ struct SettingsView: View {
         NameFormatOption(rawValue: "最后更新时间", title: "最后更新时间"),
         NameFormatOption(rawValue: "作者昵称", title: "作者昵称"),
         NameFormatOption(rawValue: "作者ID", title: "作者 ID"),
+    ]
+
+    private let browserCookieChoices = [
+        SettingsChoice("chrome", value: "Chrome", title: "Chrome"),
+        SettingsChoice("safari", value: "Safari", title: "Safari"),
+        SettingsChoice("arc", value: "Arc", title: "Arc"),
+        SettingsChoice("edge", value: "Edge", title: "Edge"),
+        SettingsChoice("brave", value: "Brave", title: "Brave"),
+        SettingsChoice("chromium", value: "Chromium", title: "Chromium"),
+        SettingsChoice("firefox", value: "Firefox", title: "Firefox"),
+        SettingsChoice("librewolf", value: "LibreWolf", title: "LibreWolf"),
+        SettingsChoice("opera", value: "Opera", title: "Opera"),
+        SettingsChoice("operagx", value: "OperaGX", title: "Opera GX"),
+        SettingsChoice("vivaldi", value: "Vivaldi", title: "Vivaldi"),
     ]
 
     private let douyinNameOptions = [
@@ -320,18 +330,22 @@ struct SettingsView: View {
             observingEngineSettingsChanges = false
             await model.loadEngineSettings()
             if isInitialLoad && model.hasLoadedEngineSettings {
-                xhsSettingsDirty = false
-                douyinSettingsDirty = false
+                model.xhsSettingsDirty = false
+                model.douyinSettingsDirty = false
             }
             observingEngineSettingsChanges = true
+            handleSettingsDestination()
         }
         .onReceive(model.$xhsSettings.dropFirst()) { _ in
             guard observingEngineSettingsChanges, !model.settingsLoading else { return }
-            xhsSettingsDirty = true
+            model.xhsSettingsDirty = true
         }
         .onReceive(model.$douyinSettings.dropFirst()) { _ in
             guard observingEngineSettingsChanges, !model.settingsLoading else { return }
-            douyinSettingsDirty = true
+            model.douyinSettingsDirty = true
+        }
+        .onChange(of: model.settingsDestination) { _, _ in
+            handleSettingsDestination()
         }
         .alert("恢复默认配置？", isPresented: Binding(
             get: { resetTarget != nil },
@@ -346,9 +360,9 @@ struct SettingsView: View {
                         await model.resetEngineSettings(target)
                         guard !model.settingsStatusIsError else { return }
                         if target == "xiaohongshu" {
-                            xhsSettingsDirty = false
+                            model.xhsSettingsDirty = false
                         } else if target == "douyin" {
-                            douyinSettingsDirty = false
+                            model.douyinSettingsDirty = false
                         }
                     }
                 }
@@ -359,14 +373,21 @@ struct SettingsView: View {
     }
 
     private var showsEngineStatus: Bool {
-        tab == .xhs || tab == .douyin || tab == .advanced
+        guard tab == .xhs || tab == .douyin || tab == .advanced else { return false }
+        guard let scope = model.settingsStatusEngine else { return true }
+        switch tab {
+        case .xhs: return scope == "xiaohongshu"
+        case .douyin: return scope == "douyin"
+        case .advanced: return false
+        default: return false
+        }
     }
 
     private var settingsTabs: some View {
         CenteredControl(width: RefinementLayout.settingsTabsWidth) {
             Picker("设置分类", selection: $tab) {
                 ForEach(SettingsTab.allCases) { item in
-                    Label(item.rawValue, systemImage: item.systemImage)
+                    Label(settingsTabTitle(item), remixSystemImage: item.systemImage)
                         .tag(item)
                 }
             }
@@ -392,8 +413,7 @@ struct SettingsView: View {
         } else if !model.settingsStatus.isEmpty {
             HStack(spacing: CoreSpacing.s) {
                 Label(
-                    model.settingsStatus,
-                    systemImage: model.settingsStatusIsError ? "exclamationmark.triangle" : "checkmark.circle"
+                    model.settingsStatus, remixSystemImage: model.settingsStatusIsError ? "exclamationmark.triangle" : "checkmark.circle"
                 )
                 .coreTypography(CoreTypography.body)
                 .foregroundStyle(model.settingsStatusIsError ? CoreColor.danger : CoreColor.textSecondary)
@@ -420,8 +440,6 @@ struct SettingsView: View {
                 case .xhs: xhsSettings
                 case .douyin: douyinSettings
                 case .advanced: advancedSettings
-                case .update: updateSettings
-                case .about: aboutSettings
                 }
             }
             .padding(.bottom, CoreSpacing.s)
@@ -439,18 +457,52 @@ struct SettingsView: View {
                     TextField("下载目录", text: $model.outputDirectory)
                         .textFieldStyle(.roundedBorder)
                         .labelsHidden()
+                        .focused($focusedField, equals: .downloadDirectory)
                         .frame(width: RefinementLayout.settingsPathFieldWidth)
                         .frame(height: CoreMetrics.controlHeightDefault)
+                        .disabled(model.activeTaskCount > 0)
                     Button("更改") { chooseFolder() }
                         .font(CoreTypography.controlFont)
                         .frame(height: CoreMetrics.controlHeightDefault)
+                        .disabled(model.activeTaskCount > 0)
                 }
             }
 
-            Text("小红书与抖音都会直接保存到这个目录，不再额外创建 Download 文件夹。")
+            if let issue = model.outputDirectoryIssue {
+                Text(issue)
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.danger)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, CoreSpacing.s)
+            } else {
+                Text(
+                    model.activeTaskCount > 0
+                        ? "有任务运行时暂不允许更改下载目录。"
+                        : "小红书与抖音都会直接保存到这个目录，不再额外创建 Download 文件夹。"
+                )
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, CoreSpacing.s)
+            }
+        }
+
+        CoreSettingsSection("重复文件") {
+            SettingsControlRow("同名文件处理", showsDivider: false) {
+                Picker("同名文件处理", selection: $model.overwriteExistingFiles) {
+                    Text("保留并跳过").tag(false)
+                    Text("覆盖重新下载").tag(true)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: SYDownloadLayout.settingsFieldWidth)
+                .accessibilityLabel("同名文件处理")
+            }
+
+            Text("这个选项独立于小红书的“引擎下载记录”。关闭下载记录后，如果磁盘上已有同名文件，上游仍会跳过；选择“覆盖重新下载”才会绕过记录和同名文件检查。")
                 .coreTypography(CoreTypography.caption)
                 .foregroundStyle(CoreColor.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, CoreSpacing.s)
         }
 
@@ -535,14 +587,14 @@ struct SettingsView: View {
             }
             .foregroundStyle(CoreColor.textSecondary)
         } else if let error = updater.updateError {
-            Label(error, systemImage: "exclamationmark.triangle")
+            Label(error, remixSystemImage: "exclamationmark.triangle")
                 .foregroundStyle(CoreColor.danger)
                 .fixedSize(horizontal: false, vertical: true)
         } else if updater.updateAvailable, let release = updater.latestRelease {
-            Label("发现新版本 \(release.tagName)", systemImage: "arrow.down.circle.fill")
+            Label("发现新版本 \(release.tagName)", remixSystemImage: "arrow.down.circle.fill")
                 .foregroundStyle(CoreColor.accent)
         } else if let release = updater.latestRelease {
-            Label("已是最新版本（\(release.tagName)）", systemImage: "checkmark.circle")
+            Label("已是最新版本（\(release.tagName)）", remixSystemImage: "checkmark.circle")
                 .foregroundStyle(CoreColor.textSecondary)
         } else {
             Text("每天自动检查一次，也可以手动检查。")
@@ -671,17 +723,30 @@ struct SettingsView: View {
 
             settingsToggleRow("每个作品使用独立文件夹", isOn: $model.xhsSettings.folderMode)
             settingsToggleRow("按作者归档", isOn: $model.xhsSettings.authorArchive)
-            settingsToggleRow("记录下载历史", isOn: $model.xhsSettings.downloadRecord)
+            settingsToggleRow("记录小红书引擎下载记录", isOn: $model.xhsSettings.downloadRecord)
+            Text("仅控制上游按作品 ID 的下载记录去重，不控制磁盘同名文件检查；重复文件策略在“通用”中设置。")
+                .coreTypography(CoreTypography.caption)
+                .foregroundStyle(CoreColor.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, CoreSpacing.xs)
             settingsToggleRow("将文件修改时间写为作品发布时间", isOn: $model.xhsSettings.writeMtime)
             settingsToggleRow("记录作品数据", isOn: $model.xhsSettings.recordData, showsDivider: false)
         }
 
         CoreSettingsSection("Cookie") {
+            browserCookieRow(engine: "xiaohongshu")
+
             VStack(alignment: .leading, spacing: CoreSpacing.s) {
                 Text("小红书网页版 Cookie")
                     .coreTypography(CoreTypography.body)
-                plainTextEditor(text: $model.xhsSettings.cookie, minHeight: 100, field: .xhsCookie)
+                cookieEditor(
+                    text: $model.xhsSettings.cookie,
+                    minHeight: 100,
+                    field: .xhsCookie,
+                    isRevealed: $revealsXHSCookie
+                )
                     .accessibilityLabel("小红书网页版 Cookie")
+                browserCookieHelp
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -754,14 +819,30 @@ struct SettingsView: View {
             }
 
             settingsToggleRow("每个作品使用独立文件夹", isOn: $model.douyinSettings.folderMode, showsDivider: false)
+
+            if let validation = model.douyinSettingsValidationMessage {
+                Text(validation)
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.danger)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, CoreSpacing.s)
+            }
         }
 
         CoreSettingsSection("Cookie") {
+            browserCookieRow(engine: "douyin")
+
             VStack(alignment: .leading, spacing: CoreSpacing.s) {
                 Text("抖音网页版 Cookie（douyin.com）")
                     .coreTypography(CoreTypography.body)
-                plainTextEditor(text: $model.douyinSettings.cookie, minHeight: 92, field: .douyinCookie)
+                cookieEditor(
+                    text: $model.douyinSettings.cookie,
+                    minHeight: 92,
+                    field: .douyinCookie,
+                    isRevealed: $revealsDouyinCookie
+                )
                     .accessibilityLabel("抖音网页版 Cookie")
+                browserCookieHelp
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -803,6 +884,38 @@ struct SettingsView: View {
             pathRow("缓存", "~/Library/Caches/SYDownload/", showsDivider: true)
             pathRow("下载文件", model.outputDirectory, showsDivider: false)
         }
+    }
+
+    private func browserCookieRow(engine: String) -> some View {
+        SettingsControlRow("从浏览器读取") {
+            HStack(spacing: CoreSpacing.s) {
+                SettingsPopupSelector(
+                    title: "浏览器",
+                    selection: $browserCookieSource,
+                    choices: browserCookieChoices
+                )
+
+                Button("读取并保存") {
+                    Task {
+                        await model.importBrowserCookie(
+                            engine: engine,
+                            browser: browserCookieSource
+                        )
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .font(CoreTypography.controlFont)
+                .frame(height: CoreMetrics.controlHeightDefault)
+                .disabled(model.settingsLoading)
+            }
+        }
+    }
+
+    private var browserCookieHelp: some View {
+        Text("读取成功后会直接保存到对应引擎配置。首次读取 Chrome、Arc、Edge、Brave 等 Chromium 浏览器时，macOS 可能请求钥匙串授权。")
+            .coreTypography(CoreTypography.caption)
+            .foregroundStyle(CoreColor.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func settingsToggleRow(
@@ -866,8 +979,7 @@ struct SettingsView: View {
     ) -> some View {
         HStack(spacing: CoreSpacing.m) {
             Label(
-                isDirty ? "有未保存更改" : "当前配置已保存",
-                systemImage: isDirty ? "circle.fill" : "checkmark.circle"
+                isDirty ? "有未保存更改" : "当前配置已保存", remixSystemImage: isDirty ? "circle.fill" : "checkmark.circle"
             )
             .font(CoreTypography.groupLabelFont)
             .foregroundStyle(isDirty ? CoreColor.accent : CoreColor.textSecondary)
@@ -892,26 +1004,24 @@ struct SettingsView: View {
     @ViewBuilder
     private var saveBarForCurrentTab: some View {
         switch tab {
-        case .general, .advanced, .update, .about:
+        case .general, .advanced:
             EmptyView()
         case .xhs:
-            saveBar(title: "保存小红书设置", isDirty: xhsSettingsDirty, action: saveXHSSettings)
+            saveBar(title: "保存小红书设置", isDirty: model.xhsSettingsDirty, action: saveXHSSettings)
         case .douyin:
-            saveBar(title: "保存抖音设置", isDirty: douyinSettingsDirty, action: saveDouyinSettings)
+            saveBar(title: "保存抖音设置", isDirty: model.douyinSettingsDirty, action: saveDouyinSettings)
         }
     }
 
     private func saveXHSSettings() {
         Task {
             await model.saveXHSSettings()
-            if !model.settingsStatusIsError { xhsSettingsDirty = false }
         }
     }
 
     private func saveDouyinSettings() {
         Task {
             await model.saveDouyinSettings()
-            if !model.settingsStatusIsError { douyinSettingsDirty = false }
         }
     }
 
@@ -920,10 +1030,58 @@ struct SettingsView: View {
             observingEngineSettingsChanges = false
             await model.loadEngineSettings(force: true)
             if model.hasLoadedEngineSettings && !model.settingsStatusIsError {
-                xhsSettingsDirty = false
-                douyinSettingsDirty = false
+                model.xhsSettingsDirty = false
+                model.douyinSettingsDirty = false
             }
             observingEngineSettingsChanges = true
+        }
+    }
+
+    private func cookieEditor(
+        text: Binding<String>,
+        minHeight: CGFloat,
+        field: SettingsFocusField,
+        isRevealed: Binding<Bool>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: CoreSpacing.s) {
+            Group {
+                if isRevealed.wrappedValue {
+                    plainTextEditor(text: text, minHeight: minHeight, field: field)
+                } else {
+                    SecureField("Cookie 已隐藏", text: text)
+                        .textFieldStyle(.plain)
+                        .font(CoreTypography.captionFont.monospaced())
+                        .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
+                        .frame(minHeight: CoreMetrics.controlHeightDefault)
+                        .coreInputSurface(isFocused: focusedField == field)
+                        .focused($focusedField, equals: field)
+                }
+            }
+
+            HStack(spacing: CoreSpacing.s) {
+                Button(isRevealed.wrappedValue ? "隐藏" : "显示") {
+                    isRevealed.wrappedValue.toggle()
+                }
+                .buttonStyle(.borderless)
+                .font(CoreTypography.controlFont)
+
+                Button("复制") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text.wrappedValue, forType: .string)
+                }
+                .buttonStyle(.borderless)
+                .font(CoreTypography.controlFont)
+                .disabled(text.wrappedValue.isEmpty)
+
+                Button("清除", role: .destructive) {
+                    text.wrappedValue = ""
+                }
+                .buttonStyle(.borderless)
+                .font(CoreTypography.controlFont)
+                .disabled(text.wrappedValue.isEmpty)
+
+                Spacer(minLength: 0)
+            }
         }
     }
 
@@ -941,7 +1099,43 @@ struct SettingsView: View {
             .focused($focusedField, equals: field)
     }
 
+    private func settingsTabTitle(_ item: SettingsTab) -> String {
+        switch item {
+        case .xhs where model.xhsSettingsDirty:
+            return "\(item.rawValue) •"
+        case .douyin where model.douyinSettingsDirty:
+            return "\(item.rawValue) •"
+        default:
+            return item.rawValue
+        }
+    }
+
+    private func handleSettingsDestination() {
+        guard let destination = model.settingsDestination else { return }
+        switch destination {
+        case .general:
+            tab = .general
+        case .downloadDirectory:
+            tab = .general
+            DispatchQueue.main.async {
+                focusedField = .downloadDirectory
+            }
+        case .xhsCookie:
+            tab = .xhs
+            DispatchQueue.main.async {
+                focusedField = .xhsCookie
+            }
+        case .douyinCookie:
+            tab = .douyin
+            DispatchQueue.main.async {
+                focusedField = .douyinCookie
+            }
+        }
+        model.settingsDestination = nil
+    }
+
     private func chooseFolder() {
+        guard model.activeTaskCount == 0 else { return }
         let panel = NSOpenPanel()
         panel.title = "选择下载保存位置"
         panel.prompt = "选择"

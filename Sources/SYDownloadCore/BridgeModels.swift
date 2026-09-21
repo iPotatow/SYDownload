@@ -8,6 +8,7 @@ public struct BridgeRequest: Codable, Sendable {
     public let engine: String?
     public let settingsJSON: String?
     public let timeoutSeconds: Double?
+    public let overwriteExisting: Bool?
 
     public init(
         id: UUID = UUID(),
@@ -16,7 +17,8 @@ public struct BridgeRequest: Codable, Sendable {
         outputDirectory: String? = nil,
         engine: String? = nil,
         settingsJSON: String? = nil,
-        timeoutSeconds: Double? = nil
+        timeoutSeconds: Double? = nil,
+        overwriteExisting: Bool? = nil
     ) {
         self.id = id
         self.command = command
@@ -25,6 +27,7 @@ public struct BridgeRequest: Codable, Sendable {
         self.engine = engine
         self.settingsJSON = settingsJSON
         self.timeoutSeconds = timeoutSeconds
+        self.overwriteExisting = overwriteExisting
     }
 }
 

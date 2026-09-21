@@ -1,5 +1,6 @@
 #if canImport(SwiftUI)
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
@@ -50,18 +51,60 @@ struct ContentView: View {
         .tint(CoreColor.accent)
         .preferredColorScheme(preferredAppearance == "浅色" ? .light : preferredAppearance == "深色" ? .dark : nil)
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadNewDownload)) { _ in
-            model.selection = .download
-            focusedSection = .download
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+            model.requestSelection(.download)
+            if model.selection == .download {
+                focusedSection = .download
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadShowAbout)) { _ in
             showsAbout = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .syDownloadShowSettings)) { _ in
-            model.selection = .settings
+            model.openSettings(.general)
             focusedSection = .settings
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .syDownloadRequestTermination)) { _ in
+            if model.requestTermination() {
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        .alert("保存设置更改？", isPresented: $model.showsUnsavedSettingsPrompt) {
+            Button("保存") {
+                let shouldTerminate = model.pendingTermination
+                Task {
+                    if await model.saveUnsavedSettingsAndContinue() {
+                        if shouldTerminate {
+                            model.pendingTermination = false
+                            NSApp.reply(toApplicationShouldTerminate: true)
+                        }
+                    } else if shouldTerminate {
+                        model.pendingTermination = false
+                        NSApp.reply(toApplicationShouldTerminate: false)
+                    }
+                }
+            }
+            Button("放弃更改", role: .destructive) {
+                let shouldTerminate = model.pendingTermination
+                Task {
+                    await model.discardUnsavedSettingsAndContinue()
+                    if shouldTerminate {
+                        model.pendingTermination = false
+                        NSApp.reply(toApplicationShouldTerminate: true)
+                    }
+                }
+            }
+            Button("取消", role: .cancel) {
+                let shouldTerminate = model.pendingTermination
+                model.cancelUnsavedSettingsPrompt()
+                if shouldTerminate {
+                    NSApp.reply(toApplicationShouldTerminate: false)
+                }
+            }
+        } message: {
+            Text("小红书或抖音设置还有未保存的更改。")
         }
         .sheet(isPresented: $showsAbout) {
             AboutView()

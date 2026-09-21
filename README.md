@@ -12,6 +12,7 @@
 - DouK 单作品兼容适配器
 - 下载任务最多 3 个并发；Bridge 流式返回上游百分比与真实落盘字节/文件数，支持取消和 15 分钟整任务超时
 - 下载完成前校验实际新增/更新文件，并按网络、Cookie/登录、风控、超时、磁盘和文件校验等类别标记失败
+- 设置页可从 Chrome、Safari、Arc、Edge、Brave、Firefox 等本机浏览器读取小红书/抖音 Cookie，并直接保存到对应引擎配置
 - GitHub Actions 仅构建 Apple Silicon `.app`
 - Release Artifact 内置 Python 3.12
 - Release Artifact 内置 XHS-Downloader 与 TikTokDownloader/DouK 源码

@@ -86,6 +86,35 @@ class BridgeTests(unittest.TestCase):
             self.assertFalse(ok)
             self.assertEqual(details["verification"], "missing")
 
+    def test_output_verification_distinguishes_skip_reasons(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            before = runtime.snapshot_artifacts(root)
+
+            ok, _, details = runtime.verify_output(
+                before,
+                root,
+                log="作品 123 存在下载记录，跳过处理",
+            )
+            self.assertTrue(ok)
+            self.assertEqual(details["verification"], "skipped_record")
+
+            ok, _, details = runtime.verify_output(
+                before,
+                root,
+                log="demo.mp4 文件已存在，跳过下载",
+            )
+            self.assertTrue(ok)
+            self.assertEqual(details["verification"], "existing")
+
+            ok, _, details = runtime.verify_output(
+                before,
+                root,
+                log="视频作品下载功能已关闭，跳过下载",
+            )
+            self.assertFalse(ok)
+            self.assertEqual(details["verification"], "disabled")
+
     def test_subprocess_timeout_terminates_work(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

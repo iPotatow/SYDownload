@@ -13,6 +13,13 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     var id: String { rawValue }
 }
 
+enum SettingsDestination: Equatable {
+    case general
+    case downloadDirectory
+    case xhsCookie
+    case douyinCookie
+}
+
 enum TaskFilter: String, CaseIterable, Identifiable {
     case all = "全部"
     case active = "进行中"
@@ -223,6 +230,9 @@ final class AppModel: ObservableObject {
     @Published var history: [HistoryItem] = []
     @Published var taskFilter: TaskFilter = .all
     @Published var historySearch = ""
+    @Published var overwriteExistingFiles: Bool {
+        didSet { defaults.set(overwriteExistingFiles, forKey: "SYDownload.overwriteExistingFiles") }
+    }
 
     @Published var xhsSettings = XHSSettingsForm()
     @Published var douyinSettings = DouyinSettingsForm()
@@ -232,13 +242,24 @@ final class AppModel: ObservableObject {
     @Published var hasLoadedEngineSettings = false
     @Published var xhsSettingsPath = ""
     @Published var douyinSettingsPath = ""
+    @Published var xhsSettingsDirty = false
+    @Published var douyinSettingsDirty = false
+    @Published var settingsDestination: SettingsDestination?
+    @Published var settingsStatusEngine: String?
+    @Published var showsUnsavedSettingsPrompt = false
+    @Published var pendingSectionAfterSettings: AppSection?
+    @Published var pendingTermination = false
 
     private let defaults: UserDefaults
     private let sendBridge: BridgeSender
     private let sendBridgeStreaming: BridgeStreamingSender
     private let historyKey = "SYDownload.history.v1"
+    private let overwriteExistingKey = "SYDownload.overwriteExistingFiles"
+    private let historyLimit = 100
     private let maxConcurrentDownloads = 3
     private let downloadTimeoutSeconds: Double = 15 * 60
+    private let downloadLimiter = AsyncSemaphore(value: 3)
+    private var activeBatchCount = 0
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -256,6 +277,7 @@ final class AppModel: ObservableObject {
             ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)
                 .first?.appendingPathComponent("SYDownload").path
             ?? "~/Downloads/SYDownload"
+        overwriteExistingFiles = userDefaults.bool(forKey: overwriteExistingKey)
         loadHistory()
     }
 
@@ -264,8 +286,78 @@ final class AppModel: ObservableObject {
         case .all: return tasks
         case .active: return tasks.filter { $0.state == .queued || $0.state == .downloading }
         case .completed: return tasks.filter { $0.state == .completed }
-        case .failed: return tasks.filter { $0.state == .failed || $0.state == .cancelled }
+        case .failed: return tasks.filter { $0.state == .failed }
         }
+    }
+
+    var activeTaskCount: Int {
+        tasks.filter { $0.state == .queued || $0.state == .downloading }.count
+    }
+
+    var completedTaskCount: Int {
+        tasks.filter { $0.state == .completed }.count
+    }
+
+    var failedTaskCount: Int {
+        tasks.filter { $0.state == .failed }.count
+    }
+
+    var cancelledTaskCount: Int {
+        tasks.filter { $0.state == .cancelled }.count
+    }
+
+    var hasUnsavedSettings: Bool {
+        xhsSettingsDirty || douyinSettingsDirty
+    }
+
+    var historyRetentionLimit: Int { historyLimit }
+
+    var outputDirectoryIssue: String? {
+        let expanded = NSString(string: outputDirectory).expandingTildeInPath
+        let target = URL(fileURLWithPath: expanded, isDirectory: true).standardizedFileURL
+        guard target.path != "/", !target.lastPathComponent.isEmpty else {
+            return "下载目录不能直接使用磁盘根目录。"
+        }
+
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory) {
+            guard isDirectory.boolValue else { return "保存位置必须是文件夹。" }
+            guard FileManager.default.isWritableFile(atPath: target.path) else {
+                return "当前下载目录不可写。"
+            }
+            return nil
+        }
+
+        var ancestor = target.deletingLastPathComponent()
+        while ancestor.path != "/" &&
+              !FileManager.default.fileExists(atPath: ancestor.path, isDirectory: &isDirectory) {
+            ancestor.deleteLastPathComponent()
+        }
+        if FileManager.default.fileExists(atPath: ancestor.path, isDirectory: &isDirectory),
+           (!isDirectory.boolValue || !FileManager.default.isWritableFile(atPath: ancestor.path)) {
+            return "下载目录的上级位置不可写。"
+        }
+        return nil
+    }
+
+    var outputDirectoryExists: Bool {
+        let expanded = NSString(string: outputDirectory).expandingTildeInPath
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: expanded, isDirectory: &isDirectory)
+            && isDirectory.boolValue
+    }
+
+    var douyinSettingsValidationMessage: String? {
+        if douyinSettings.descLength < 0 || douyinSettings.descLength > 10_000 {
+            return "描述最大长度应在 0–10000 之间。"
+        }
+        if douyinSettings.nameLength < 1 || douyinSettings.nameLength > 255 {
+            return "文件名最大长度应在 1–255 之间。"
+        }
+        if douyinSettings.maxSize < 0 {
+            return "文件大小限制不能小于 0。"
+        }
+        return nil
     }
 
     var filteredHistory: [HistoryItem] {
@@ -378,17 +470,16 @@ final class AppModel: ObservableObject {
     }
 
     func runDownload() async {
-        guard !isWorking, !isParsing else { return }
+        guard !isParsing else { return }
         detectLocally()
-        guard hasSupportedLinks else { return }
+        guard hasSupportedLinks, outputDirectoryIssue == nil else { return }
 
         let requestedInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestedLinks = detectedLinks
         let destination = outputDirectory
+        let overwriteExisting = overwriteExistingFiles
+        let wasValidated = validatedInput == requestedInput
         let taskIDs = requestedLinks.map { _ in UUID() }
-
-        isWorking = true
-        defer { isWorking = false }
 
         let newTasks = zip(taskIDs, requestedLinks).map { pair in
             let (taskID, link) = pair
@@ -406,7 +497,13 @@ final class AppModel: ObservableObject {
             )
         }
         tasks.insert(contentsOf: newTasks, at: 0)
-        selection = .tasks
+
+        clearInput()
+        status = requestedLinks.count == 1 ? "已加入 1 个下载任务" : "已加入 \(requestedLinks.count) 个下载任务"
+        statusIsError = false
+
+        beginDownloadWork()
+        defer { endDownloadWork() }
 
         guard let outputContext = downloadOutputContext(for: destination) else {
             for taskID in taskIDs {
@@ -417,13 +514,12 @@ final class AppModel: ObservableObject {
                     task.detail = "下载目录必须是具体文件夹，不能直接使用磁盘根目录。"
                 }
             }
-            status = "下载目录无效"
-            statusIsError = true
+            updateComposerStatusIfIdle("下载目录无效", isError: true)
             return
         }
 
         let validations: [LinkValidationResult]
-        if validatedInput == requestedInput {
+        if wasValidated {
             validations = requestedLinks.map { link in
                 LinkValidationResult(
                     link: link,
@@ -437,13 +533,6 @@ final class AppModel: ObservableObject {
             abortOnInputChange: false
         ) {
             validations = results
-            let supportedFailures = results.contains {
-                $0.link.platform != .unknown && !$0.ok
-            }
-            if !supportedFailures,
-               input.trimmingCharacters(in: .whitespacesAndNewlines) == requestedInput {
-                validatedInput = requestedInput
-            }
         } else {
             for taskID in taskIDs {
                 updateTask(taskID) { task in
@@ -453,8 +542,7 @@ final class AppModel: ObservableObject {
                     task.detail = "下载环境检查已取消。"
                 }
             }
-            status = "下载环境检查已取消"
-            statusIsError = true
+            updateComposerStatusIfIdle("下载环境检查已取消", isError: true)
             return
         }
 
@@ -502,20 +590,97 @@ final class AppModel: ObservableObject {
             preparationFailures[$0.validation.link.platform] == nil
         }
         if downloadable.isEmpty {
-            status = "没有可下载的链接"
-            statusIsError = true
+            updateComposerStatusIfIdle("没有可下载的链接", isError: true)
             return
         }
 
-        status = downloadable.count == 1
-            ? "正在下载…"
-            : "正在下载 \(downloadable.count) 个任务（最多 \(maxConcurrentDownloads) 个并行）…"
-        statusIsError = false
+        let results = await executeDownloads(
+            downloadable,
+            outputContext: outputContext,
+            destination: destination,
+            overwriteExisting: overwriteExisting
+        )
+        updateBatchSummary(prepared: prepared, results: results)
+    }
 
-        let limiter = AsyncSemaphore(value: maxConcurrentDownloads)
+    func retryTask(_ task: DownloadTaskItem) {
+        Task { await retryTaskNow(task.id) }
+    }
+
+    private func retryTaskNow(_ id: UUID) async {
+        guard let task = tasks.first(where: { $0.id == id }),
+              task.state == .failed || task.state == .cancelled,
+              task.platform != .unknown,
+              let link = PlatformDetector.extractLinks(task.sourceURL).first,
+              let outputContext = downloadOutputContext(for: task.outputDirectory)
+        else { return }
+
+        updateTask(id) { item in
+            item.state = .queued
+            item.progress = nil
+            item.failureKind = nil
+            item.bytesWritten = 0
+            item.fileCount = 0
+            item.detail = "正在重新检查下载环境…"
+        }
+
+        beginDownloadWork()
+        defer { endDownloadWork() }
+
+        guard let validations = await validateLinks(
+            [link],
+            expectedInput: task.sourceURL.trimmingCharacters(in: .whitespacesAndNewlines),
+            abortOnInputChange: false
+        ), let validation = validations.first else {
+            updateTask(id) { item in
+                item.state = .failed
+                item.failureKind = .validation
+                item.detail = "下载环境检查已取消。"
+            }
+            return
+        }
+
+        guard validation.ok else {
+            updateTask(id) { item in
+                item.state = .failed
+                item.failureKind = .validation
+                item.detail = validation.message
+            }
+            return
+        }
+
+        let preparationFailures = await prepareDownloadFolders(
+            platforms: [link.platform],
+            folderName: outputContext.folderName
+        )
+        if let message = preparationFailures[link.platform] {
+            updateTask(id) { item in
+                item.state = .failed
+                item.failureKind = .validation
+                item.detail = "下载目录准备失败：\(message)"
+            }
+            return
+        }
+
+        let prepared = PreparedDownload(taskID: id, validation: validation, batchIndex: 0)
+        _ = await executeDownloads(
+            [prepared],
+            outputContext: outputContext,
+            destination: task.outputDirectory,
+            overwriteExisting: overwriteExistingFiles
+        )
+    }
+
+    private func executeDownloads(
+        _ downloadable: [PreparedDownload],
+        outputContext: DownloadOutputContext,
+        destination: String,
+        overwriteExisting: Bool
+    ) async -> [DownloadExecutionResult] {
         let streamingSender = sendBridgeStreaming
         let timeoutSeconds = downloadTimeoutSeconds
         let bridgeDirectory = outputContext.bridgeDirectory
+        let limiter = downloadLimiter
         var results: [DownloadExecutionResult] = []
 
         await withTaskGroup(of: DownloadExecutionResult.self) { group in
@@ -551,7 +716,8 @@ final class AppModel: ObservableObject {
                         command: "download",
                         url: preparedItem.validation.link.url,
                         outputDirectory: bridgeDirectory,
-                        timeoutSeconds: timeoutSeconds
+                        timeoutSeconds: timeoutSeconds,
+                        overwriteExisting: overwriteExisting
                     )
                     do {
                         let response = try await streamingSender(request) { event in
@@ -582,33 +748,46 @@ final class AppModel: ObservableObject {
             for await result in group {
                 results.append(result)
                 applyDownloadResult(result)
+                if result.response?.ok == true,
+                   result.response?.details?["verification"] == "written",
+                   tasks.first(where: { $0.id == result.prepared.taskID })?.state == .completed {
+                    appendHistory(for: result.prepared.validation.link, destination: destination)
+                }
             }
         }
+        return results
+    }
 
-        let successfulResults = results
-            .filter { result in
-                guard result.response?.ok == true else { return false }
-                return tasks.first(where: { $0.id == result.prepared.taskID })?.state == .completed
-            }
-            .sorted { $0.prepared.batchIndex < $1.prepared.batchIndex }
-
-        if !successfulResults.isEmpty {
-            let newHistory = successfulResults.map { result in
-                let link = result.prepared.validation.link
-                return HistoryItem(
-                    title: taskTitle(for: link),
-                    platform: link.platform,
-                    sourceURL: link.url,
-                    outputDirectory: destination
-                )
-            }
-            history.insert(contentsOf: newHistory, at: 0)
-            if history.count > 100 {
-                history.removeLast(history.count - 100)
-            }
-            persistHistory()
+    private func appendHistory(for link: DetectedDownloadLink, destination: String) {
+        history.insert(
+            HistoryItem(
+                title: taskTitle(for: link),
+                platform: link.platform,
+                sourceURL: link.url,
+                outputDirectory: destination
+            ),
+            at: 0
+        )
+        if history.count > historyLimit {
+            history.removeLast(history.count - historyLimit)
         }
+        persistHistory()
+    }
 
+    private func beginDownloadWork() {
+        activeBatchCount += 1
+        isWorking = true
+    }
+
+    private func endDownloadWork() {
+        activeBatchCount = max(0, activeBatchCount - 1)
+        isWorking = activeBatchCount > 0
+    }
+
+    private func updateBatchSummary(
+        prepared: [PreparedDownload],
+        results: [DownloadExecutionResult]
+    ) {
         let batchTasks = prepared.compactMap { preparedItem in
             tasks.first(where: { $0.id == preparedItem.taskID })
         }
@@ -616,29 +795,38 @@ final class AppModel: ObservableObject {
         let failedCount = batchTasks.filter { $0.state == .failed }.count
         let cancelledCount = batchTasks.filter { $0.state == .cancelled }.count
 
+        let summary: String
+        let isError: Bool
         if prepared.count == 1, let onlyTask = batchTasks.first {
             switch onlyTask.state {
             case .completed:
-                status = "下载完成"
-                statusIsError = false
+                summary = onlyTask.detail
+                isError = false
             case .cancelled:
-                status = "下载已取消"
-                statusIsError = false
+                summary = "下载已取消"
+                isError = false
             case .failed:
-                status = onlyTask.detail
-                statusIsError = true
+                summary = onlyTask.detail
+                isError = true
             case .queued, .downloading:
-                status = onlyTask.detail
-                statusIsError = false
+                summary = onlyTask.detail
+                isError = false
             }
         } else {
-            var summary = "批量下载完成：\(successCount) 成功，\(failedCount) 失败"
+            var text = "批量下载完成：\(successCount) 成功，\(failedCount) 失败"
             if cancelledCount > 0 {
-                summary += "，\(cancelledCount) 取消"
+                text += "，\(cancelledCount) 取消"
             }
-            status = summary
-            statusIsError = failedCount > 0
+            summary = text
+            isError = failedCount > 0
         }
+        updateComposerStatusIfIdle(summary, isError: isError)
+    }
+
+    private func updateComposerStatusIfIdle(_ text: String, isError: Bool) {
+        guard input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        status = text
+        statusIsError = isError
     }
 
     func loadEngineSettings(force: Bool = false) async {
@@ -649,6 +837,7 @@ final class AppModel: ObservableObject {
         do {
             let xhs = try await sendBridge(.init(command: "settings_get", engine: "xiaohongshu"))
             guard xhs.ok else {
+                settingsStatusEngine = "xiaohongshu"
                 settingsStatus = xhs.message
                 settingsStatusIsError = true
                 return
@@ -657,6 +846,7 @@ final class AppModel: ObservableObject {
 
             let douyin = try await sendBridge(.init(command: "settings_get", engine: "douyin"))
             guard douyin.ok else {
+                settingsStatusEngine = "douyin"
                 settingsStatus = douyin.message
                 settingsStatusIsError = true
                 return
@@ -664,7 +854,10 @@ final class AppModel: ObservableObject {
             applyDouyinSettings(douyin.details ?? [:])
 
             hasLoadedEngineSettings = true
+            xhsSettingsDirty = false
+            douyinSettingsDirty = false
             settingsStatus = "已读取原始项目配置。"
+            settingsStatusEngine = nil
             settingsStatusIsError = false
         } catch {
             settingsStatus = error.localizedDescription
@@ -689,9 +882,16 @@ final class AppModel: ObservableObject {
             "cookie": xhsSettings.cookie,
         ]
         await saveEngineSettings(engine: "xiaohongshu", values: values)
+        if !settingsStatusIsError { xhsSettingsDirty = false }
     }
 
     func saveDouyinSettings() async {
+        if let validation = douyinSettingsValidationMessage {
+            settingsStatus = validation
+            settingsStatusEngine = "douyin"
+            settingsStatusIsError = true
+            return
+        }
         let values: [String: Any] = [
             "music": douyinSettings.music,
             "dynamic_cover": douyinSettings.dynamicCover,
@@ -708,6 +908,49 @@ final class AppModel: ObservableObject {
             "cookie": douyinSettings.cookie,
         ]
         await saveEngineSettings(engine: "douyin", values: values)
+        if !settingsStatusIsError { douyinSettingsDirty = false }
+    }
+
+    func importBrowserCookie(engine: String, browser: String) async {
+        settingsLoading = true
+        defer { settingsLoading = false }
+
+        do {
+            let payload = try JSONSerialization.data(
+                withJSONObject: ["browser": browser],
+                options: []
+            )
+            let settingsJSON = String(decoding: payload, as: UTF8.self)
+            let response = try await sendBridge(
+                .init(
+                    command: "browser_cookie",
+                    engine: engine,
+                    settingsJSON: settingsJSON
+                )
+            )
+            settingsStatus = response.message
+            settingsStatusEngine = engine
+            guard response.ok, let cookie = response.details?["cookie"] else {
+                settingsStatusIsError = true
+                return
+            }
+
+            if engine == "xiaohongshu" {
+                xhsSettings.cookie = cookie
+                if let path = response.details?["config_path"] {
+                    xhsSettingsPath = path
+                }
+            } else if engine == "douyin" {
+                douyinSettings.cookie = cookie
+                if let path = response.details?["config_path"] {
+                    douyinSettingsPath = path
+                }
+            }
+            settingsStatusIsError = false
+        } catch {
+            settingsStatus = error.localizedDescription
+            settingsStatusIsError = true
+        }
     }
 
     func resetEngineSettings(_ engine: String) async {
@@ -716,6 +959,7 @@ final class AppModel: ObservableObject {
         do {
             let response = try await sendBridge(.init(command: "settings_reset", engine: engine))
             settingsStatus = response.message
+            settingsStatusEngine = engine
             if response.ok {
                 settingsStatusIsError = false
                 hasLoadedEngineSettings = false
@@ -742,21 +986,38 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func cancelAllActiveTasks() {
+        let ids = tasks
+            .filter { $0.state == .queued || $0.state == .downloading }
+            .map(\.id)
+        for id in ids { cancelTask(id) }
+    }
+
     func clearCompletedTasks() {
         tasks.removeAll { $0.state == .completed }
     }
 
-    func removeTask(_ id: UUID) {
-        tasks.removeAll { $0.id == id && $0.state != .downloading }
+    func clearFailedAndCancelledTasks() {
+        tasks.removeAll { $0.state == .failed || $0.state == .cancelled }
     }
 
-    func retryTask(_ task: DownloadTaskItem) {
-        guard !isWorking else { return }
-        input = task.sourceURL
-        validatedInput = ""
-        detectLocally()
-        selection = .download
-        status = "已载入失败任务，可重新检查后下载"
+    func clearFinishedTasks() {
+        tasks.removeAll {
+            $0.state == .completed || $0.state == .failed || $0.state == .cancelled
+        }
+    }
+
+    func removeTask(_ id: UUID) {
+        tasks.removeAll {
+            $0.id == id &&
+            $0.state != .downloading &&
+            $0.state != .queued
+        }
+    }
+
+    func clearHistory() {
+        history.removeAll()
+        persistHistory()
     }
 
     func removeHistory(_ id: UUID) {
@@ -766,11 +1027,78 @@ final class AppModel: ObservableObject {
 
     func useHistory(_ item: HistoryItem) {
         input = item.sourceURL
-        outputDirectory = item.outputDirectory
+        if activeTaskCount == 0 {
+            outputDirectory = item.outputDirectory
+        }
         validatedInput = ""
         detectLocally()
         selection = .download
-        status = "已载入历史链接，可重新检查"
+        status = activeTaskCount == 0
+            ? "已载入历史链接和原保存位置，可重新检查"
+            : "已载入历史链接；当前有任务进行中，将沿用当前保存位置"
+    }
+
+    func requestSelection(_ section: AppSection) {
+        guard section != selection else { return }
+        if selection == .settings, hasUnsavedSettings {
+            pendingSectionAfterSettings = section
+            showsUnsavedSettingsPrompt = true
+            return
+        }
+        selection = section
+    }
+
+    func openSettings(_ destination: SettingsDestination = .general) {
+        settingsDestination = destination
+        selection = .settings
+    }
+
+    func requestTermination() -> Bool {
+        guard hasUnsavedSettings else { return true }
+        pendingTermination = true
+        showsUnsavedSettingsPrompt = true
+        return false
+    }
+
+    func saveUnsavedSettingsAndContinue() async -> Bool {
+        if xhsSettingsDirty {
+            await saveXHSSettings()
+            if settingsStatusIsError { return false }
+        }
+        if douyinSettingsDirty {
+            await saveDouyinSettings()
+            if settingsStatusIsError { return false }
+        }
+        completePendingSettingsTransition()
+        return true
+    }
+
+    func discardUnsavedSettingsAndContinue() async {
+        if pendingTermination {
+            xhsSettingsDirty = false
+            douyinSettingsDirty = false
+            showsUnsavedSettingsPrompt = false
+            pendingSectionAfterSettings = nil
+            return
+        }
+        await loadEngineSettings(force: true)
+        xhsSettingsDirty = false
+        douyinSettingsDirty = false
+        completePendingSettingsTransition()
+    }
+
+    func cancelUnsavedSettingsPrompt() {
+        showsUnsavedSettingsPrompt = false
+        pendingSectionAfterSettings = nil
+        pendingTermination = false
+    }
+
+    private func completePendingSettingsTransition() {
+        showsUnsavedSettingsPrompt = false
+        if let section = pendingSectionAfterSettings {
+            pendingSectionAfterSettings = nil
+            selection = section
+        }
     }
 
     private func markTaskStarted(_ id: UUID, platform: DownloadPlatform) -> Bool {
@@ -834,7 +1162,9 @@ final class AppModel: ObservableObject {
                 }
                 switch response.details?["verification"] {
                 case "existing":
-                    tasks[index].detail = "文件已存在，校验通过"
+                    tasks[index].detail = "已跳过：同名文件已存在（与下载记录无关）"
+                case "skipped_record":
+                    tasks[index].detail = "已跳过：上游下载记录命中"
                 case "written":
                     let count = tasks[index].fileCount
                     tasks[index].detail = count > 0
@@ -850,7 +1180,7 @@ final class AppModel: ObservableObject {
                 tasks[index].state = kind == .cancelled ? .cancelled : .failed
                 tasks[index].progress = nil
                 tasks[index].failureKind = kind
-                tasks[index].detail = "\(kind.label)：\(response.message)"
+                tasks[index].detail = response.message
             }
             return
         }
@@ -859,7 +1189,7 @@ final class AppModel: ObservableObject {
         tasks[index].state = kind == .cancelled ? .cancelled : .failed
         tasks[index].progress = nil
         tasks[index].failureKind = kind
-        tasks[index].detail = "\(kind.label)：\(result.failureMessage ?? kind.label)"
+        tasks[index].detail = result.failureMessage ?? kind.label
     }
 
     private var detectionSummary: String {
@@ -1005,6 +1335,7 @@ final class AppModel: ObservableObject {
     }
 
     private func saveEngineSettings(engine: String, values: [String: Any]) async {
+        settingsStatusEngine = engine
         guard JSONSerialization.isValidJSONObject(values),
               let data = try? JSONSerialization.data(withJSONObject: values, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8)

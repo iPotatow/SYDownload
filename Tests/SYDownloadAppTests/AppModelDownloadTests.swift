@@ -39,7 +39,9 @@ private actor RequestRecorder {
             "ok": !rejected,
             "platform": PlatformDetector.detect(request.url ?? "").rawValue,
             "message": rejected ? "rejected" : "ok",
-            "details": [:]
+            "details": request.command == "download"
+                ? ["verification": "written", "verified_files": "1", "verified_bytes": "1"]
+                : [:]
         ]
         let data = try! JSONSerialization.data(withJSONObject: payload)
         return try! JSONDecoder().decode(BridgeResponse.self, from: data)
@@ -232,7 +234,8 @@ final class AppModelDownloadTests: XCTestCase {
         XCTAssertEqual(model.tasks.count, 4)
         XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == unsupported })?.state, .failed)
         XCTAssertEqual(model.tasks.first(where: { $0.sourceURL == tiktok })?.state, .failed)
-        XCTAssertEqual(model.history.map(\.sourceURL), [xhs, douyin])
+        XCTAssertEqual(Set(model.history.map(\.sourceURL)), Set([xhs, douyin]))
+        XCTAssertEqual(model.history.count, 2)
         XCTAssertEqual(model.status, "批量下载完成：2 成功，2 失败")
     }
 
@@ -270,7 +273,7 @@ final class AppModelDownloadTests: XCTestCase {
         await waitForRequestCount(recorder, command: "validate", count: 1)
 
         XCTAssertEqual(model.tasks.count, 100)
-        XCTAssertEqual(model.selection, .tasks)
+        XCTAssertEqual(model.selection, .download)
         XCTAssertEqual(model.tasks.filter { $0.state == .queued }.count, 100)
         let validationsWhileWaiting = await recorder.requests(for: "validate")
         XCTAssertEqual(validationsWhileWaiting.count, 1)

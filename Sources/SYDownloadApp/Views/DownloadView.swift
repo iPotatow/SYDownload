@@ -1,5 +1,6 @@
 #if canImport(SwiftUI)
 import SwiftUI
+import AppKit
 import SYDownloadCore
 
 struct DownloadView: View {
@@ -29,6 +30,8 @@ struct DownloadView: View {
                 .coreTypography(CoreTypography.sectionTitle)
                 .foregroundStyle(CoreColor.textPrimary)
 
+            destinationRow
+
             TextField("粘贴一个或多个链接 / 完整分享文本…", text: $model.input, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(CoreTypography.bodyFont)
@@ -51,7 +54,7 @@ struct DownloadView: View {
                 Spacer(minLength: CoreSpacing.m)
 
                 if !model.input.isEmpty {
-                    Button("清空", systemImage: "xmark", action: model.clearInput)
+                    Button("清空", remixSystemImage: "xmark", action: model.clearInput)
                         .buttonStyle(.borderless)
                         .font(CoreTypography.controlFont)
                         .frame(height: CoreMetrics.controlHeightCompact)
@@ -70,19 +73,63 @@ struct DownloadView: View {
             HStack(spacing: CoreSpacing.m) {
                 Spacer(minLength: 0)
 
-                Button("检查链接", systemImage: "checkmark.circle", action: validate)
+                Button("检查链接", remixSystemImage: "checkmark.circle", action: validate)
                     .buttonStyle(.bordered)
                     .font(CoreTypography.controlFont)
                     .frame(height: CoreMetrics.controlHeightDefault)
                     .disabled(actionsDisabled)
 
-                Button(downloadButtonTitle, systemImage: "arrow.down", action: download)
+                Button(downloadButtonTitle, remixSystemImage: "arrow.down", action: download)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .font(CoreTypography.controlFont)
                     .frame(height: CoreMetrics.controlHeightLarge)
                     .keyboardShortcut(.return, modifiers: [.command])
                     .disabled(actionsDisabled)
+            }
+        }
+    }
+
+    private var destinationRow: some View {
+        VStack(alignment: .leading, spacing: CoreSpacing.xs) {
+            HStack(spacing: CoreSpacing.s) {
+                Label(model.outputDirectory, remixSystemImage: "folder")
+                    .font(CoreTypography.captionFont.monospaced())
+                    .foregroundStyle(model.outputDirectoryIssue == nil ? CoreColor.textSecondary : CoreColor.danger)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(model.outputDirectory)
+
+                Spacer(minLength: CoreSpacing.m)
+
+                Button("在 Finder 中显示", remixSystemImage: "folder") {
+                    NSWorkspace.shared.open(
+                        URL(
+                            fileURLWithPath: NSString(string: model.outputDirectory).expandingTildeInPath,
+                            isDirectory: true
+                        )
+                    )
+                }
+                .buttonStyle(.borderless)
+                .font(CoreTypography.controlFont)
+                .disabled(!model.outputDirectoryExists)
+
+                Button("更改", remixSystemImage: "settings") {
+                    model.openSettings(.downloadDirectory)
+                }
+                .buttonStyle(.borderless)
+                .font(CoreTypography.controlFont)
+                .disabled(model.activeTaskCount > 0)
+            }
+
+            if let issue = model.outputDirectoryIssue {
+                Text(issue)
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.danger)
+            } else if model.activeTaskCount > 0 {
+                Text("有任务运行时暂不允许更改下载目录，避免不同任务写入位置发生竞争。")
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.textTertiary)
             }
         }
     }
@@ -132,8 +179,7 @@ struct DownloadView: View {
                     .controlSize(.small)
                     .frame(width: CoreMetrics.controlIconSize, height: CoreMetrics.controlIconSize)
             } else {
-                Image(systemName: statusSymbol)
-                    .font(.system(size: CoreMetrics.controlIconSize, weight: .semibold))
+                RemixIcon(systemName: statusSymbol, size: CoreMetrics.controlIconSize)
                     .foregroundStyle(statusColor)
                     .frame(width: CoreMetrics.controlIconSize, height: CoreMetrics.controlIconSize)
             }
@@ -183,8 +229,8 @@ struct DownloadView: View {
     private var actionsDisabled: Bool {
         !model.hasSupportedLinks
             || model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || model.isWorking
             || model.isParsing
+            || model.outputDirectoryIssue != nil
     }
 
     private var platformStatus: String {
@@ -211,7 +257,7 @@ struct DownloadView: View {
         if model.isParsing {
             return "正在检查链接…"
         }
-        if model.isWorking {
+        if model.isWorking && model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return model.status
         }
         if model.statusIsError || !model.validatedInput.isEmpty {
@@ -224,8 +270,8 @@ struct DownloadView: View {
         if model.isParsing {
             return "正在确认下载环境与平台可用性"
         }
-        if model.isWorking {
-            return "任务会自动进入任务列表，可在那里查看实时进度"
+        if model.isWorking && model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "后台 \(model.activeTaskCount) 个任务等待或正在下载，可继续粘贴下一批链接"
         }
         if model.statusIsError {
             return "请检查链接内容、平台支持或下载环境"
@@ -242,7 +288,11 @@ struct DownloadView: View {
     }
 
     private var downloadButtonTitle: String {
-        if model.isWorking { return "正在下载…" }
+        if model.isWorking {
+            return model.supportedLinkCount > 1
+                ? "加入任务 \(model.supportedLinkCount) 项"
+                : "加入任务"
+        }
         return model.supportedLinkCount > 1
             ? "开始下载 \(model.supportedLinkCount) 项"
             : "开始下载"
@@ -251,15 +301,14 @@ struct DownloadView: View {
     private var statusSymbol: String {
         if model.statusIsError { return "exclamationmark.triangle.fill" }
         if !model.validatedInput.isEmpty { return "checkmark.circle.fill" }
-        if model.supportedLinkCount > 0 { return "checkmark.circle.fill" }
+        if model.supportedLinkCount > 0 { return "link" }
         return "link"
     }
 
     private var statusColor: Color {
         if model.statusIsError { return CoreColor.danger }
-        if !model.validatedInput.isEmpty || model.supportedLinkCount > 0 {
-            return CoreColor.success
-        }
+        if !model.validatedInput.isEmpty { return CoreColor.success }
+        if model.supportedLinkCount > 0 { return CoreColor.accent }
         return CoreColor.textSecondary
     }
 

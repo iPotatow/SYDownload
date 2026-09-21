@@ -5,11 +5,12 @@ import AppKit
 struct HistoryView: View {
     @ObservedObject var model: AppModel
     @State private var selectedHistoryID: UUID?
+    @State private var showsClearHistoryConfirmation = false
     @FocusState private var searchFocused: Bool
 
     var body: some View {
         CorePageContainer(title: "历史记录", maxWidth: SYDownloadLayout.contentMaxWidth) {
-            searchField
+            headerActions
         } content: {
             VStack(alignment: .leading, spacing: CoreSpacing.l) {
                 summaryBar
@@ -42,12 +43,40 @@ struct HistoryView: View {
             guard model.selection == .history else { return }
             searchFocused = true
         }
+        .alert("清空下载历史？", isPresented: $showsClearHistoryConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("清空记录", role: .destructive) {
+                model.clearHistory()
+                selectedHistoryID = nil
+            }
+        } message: {
+            Text("只会删除 SYDownload 的历史记录，不会删除已经下载到磁盘的文件。")
+        }
         .tint(CoreColor.accent)
+    }
+
+    private var headerActions: some View {
+        HStack(spacing: CoreSpacing.s) {
+            searchField
+
+            Menu {
+                Button("清空历史记录", remixSystemImage: "trash", role: .destructive) {
+                    showsClearHistoryConfirmation = true
+                }
+                .disabled(model.history.isEmpty)
+            } label: {
+                Label("历史记录操作", remixSystemImage: "ellipsis")
+                    .labelStyle(.iconOnly)
+            }
+            .menuStyle(.borderlessButton)
+            .frame(width: CoreMetrics.controlHeightSmall, height: CoreMetrics.controlHeightSmall)
+            .help("历史记录操作")
+        }
     }
 
     private var searchField: some View {
         HStack(spacing: CoreSpacing.s) {
-            Image(systemName: "magnifyingglass")
+            RemixIcon(systemName: "magnifyingglass")
                 .foregroundStyle(CoreColor.textTertiary)
                 .accessibilityHidden(true)
 
@@ -55,6 +84,17 @@ struct HistoryView: View {
                 .textFieldStyle(.plain)
                 .font(CoreTypography.bodyFont)
                 .focused($searchFocused)
+
+            if !model.historySearch.isEmpty {
+                Button("清除搜索", remixSystemImage: "xmark.circle.fill") {
+                    model.historySearch = ""
+                    searchFocused = true
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .foregroundStyle(CoreColor.textTertiary)
+                .help("清除搜索")
+            }
         }
         .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
         .frame(width: SYDownloadLayout.pageHeaderSearchWidth, height: CoreMetrics.controlHeightSmall)
@@ -65,14 +105,22 @@ struct HistoryView: View {
 
     private var summaryBar: some View {
         HStack(alignment: .center, spacing: CoreSpacing.s) {
-            Text("共 \(model.filteredHistory.count) 条记录")
+            Text(
+                model.historySearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? "共 \(model.history.count) 条记录"
+                    : "找到 \(model.filteredHistory.count) / 共 \(model.history.count) 条"
+            )
                 .coreTypography(CoreTypography.control)
                 .foregroundStyle(CoreColor.textPrimary)
                 .monospacedDigit()
 
+            Text("保留最近 \(model.historyRetentionLimit) 条")
+                .coreTypography(CoreTypography.caption)
+                .foregroundStyle(CoreColor.textTertiary)
+
             Spacer()
 
-            Label("按完成时间排序", systemImage: "arrow.down")
+            Label("按完成时间排序", remixSystemImage: "arrow.down")
                 .coreTypography(CoreTypography.caption)
                 .foregroundStyle(CoreColor.textSecondary)
         }
@@ -93,17 +141,17 @@ struct HistoryView: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
                 .contextMenu {
-                    Button("在 Finder 中显示", systemImage: "folder") {
+                    Button("在 Finder 中显示", remixSystemImage: "folder") {
                         openFolder(item)
                     }
-                    Button("打开原链接", systemImage: "safari") {
+                    Button("打开原链接", remixSystemImage: "safari") {
                         openSource(item)
                     }
-                    Button("再次下载", systemImage: "arrow.down") {
+                    Button("重新下载…", remixSystemImage: "arrow.down") {
                         prepareRedownload(item)
                     }
                     Divider()
-                    Button("从历史中删除", systemImage: "trash", role: .destructive) {
+                    Button("从历史中删除", remixSystemImage: "trash", role: .destructive) {
                         removeHistory(item.id)
                     }
                 }
@@ -158,6 +206,7 @@ private struct HistoryRow: View {
     let isSelected: Bool
     let showsDivider: Bool
     @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: CoreSpacing.m) {
@@ -199,7 +248,7 @@ private struct HistoryRow: View {
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
-        .animation(CoreMotion.fast, value: isHovered)
+        .animation(reduceMotion ? nil : CoreMotion.fast, value: isHovered)
     }
 
     private var rowBackground: Color {
@@ -216,7 +265,7 @@ private struct HistoryRow: View {
 
     private var actions: some View {
         HStack(spacing: CoreSpacing.s) {
-            Button("在 Finder 中显示", systemImage: "folder") {
+            Button("在 Finder 中显示", remixSystemImage: "folder") {
                 NSWorkspace.shared.open(URL(fileURLWithPath: item.outputDirectory))
             }
             .labelStyle(.iconOnly)
@@ -225,23 +274,23 @@ private struct HistoryRow: View {
             .help("在 Finder 中显示")
 
             Menu {
-                Button("打开原链接", systemImage: "safari") {
+                Button("打开原链接", remixSystemImage: "safari") {
                     if let url = URL(string: item.sourceURL) {
                         NSWorkspace.shared.open(url)
                     }
                 }
-                Button("再次下载", systemImage: "arrow.down") {
+                Button("重新下载…", remixSystemImage: "arrow.down") {
                     model.prepareHistoryRedownload(item)
                     DispatchQueue.main.async {
                         NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
                     }
                 }
                 Divider()
-                Button("从历史中删除", systemImage: "trash", role: .destructive) {
+                Button("从历史中删除", remixSystemImage: "trash", role: .destructive) {
                     model.removeHistory(item.id)
                 }
             } label: {
-                Label("更多操作", systemImage: "ellipsis")
+                Label("更多操作", remixSystemImage: "ellipsis")
                     .labelStyle(.iconOnly)
             }
             .menuStyle(.borderlessButton)

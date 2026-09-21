@@ -16,6 +16,9 @@ struct PhotosView: View {
     @State private var isDeleting = false
     @State private var statusIsError = false
     @State private var statusMessage = ""
+    @State private var scanTask: Task<PhotoScanOutcome, Never>?
+    @State private var scanID = UUID()
+    @State private var failedDeleteURLs: [URL] = []
 
     var body: some View {
         CorePageContainer(title: "照片整理", maxWidth: SYDownloadLayout.contentMaxWidth) {
@@ -23,14 +26,19 @@ struct PhotosView: View {
                 workspace
 
                 if shouldShowStatus {
-                    Label(
-                        statusMessage,
-                        systemImage: statusIsError ? "exclamationmark.circle" : "checkmark.circle"
-                    )
-                    .font(CoreTypography.bodyFont)
-                    .foregroundStyle(statusIsError ? CoreColor.danger : CoreColor.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityElement(children: .combine)
+                    VStack(alignment: .leading, spacing: CoreSpacing.s) {
+                        Label(
+                            statusMessage, remixSystemImage: statusIsError ? "exclamationmark.circle" : "checkmark.circle"
+                        )
+                        .font(CoreTypography.bodyFont)
+                        .foregroundStyle(statusIsError ? CoreColor.danger : CoreColor.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .combine)
+
+                        if !failedDeleteURLs.isEmpty {
+                            deleteFailureActions
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -81,8 +89,7 @@ struct PhotosView: View {
 
     private var initialDropZone: some View {
         VStack(spacing: CoreSpacing.m) {
-            Image(systemName: isDropTargeted ? "folder.fill.badge.plus" : "folder")
-                .font(.system(size: CoreMetrics.controlHeightLarge, weight: .regular))
+            RemixIcon(systemName: isDropTargeted ? "folder.fill.badge.plus" : "folder", size: CoreMetrics.controlHeightLarge)
                 .foregroundStyle(isDropTargeted ? CoreColor.accent : CoreColor.textSecondary)
 
             Text("拖入照片文件夹到这里")
@@ -92,7 +99,7 @@ struct PhotosView: View {
                 .font(CoreTypography.bodyFont)
                 .foregroundStyle(CoreColor.textSecondary)
 
-            Button("选择文件夹…", systemImage: "folder", action: chooseFolder)
+            Button("选择文件夹…", remixSystemImage: "folder", action: chooseFolder)
                 .buttonStyle(.borderedProminent)
                 .font(CoreTypography.controlFont)
                 .frame(height: CoreMetrics.controlHeightDefault)
@@ -138,6 +145,19 @@ struct PhotosView: View {
                     .font(CoreTypography.bodyFont)
                     .foregroundStyle(CoreColor.textSecondary)
                     .multilineTextAlignment(.center)
+            }
+
+            HStack(spacing: CoreSpacing.s) {
+                Button("取消扫描", role: .cancel) {
+                    cancelScan()
+                }
+                .font(CoreTypography.controlFont)
+
+                Button("更换文件夹…", remixSystemImage: "folder") {
+                    cancelScan()
+                    chooseFolder()
+                }
+                .font(CoreTypography.controlFont)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 360)
@@ -190,7 +210,7 @@ struct PhotosView: View {
         VStack(alignment: .leading, spacing: CoreSpacing.s) {
             HStack(spacing: CoreSpacing.s) {
                 if let folderURL {
-                    Label(folderURL.path, systemImage: "folder")
+                    Label(folderURL.path, remixSystemImage: "folder")
                         .font(CoreTypography.bodyFont)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -199,13 +219,13 @@ struct PhotosView: View {
 
                 Spacer(minLength: CoreSpacing.m)
 
-                Button("重新扫描", systemImage: "arrow.clockwise", action: rescan)
+                Button("重新扫描", remixSystemImage: "arrow.clockwise", action: rescan)
                     .buttonStyle(.borderless)
                     .font(CoreTypography.controlFont)
                     .frame(height: CoreMetrics.controlHeightCompact)
                     .disabled(isDeleting || isScanning)
 
-                Button("更换文件夹…", systemImage: "folder", action: chooseFolder)
+                Button("更换文件夹…", remixSystemImage: "folder", action: chooseFolder)
                     .buttonStyle(.bordered)
                     .font(CoreTypography.controlFont)
                     .frame(height: CoreMetrics.controlHeightCompact)
@@ -230,8 +250,7 @@ struct PhotosView: View {
 
                 if !scanResult.groups.isEmpty {
                     Button(
-                        allDatesSelected ? "取消全选" : "全选日期",
-                        systemImage: allDatesSelected ? "minus.square" : "checkmark.square",
+                        allDatesSelected ? "取消全选" : "全选日期", remixSystemImage: allDatesSelected ? "minus.square" : "checkmark.square",
                         action: toggleAllDates
                     )
                     .buttonStyle(.borderless)
@@ -292,7 +311,7 @@ struct PhotosView: View {
 
     private var ungroupedRow: some View {
         HStack(spacing: CoreSpacing.m) {
-            Image(systemName: "questionmark.circle")
+            RemixIcon(systemName: "questionmark.circle")
                 .foregroundStyle(CoreColor.textSecondary)
                 .frame(width: CoreSpacing.l)
 
@@ -331,6 +350,8 @@ struct PhotosView: View {
             if let cover = photos.first {
                 LocalPhotoThumbnail(
                     url: cover.url,
+                    previewURLs: photos.map(\.url),
+                    previewIndex: 0,
                     width: RefinementLayout.photoCoverWidth,
                     height: RefinementLayout.photoCoverHeight,
                     cornerRadius: CoreRadius.panel
@@ -341,10 +362,12 @@ struct PhotosView: View {
                 LazyVGrid(columns: columns, spacing: RefinementLayout.photoPreviewSpacing) {
                     ForEach(Array(supportingPhotos.enumerated()), id: \.element.id) { index, photo in
                         if index == 3 && photos.count > 5 {
-                            photoOverflowTile(count: photos.count - 4)
+                            photoOverflowTile(count: photos.count - 4, photos: photos)
                         } else {
                             LocalPhotoThumbnail(
                                 url: photo.url,
+                                previewURLs: photos.map(\.url),
+                                previewIndex: index + 1,
                                 width: RefinementLayout.photoSecondaryThumbnailSize,
                                 height: RefinementLayout.photoSecondaryThumbnailSize,
                                 cornerRadius: CoreRadius.row
@@ -362,24 +385,30 @@ struct PhotosView: View {
         .frame(height: RefinementLayout.photoCoverHeight, alignment: .leading)
     }
 
-    private func photoOverflowTile(count: Int) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
-                .fill(CoreColor.panelBackground)
-            Text("+\(count)")
-                .coreTypography(CoreTypography.groupLabel)
-                .foregroundStyle(CoreColor.textSecondary)
-                .monospacedDigit()
+    private func photoOverflowTile(count: Int, photos: [PhotoFileItem]) -> some View {
+        Button {
+            PhotoQuickLookPresenter.shared.open(photos.map(\.url), startAt: min(4, max(0, photos.count - 1)))
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
+                    .fill(CoreColor.panelBackground)
+                Text("+\(count)")
+                    .coreTypography(CoreTypography.groupLabel)
+                    .foregroundStyle(CoreColor.textSecondary)
+                    .monospacedDigit()
+            }
+            .frame(
+                width: RefinementLayout.photoSecondaryThumbnailSize,
+                height: RefinementLayout.photoSecondaryThumbnailSize
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
+                    .strokeBorder(CoreColor.divider, lineWidth: CoreMetrics.dividerWidth)
+            }
         }
-        .frame(
-            width: RefinementLayout.photoSecondaryThumbnailSize,
-            height: RefinementLayout.photoSecondaryThumbnailSize
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
-                .strokeBorder(CoreColor.divider, lineWidth: CoreMetrics.dividerWidth)
-        }
-        .accessibilityLabel("还有 \(count) 张照片")
+        .buttonStyle(.plain)
+        .help("查看这一日期的全部 \(photos.count) 张照片")
+        .accessibilityLabel("查看全部照片，还有 \(count) 张未显示")
     }
 
     private var deleteBar: some View {
@@ -404,7 +433,7 @@ struct PhotosView: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    Label("移到废纸篓", systemImage: "trash")
+                    Label("移到废纸篓", remixSystemImage: "trash")
                 }
             }
             .font(CoreTypography.controlFont)
@@ -452,30 +481,91 @@ struct PhotosView: View {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }
 
+    private var deleteFailureActions: some View {
+        VStack(alignment: .leading, spacing: CoreSpacing.s) {
+            ForEach(Array(failedDeleteURLs.prefix(4)), id: \.self) { url in
+                Text(url.lastPathComponent)
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(url.path)
+            }
+
+            if failedDeleteURLs.count > 4 {
+                Text("另有 \(failedDeleteURLs.count - 4) 个文件")
+                    .coreTypography(CoreTypography.caption)
+                    .foregroundStyle(CoreColor.textTertiary)
+            }
+
+            HStack(spacing: CoreSpacing.s) {
+                Button("在 Finder 中显示", remixSystemImage: "folder") {
+                    NSWorkspace.shared.activateFileViewerSelecting(failedDeleteURLs)
+                }
+                .buttonStyle(.borderless)
+                .font(CoreTypography.controlFont)
+
+                Button("重试失败项", remixSystemImage: "arrow.clockwise") {
+                    deletePhotos(failedDeleteURLs)
+                }
+                .buttonStyle(.borderless)
+                .font(CoreTypography.controlFont)
+                .disabled(isDeleting)
+            }
+        }
+        .padding(.leading, CoreSpacing.l)
+    }
+
+    @MainActor
+    private func cancelScan() {
+        scanTask?.cancel()
+        scanTask = nil
+        scanID = UUID()
+        isScanning = false
+        statusIsError = false
+        statusMessage = folderURL == nil ? "" : "已取消扫描。"
+    }
+
     @MainActor
     private func openFolder(_ url: URL, statusPrefix: String? = nil) {
+        scanTask?.cancel()
+        let currentID = UUID()
+        scanID = currentID
         folderURL = url
         selectedDates.removeAll()
+        failedDeleteURLs.removeAll()
         isScanning = true
         statusIsError = false
         statusMessage = "正在扫描 \(url.lastPathComponent)…"
 
-        Task {
-            let outcome = await Task.detached(priority: .userInitiated) {
-                do {
-                    return PhotoScanOutcome.success(try PhotoLibraryService.scan(folder: url))
-                } catch {
-                    return PhotoScanOutcome.failure(error.localizedDescription)
-                }
-            }.value
+        let worker = Task.detached(priority: .userInitiated) { () -> PhotoScanOutcome in
+            do {
+                return PhotoScanOutcome.success(try PhotoLibraryService.scan(folder: url))
+            } catch is CancellationError {
+                return PhotoScanOutcome.failure("__cancelled__")
+            } catch {
+                return PhotoScanOutcome.failure(error.localizedDescription)
+            }
+        }
+        scanTask = worker
 
+        Task { @MainActor in
+            let outcome = await worker.value
+            guard scanID == currentID else { return }
+            scanTask = nil
             isScanning = false
+
             switch outcome {
             case .success(let result):
                 scanResult = result
                 statusIsError = false
                 statusMessage = statusPrefix ?? ""
             case .failure(let message):
+                if message == "__cancelled__" {
+                    statusMessage = "已取消扫描。"
+                    statusIsError = false
+                    return
+                }
                 scanResult = .empty
                 statusMessage = "无法读取照片：\(message)"
                 statusIsError = true
@@ -485,11 +575,16 @@ struct PhotosView: View {
 
     @MainActor
     private func deleteSelectedPhotos() {
-        let urls = selectedPhotoURLs
+        deletePhotos(selectedPhotoURLs)
+    }
+
+    @MainActor
+    private func deletePhotos(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
 
         isDeleting = true
         statusMessage = ""
+        failedDeleteURLs.removeAll()
 
         Task {
             let result = await Task.detached(priority: .userInitiated) {
@@ -497,14 +592,18 @@ struct PhotosView: View {
             }.value
 
             isDeleting = false
+            let failed = Set(result.failedPaths)
+            failedDeleteURLs = urls.filter { failed.contains($0.path) }
             let failedText = result.failedPaths.isEmpty ? "" : "，\(result.failedPaths.count) 张失败"
             statusIsError = !result.failedPaths.isEmpty
-            let prefix = "已移到废纸篓 \(result.deletedCount) 张照片\(failedText)。"
+            statusMessage = "已移到废纸篓 \(result.deletedCount) 张照片\(failedText)。"
+            selectedDates.removeAll()
 
             if let folderURL {
-                openFolder(folderURL, statusPrefix: prefix)
-            } else {
-                statusMessage = prefix
+                let preservedStatus = statusMessage
+                let preservedFailures = failedDeleteURLs
+                openFolder(folderURL, statusPrefix: preservedStatus)
+                failedDeleteURLs = preservedFailures
             }
         }
     }
@@ -512,6 +611,8 @@ struct PhotosView: View {
 
 private struct LocalPhotoThumbnail: View {
     let url: URL
+    var previewURLs: [URL]?
+    var previewIndex: Int = 0
     var width: CGFloat = SYDownloadLayout.photoThumbnailSize
     var height: CGFloat = SYDownloadLayout.photoThumbnailSize
     var cornerRadius: CGFloat = CoreRadius.panel
@@ -519,38 +620,36 @@ private struct LocalPhotoThumbnail: View {
     @State private var thumbnailImage: NSImage?
 
     var body: some View {
-        Group {
-            if let thumbnailImage {
-                Image(nsImage: thumbnailImage)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                ZStack {
-                    Color.primary.opacity(0.04)
-                    Image(systemName: "photo")
-                        .foregroundStyle(CoreColor.textSecondary)
+        Button {
+            PhotoQuickLookPresenter.shared.open(previewURLs ?? [url], startAt: previewIndex)
+        } label: {
+            Group {
+                if let thumbnailImage {
+                    Image(nsImage: thumbnailImage)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ZStack {
+                        Color.primary.opacity(0.04)
+                        RemixIcon(systemName: "photo")
+                            .foregroundStyle(CoreColor.textSecondary)
+                    }
                 }
             }
+            .frame(width: width, height: height)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: CoreMetrics.borderWidth)
+            }
+            .contentShape(Rectangle())
         }
-        .frame(width: width, height: height)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.07), lineWidth: CoreMetrics.borderWidth)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            PhotoQuickLookPresenter.shared.open(url)
-        }
+        .buttonStyle(.plain)
         .task(id: url) {
             await loadThumbnail()
         }
         .help("点按使用快速查看预览 \(url.lastPathComponent)")
-        .accessibilityLabel(url.lastPathComponent)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction {
-            PhotoQuickLookPresenter.shared.open(url)
-        }
+        .accessibilityLabel("预览 \(url.lastPathComponent)")
     }
 
     @MainActor
@@ -584,24 +683,28 @@ private struct LocalPhotoThumbnail: View {
 private final class PhotoQuickLookPresenter: NSObject, @MainActor QLPreviewPanelDataSource {
     static let shared = PhotoQuickLookPresenter()
 
-    private var previewURL: URL?
+    private var previewURLs: [URL] = []
 
     func open(_ url: URL) {
-        previewURL = url
-        guard let panel = QLPreviewPanel.shared() else { return }
+        open([url], startAt: 0)
+    }
+
+    func open(_ urls: [URL], startAt index: Int = 0) {
+        previewURLs = urls
+        guard let panel = QLPreviewPanel.shared(), !urls.isEmpty else { return }
         panel.dataSource = self
-        panel.currentPreviewItemIndex = 0
         panel.reloadData()
+        panel.currentPreviewItemIndex = min(max(index, 0), urls.count - 1)
         panel.makeKeyAndOrderFront(nil)
     }
 
     func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
-        previewURL == nil ? 0 : 1
+        previewURLs.count
     }
 
     func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
-        guard index == 0, let previewURL else { return nil }
-        return previewURL as NSURL
+        guard previewURLs.indices.contains(index) else { return nil }
+        return previewURLs[index] as NSURL
     }
 }
 #endif

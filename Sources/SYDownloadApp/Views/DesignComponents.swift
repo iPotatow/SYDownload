@@ -62,8 +62,7 @@ struct IconBadge: View {
             RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
                 .fill(tint.opacity(0.10))
 
-            Image(systemName: systemImage)
-                .font(.system(size: CoreMetrics.controlIconSize, weight: .medium))
+            RemixIcon(systemName: systemImage, size: CoreMetrics.controlIconSize)
                 .foregroundStyle(tint)
         }
         .frame(width: size, height: size)
@@ -88,8 +87,7 @@ struct PlatformBrandIcon: View {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(platform.designColor.opacity(0.09))
 
-                    Image(systemName: platform.fallbackSymbol)
-                        .font(CoreTypography.controlFont)
+                    RemixIcon(systemName: platform.fallbackSymbol, size: 14)
                         .foregroundStyle(platform.designColor)
                 }
             }
@@ -130,8 +128,7 @@ struct StatusPill: View {
 
     var body: some View {
         HStack(spacing: CoreSpacing.xs) {
-            Image(systemName: symbol)
-                .font(CoreTypography.groupLabelFont)
+            RemixIcon(systemName: symbol, size: 12)
 
             Text(state.label)
                 .coreTypography(CoreTypography.groupLabel)

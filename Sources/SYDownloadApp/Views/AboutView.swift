@@ -21,7 +21,7 @@ struct AboutView: View {
             capabilityRow
 
             VStack(alignment: .leading, spacing: CoreSpacing.m) {
-                Button("打开 GitHub 仓库", systemImage: "arrow.up.right", action: openRepository)
+                Button("打开 GitHub 仓库", remixSystemImage: "arrow.up.right", action: openRepository)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .font(CoreTypography.controlFont)
@@ -66,7 +66,7 @@ struct AboutView: View {
                     .foregroundStyle(CoreColor.textSecondary)
             }
             Spacer(minLength: CoreSpacing.l)
-            Button("关闭", systemImage: "xmark", action: dismiss.callAsFunction)
+            Button("关闭", remixSystemImage: "xmark", action: dismiss.callAsFunction)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .foregroundStyle(CoreColor.textSecondary)
@@ -108,7 +108,7 @@ struct AboutView: View {
     }
 
     private func linkButton(_ title: String, symbol: String, url: String) -> some View {
-        Button(title, systemImage: symbol) {
+        Button(title, remixSystemImage: symbol) {
             open(url)
         }
         .buttonStyle(.plain)

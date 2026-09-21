@@ -6,11 +6,12 @@ struct TasksView: View {
     @ObservedObject var model: AppModel
     @State private var searchText = ""
     @State private var selectedTaskID: UUID?
+    @State private var showsCancelAllConfirmation = false
     @FocusState private var searchFocused: Bool
 
     var body: some View {
         CorePageContainer(title: "任务", maxWidth: SYDownloadLayout.contentMaxWidth) {
-            searchField
+            headerActions
         } content: {
             VStack(alignment: .leading, spacing: CoreSpacing.l) {
                 filterBar
@@ -46,12 +47,61 @@ struct TasksView: View {
             guard model.selection == .tasks else { return }
             searchFocused = true
         }
+        .alert("取消所有进行中的任务？", isPresented: $showsCancelAllConfirmation) {
+            Button("继续下载", role: .cancel) {}
+            Button("全部取消", role: .destructive) {
+                model.cancelAllActiveTasks()
+            }
+        } message: {
+            Text("会取消正在下载和等待中的任务；已经完成、失败或已取消的任务不会受影响。")
+        }
         .tint(CoreColor.accent)
+    }
+
+    private var headerActions: some View {
+        HStack(spacing: CoreSpacing.s) {
+            searchField
+
+            Menu {
+                Button("清除已完成任务", remixSystemImage: "checkmark.circle") {
+                    model.clearCompletedTasks()
+                    selectedTaskID = nil
+                }
+                .disabled(model.completedTaskCount == 0)
+
+                Button("清除失败与已取消任务", remixSystemImage: "trash") {
+                    model.clearFailedAndCancelledTasks()
+                    selectedTaskID = nil
+                }
+                .disabled(model.failedTaskCount + model.cancelledTaskCount == 0)
+
+                Button("清除所有已结束任务", remixSystemImage: "trash") {
+                    model.clearFinishedTasks()
+                    selectedTaskID = nil
+                }
+                .disabled(
+                    model.completedTaskCount + model.failedTaskCount + model.cancelledTaskCount == 0
+                )
+
+                if model.activeTaskCount > 0 {
+                    Divider()
+                    Button("取消所有进行中的任务", remixSystemImage: "xmark.circle", role: .destructive) {
+                        showsCancelAllConfirmation = true
+                    }
+                }
+            } label: {
+                Label("任务操作", remixSystemImage: "ellipsis")
+                    .labelStyle(.iconOnly)
+            }
+            .menuStyle(.borderlessButton)
+            .frame(width: CoreMetrics.controlHeightSmall, height: CoreMetrics.controlHeightSmall)
+            .help("任务操作")
+        }
     }
 
     private var searchField: some View {
         HStack(spacing: CoreSpacing.s) {
-            Image(systemName: "magnifyingglass")
+            RemixIcon(systemName: "magnifyingglass")
                 .foregroundStyle(CoreColor.textTertiary)
                 .accessibilityHidden(true)
 
@@ -59,6 +109,17 @@ struct TasksView: View {
                 .textFieldStyle(.plain)
                 .font(CoreTypography.bodyFont)
                 .focused($searchFocused)
+
+            if !searchText.isEmpty {
+                Button("清除搜索", remixSystemImage: "xmark.circle.fill") {
+                    searchText = ""
+                    searchFocused = true
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.plain)
+                .foregroundStyle(CoreColor.textTertiary)
+                .help("清除搜索")
+            }
         }
         .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
         .frame(width: SYDownloadLayout.pageHeaderSearchWidth, height: CoreMetrics.controlHeightSmall)
@@ -151,26 +212,26 @@ struct TasksView: View {
     @ViewBuilder
     private func taskContextMenu(_ task: DownloadTaskItem) -> some View {
         if task.state == .completed {
-            Button("在 Finder 中显示", systemImage: "folder") {
+            Button("在 Finder 中显示", remixSystemImage: "folder") {
                 openFolder(task)
             }
         }
 
         if task.state == .failed || task.state == .cancelled {
             if let recovery = recoveryAction(for: task) {
-                Button(recovery.title, systemImage: recovery.symbol) {
+                Button(recovery.title, remixSystemImage: recovery.symbol) {
                     performRecovery(for: task)
                 }
             }
         }
 
         if task.state == .queued || task.state == .downloading {
-            Button("取消任务", systemImage: "xmark.circle", role: .destructive) {
+            Button("取消任务", remixSystemImage: "xmark.circle", role: .destructive) {
                 model.cancelTask(task.id)
             }
         } else {
             Divider()
-            Button("移除任务", systemImage: "trash", role: .destructive) {
+            Button("移除任务", remixSystemImage: "trash", role: .destructive) {
                 model.removeTask(task.id)
                 if selectedTaskID == task.id {
                     selectedTaskID = nil
@@ -198,9 +259,9 @@ struct TasksView: View {
     private func count(for filter: TaskFilter) -> Int {
         switch filter {
         case .all: return model.tasks.count
-        case .active: return activeCount
-        case .completed: return completedCount
-        case .failed: return failedCount
+        case .active: return model.activeTaskCount
+        case .completed: return model.completedTaskCount
+        case .failed: return model.failedTaskCount
         }
     }
 
@@ -209,18 +270,6 @@ struct TasksView: View {
         case .failed: return "需处理"
         default: return filter.rawValue
         }
-    }
-
-    private var activeCount: Int {
-        model.tasks.filter { $0.state == .queued || $0.state == .downloading }.count
-    }
-
-    private var completedCount: Int {
-        model.tasks.filter { $0.state == .completed }.count
-    }
-
-    private var failedCount: Int {
-        model.tasks.filter { $0.state == .failed || $0.state == .cancelled }.count
     }
 
     private func openFolder(_ task: DownloadTaskItem) {
@@ -232,7 +281,7 @@ struct TasksView: View {
         case .unsupported:
             return nil
         case .auth:
-            return ("打开设置", "gearshape")
+            return ("修复登录状态", "gearshape")
         case .disk:
             return ("更改保存位置", "folder")
         case .notFound:
@@ -246,8 +295,10 @@ struct TasksView: View {
 
     private func performRecovery(for task: DownloadTaskItem) {
         switch task.failureKind {
-        case .auth, .disk:
-            model.selection = .settings
+        case .auth:
+            model.openSettings(task.platform == .xiaohongshu ? .xhsCookie : .douyinCookie)
+        case .disk:
+            model.openSettings(.downloadDirectory)
         case .notFound:
             if let url = URL(string: task.sourceURL) {
                 NSWorkspace.shared.open(url)
@@ -256,9 +307,6 @@ struct TasksView: View {
             break
         default:
             model.retryTask(task)
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
-            }
         }
     }
 
@@ -278,6 +326,7 @@ private struct TaskRow: View {
     let isSelected: Bool
     let showsDivider: Bool
     @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: CoreSpacing.m) {
@@ -333,7 +382,7 @@ private struct TaskRow: View {
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
-        .animation(CoreMotion.fast, value: isHovered)
+        .animation(reduceMotion ? nil : CoreMotion.fast, value: isHovered)
     }
 
     private var rowBackground: Color {
@@ -376,10 +425,9 @@ private struct TaskRow: View {
             }
             .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
         } else if task.state == .queued {
-            ProgressView(value: 0)
-                .progressViewStyle(.linear)
-                .tint(CoreColor.accent)
-                .frame(maxWidth: RefinementLayout.taskProgressMaxWidth)
+            Text("等待调度")
+                .coreTypography(CoreTypography.caption)
+                .foregroundStyle(CoreColor.textTertiary)
         }
     }
 
@@ -387,7 +435,7 @@ private struct TaskRow: View {
     private var taskAction: some View {
         if task.state == .completed {
             HStack(spacing: CoreSpacing.s) {
-                Button("在 Finder 中显示", systemImage: "folder") {
+                Button("在 Finder 中显示", remixSystemImage: "folder") {
                     NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
                 }
                 .labelStyle(.iconOnly)
@@ -396,24 +444,37 @@ private struct TaskRow: View {
                 .help("在 Finder 中显示")
 
                 Menu {
-                    Button("在 Finder 中显示", systemImage: "folder") {
+                    Button("在 Finder 中显示", remixSystemImage: "folder") {
                         NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
                     }
                     Divider()
-                    Button("移除任务", systemImage: "trash", role: .destructive) {
+                    Button("移除任务", remixSystemImage: "trash", role: .destructive) {
                         model.removeTask(task.id)
                     }
                 } label: {
-                    Label("更多操作", systemImage: "ellipsis")
+                    Label("更多操作", remixSystemImage: "ellipsis")
                         .labelStyle(.iconOnly)
                 }
                 .menuStyle(.borderlessButton)
                 .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
             }
         } else if task.state == .failed || task.state == .cancelled {
-            recoveryButton
+            HStack(spacing: CoreSpacing.s) {
+                recoveryButton
+
+                Menu {
+                    Button("移除任务", remixSystemImage: "trash", role: .destructive) {
+                        model.removeTask(task.id)
+                    }
+                } label: {
+                    Label("更多操作", remixSystemImage: "ellipsis")
+                        .labelStyle(.iconOnly)
+                }
+                .menuStyle(.borderlessButton)
+                .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
+            }
         } else {
-            Button("取消", systemImage: "xmark") {
+            Button("取消", remixSystemImage: "xmark") {
                 model.cancelTask(task.id)
             }
             .buttonStyle(.bordered)
@@ -428,21 +489,21 @@ private struct TaskRow: View {
         case .unsupported:
             EmptyView()
         case .auth:
-            Button("打开设置", systemImage: "gearshape") {
-                model.selection = .settings
+            Button("修复登录", remixSystemImage: "gearshape") {
+                model.openSettings(task.platform == .xiaohongshu ? .xhsCookie : .douyinCookie)
             }
             .buttonStyle(.borderedProminent)
             .font(CoreTypography.controlFont)
             .frame(height: CoreMetrics.controlHeightSmall)
         case .disk:
-            Button("更改保存位置", systemImage: "folder") {
-                model.selection = .settings
+            Button("更改保存位置", remixSystemImage: "folder") {
+                model.openSettings(.downloadDirectory)
             }
             .buttonStyle(.borderedProminent)
             .font(CoreTypography.controlFont)
             .frame(height: CoreMetrics.controlHeightSmall)
         case .notFound:
-            Button("打开原链接", systemImage: "safari") {
+            Button("打开原链接", remixSystemImage: "safari") {
                 if let url = URL(string: task.sourceURL) {
                     NSWorkspace.shared.open(url)
                 }
@@ -451,11 +512,8 @@ private struct TaskRow: View {
             .font(CoreTypography.controlFont)
             .frame(height: CoreMetrics.controlHeightSmall)
         default:
-            Button("重试", systemImage: "arrow.clockwise") {
+            Button("重试", remixSystemImage: "arrow.clockwise") {
                 model.retryTask(task)
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: .syDownloadFocusDownloadInput, object: nil)
-                }
             }
             .buttonStyle(.borderedProminent)
             .font(CoreTypography.controlFont)
@@ -473,8 +531,7 @@ struct EmptyLibraryView: View {
 
     var body: some View {
         VStack(spacing: CoreSpacing.m) {
-            Image(systemName: systemImage)
-                .font(.system(size: CoreSpacing.xxl, weight: .regular))
+            RemixIcon(systemName: systemImage, size: CoreSpacing.xxl)
                 .foregroundStyle(.tertiary)
             Text(title)
                 .font(CoreTypography.sectionTitleFont)
@@ -483,7 +540,7 @@ struct EmptyLibraryView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
-            Button(actionTitle, systemImage: "arrow.right", action: action)
+            Button(actionTitle, remixSystemImage: "arrow.right", action: action)
                 .buttonStyle(.borderedProminent)
                 .font(CoreTypography.controlFont)
                 .frame(height: CoreMetrics.controlHeightDefault)
