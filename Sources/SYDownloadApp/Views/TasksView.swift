@@ -93,8 +93,7 @@ struct TasksView: View {
                 Label("任务操作", remixSystemImage: "ellipsis")
                     .labelStyle(.iconOnly)
             }
-            .menuStyle(.borderlessButton)
-            .frame(width: CoreMetrics.controlHeightSmall, height: CoreMetrics.controlHeightSmall)
+            .coreIconMenu()
             .help("任务操作")
         }
     }
@@ -115,9 +114,7 @@ struct TasksView: View {
                     searchText = ""
                     searchFocused = true
                 }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .foregroundStyle(CoreColor.textTertiary)
+                .coreIconControl()
                 .help("清除搜索")
             }
         }
@@ -129,7 +126,7 @@ struct TasksView: View {
     }
 
     private var filterBar: some View {
-        CenteredControl(width: RefinementLayout.taskFilterWidth) {
+        LeadingControl(width: RefinementLayout.taskFilterWidth) {
             Picker("任务状态", selection: $model.taskFilter) {
                 ForEach(TaskFilter.allCases) { filter in
                     Text("\(filterTitle(filter)) \(count(for: filter))")
@@ -174,10 +171,11 @@ struct TasksView: View {
             .background(Color.clear)
         }
         .background(
-            CoreColor.panelBackground,
+            CoreColor.contentBackground,
             in: RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous)
         )
         .clipShape(RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: CoreRadius.panel).strokeBorder(CoreColor.divider, lineWidth: 0.5) }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -218,6 +216,9 @@ struct TasksView: View {
         }
 
         if task.state == .failed || task.state == .cancelled {
+            if task.platform != .unknown && [.auth, .disk, .notFound].contains(task.failureKind) {
+                Button("重试") { model.retryTask(task) }
+            }
             if let recovery = recoveryAction(for: task) {
                 Button(recovery.title, remixSystemImage: recovery.symbol) {
                     performRecovery(for: task)
@@ -298,7 +299,7 @@ struct TasksView: View {
         case .auth:
             model.openSettings(task.platform == .xiaohongshu ? .xhsCookie : .douyinCookie)
         case .disk:
-            model.openSettings(.downloadDirectory)
+            chooseTaskDestination(task, model: model)
         case .notFound:
             if let url = URL(string: task.sourceURL) {
                 NSWorkspace.shared.open(url)
@@ -317,6 +318,22 @@ struct TasksView: View {
               task.state != .queued else { return }
         model.removeTask(selectedTaskID)
         self.selectedTaskID = nil
+    }
+}
+
+@MainActor
+private func chooseTaskDestination(_ task: DownloadTaskItem, model: AppModel) {
+    let panel = NSOpenPanel()
+    panel.title = "更改此任务的保存位置"
+    panel.prompt = "选择并重试"
+    panel.canChooseFiles = false
+    panel.canChooseDirectories = true
+    panel.canCreateDirectories = true
+    panel.allowsMultipleSelection = false
+    panel.directoryURL = URL(fileURLWithPath: task.outputDirectory)
+    if panel.runModal() == .OK, let url = panel.url {
+        model.changeTaskDestination(task.id, to: url.path)
+        model.retryTask(task)
     }
 }
 
@@ -341,6 +358,7 @@ private struct TaskRow: View {
 
                     Text(detailText)
                         .coreTypography(CoreTypography.caption)
+                        .help(task.detail)
                         .foregroundStyle(task.state == .failed ? CoreColor.danger : CoreColor.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -438,9 +456,7 @@ private struct TaskRow: View {
                 Button("在 Finder 中显示", remixSystemImage: "folder") {
                     NSWorkspace.shared.open(URL(fileURLWithPath: task.outputDirectory))
                 }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
+                .coreIconControl()
                 .help("在 Finder 中显示")
 
                 Menu {
@@ -455,31 +471,31 @@ private struct TaskRow: View {
                     Label("更多操作", remixSystemImage: "ellipsis")
                         .labelStyle(.iconOnly)
                 }
-                .menuStyle(.borderlessButton)
-                .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
+                .coreIconMenu()
+                .help("更多操作")
             }
         } else if task.state == .failed || task.state == .cancelled {
-            HStack(spacing: CoreSpacing.s) {
+            Menu {
                 recoveryButton
-
-                Menu {
-                    Button("移除任务", remixSystemImage: "trash", role: .destructive) {
-                        model.removeTask(task.id)
-                    }
-                } label: {
-                    Label("更多操作", remixSystemImage: "ellipsis")
-                        .labelStyle(.iconOnly)
+                if task.platform != .unknown && [.auth, .disk, .notFound].contains(task.failureKind) {
+                    Button("重试") { model.retryTask(task) }
                 }
-                .menuStyle(.borderlessButton)
-                .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
+                Button("复制错误") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(task.detail, forType: .string)
+                }
+                Divider()
+                Button("移除任务", role: .destructive) { model.removeTask(task.id) }
+            } label: {
+                Label("处理", systemImage: "wrench")
             }
+            .fixedSize()
+
         } else {
             Button("取消", remixSystemImage: "xmark") {
                 model.cancelTask(task.id)
             }
-            .buttonStyle(.bordered)
-            .font(CoreTypography.controlFont)
-            .frame(height: CoreMetrics.controlHeightSmall)
+            .coreAction()
         }
     }
 
@@ -492,32 +508,24 @@ private struct TaskRow: View {
             Button("修复登录", remixSystemImage: "gearshape") {
                 model.openSettings(task.platform == .xiaohongshu ? .xhsCookie : .douyinCookie)
             }
-            .buttonStyle(.borderedProminent)
-            .font(CoreTypography.controlFont)
-            .frame(height: CoreMetrics.controlHeightSmall)
+            .coreAction(.primary)
         case .disk:
             Button("更改保存位置", remixSystemImage: "folder") {
-                model.openSettings(.downloadDirectory)
+                chooseTaskDestination(task, model: model)
             }
-            .buttonStyle(.borderedProminent)
-            .font(CoreTypography.controlFont)
-            .frame(height: CoreMetrics.controlHeightSmall)
+            .coreAction(.primary)
         case .notFound:
             Button("打开原链接", remixSystemImage: "safari") {
                 if let url = URL(string: task.sourceURL) {
                     NSWorkspace.shared.open(url)
                 }
             }
-            .buttonStyle(.bordered)
-            .font(CoreTypography.controlFont)
-            .frame(height: CoreMetrics.controlHeightSmall)
+            .coreAction()
         default:
             Button("重试", remixSystemImage: "arrow.clockwise") {
                 model.retryTask(task)
             }
-            .buttonStyle(.borderedProminent)
-            .font(CoreTypography.controlFont)
-            .frame(height: CoreMetrics.controlHeightSmall)
+            .coreAction(.primary)
         }
     }
 }
@@ -541,9 +549,7 @@ struct EmptyLibraryView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 360)
             Button(actionTitle, remixSystemImage: "arrow.right", action: action)
-                .buttonStyle(.borderedProminent)
-                .font(CoreTypography.controlFont)
-                .frame(height: CoreMetrics.controlHeightDefault)
+                .coreAction(.primary)
         }
         .padding(CoreSpacing.xxl)
         .frame(maxWidth: .infinity)

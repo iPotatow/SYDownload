@@ -1,6 +1,63 @@
 #if canImport(SwiftUI)
 import SwiftUI
 
+/// Native button rendering keeps keyboard focus, pressed and disabled feedback.
+/// All page actions share the same type and control size; emphasis carries meaning.
+enum CoreActionEmphasis { case primary, secondary, tertiary }
+
+private struct CoreActionModifier: ViewModifier {
+    let emphasis: CoreActionEmphasis
+
+    @ViewBuilder func body(content: Content) -> some View {
+        switch emphasis {
+        case .primary: content.buttonStyle(.borderedProminent).modifier(CoreActionMetrics())
+        case .secondary: content.buttonStyle(.bordered).modifier(CoreActionMetrics())
+        case .tertiary: content.buttonStyle(.borderless).modifier(CoreActionMetrics())
+        }
+    }
+}
+
+private struct CoreActionMetrics: ViewModifier {
+    func body(content: Content) -> some View {
+        content.font(CoreTypography.controlFont)
+            .controlSize(.large)
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(minHeight: 32)
+    }
+}
+
+private struct CoreIconControlModifier: ViewModifier {
+    @State private var hovered = false
+    @Environment(\.isEnabled) private var enabled
+
+    func body(content: Content) -> some View {
+        content.labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .font(.system(size: 14))
+            .tint(CoreColor.textSecondary)
+            .frame(width: 28, height: 28)
+            .background(hovered && enabled ? CoreColor.controlHoverBackground : .clear,
+                        in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+            .onHover { hovered = $0 }
+    }
+}
+
+extension View {
+    func coreAction(_ emphasis: CoreActionEmphasis = .secondary) -> some View {
+        modifier(CoreActionModifier(emphasis: emphasis))
+    }
+
+    func coreIconControl() -> some View {
+        modifier(CoreIconControlModifier())
+    }
+
+    // Icon-only menus already communicate their affordance through the ellipsis.
+    func coreIconMenu() -> some View {
+        menuStyle(.borderlessButton).menuIndicator(.hidden).coreIconControl()
+    }
+}
+
 struct CoreSidebarButtonStyle: ButtonStyle {
     let isSelected: Bool
     let isFocused: Bool
@@ -28,7 +85,7 @@ struct CoreSidebarButtonStyle: ButtonStyle {
                     .fill(stateOverlay(isPressed: configuration.isPressed))
             }
             .overlay {
-                if isFocused && !isSelected {
+                if isFocused {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .strokeBorder(CoreColor.accent.opacity(0.45), lineWidth: CoreMetrics.borderWidth)
                 }

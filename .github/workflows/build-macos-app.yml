@@ -13,6 +13,7 @@ on:
       - Package.swift
       - Package.resolved
       - VERSION
+      - sparkle-public-key.txt
       - .github/workflows/build-macos-app.yml
     tags:
       - "v*"
@@ -61,6 +62,7 @@ jobs:
             exit 1
           fi
 
+          echo "sparkle_public_key=$(tr -d '[:space:]' < sparkle-public-key.txt)" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
@@ -128,8 +130,14 @@ jobs:
       - name: Swift tests
         run: swift test
 
+      - name: Native EXIF pipeline tests
+        run: bash script/test_exif.sh
+
       - name: Python bridge tests
         run: python3 -m unittest discover -s Bridge/tests -p 'test_*.py'
+
+      - name: Release tooling tests
+        run: python3 script/test_release_tools.py
 
       - name: Install uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
@@ -148,6 +156,7 @@ jobs:
           APP_VERSION: ${{ steps.version.outputs.version }}
           ADHOC_SIGN: 1
           BUNDLE_RUNTIME: 1
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY || steps.version.outputs.sparkle_public_key }}
           PYTHON_VERSION: "3.12"
           XHS_REVISION: 47840a1bee8438324ff10753c4291148c46071c8
           DOUK_REVISION: 207e2184e1004f4f5bf87fb69231f3bb5731adbb
@@ -182,7 +191,8 @@ jobs:
           test -f "$APP/Contents/Resources/engines/XHS-Downloader/main.py"
           test -f "$APP/Contents/Resources/engines/TikTokDownloader/main.py"
           test -f "$APP/Contents/Resources/engine-manifest.json"
-          test -z "$(find "$APP" -type l -print -quit)"
+          python3 script/verify_bundle_links.py "$APP"
+          test -d "$APP/Contents/Frameworks/Sparkle.framework"
 
           PING="$(printf '%s\n' '{"id":"00000000-0000-0000-0000-000000000001","command":"ping"}' | "$PYTHON" -B "$BRIDGE" --once)"
           echo "$PING"
@@ -259,6 +269,23 @@ jobs:
 
           ditto "$APP" "$CI_ARTIFACT_DIR/SYDownload.app"
           cp "$RELEASE_DIR/SYDownload-$VERSION.dmg" "$CI_ARTIFACT_DIR/"
+
+      - name: Sign Sparkle update and generate appcast
+        if: steps.release.outputs.should_publish == 'true'
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY || steps.version.outputs.sparkle_public_key }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A configured app must never be released with an unsigned/missing feed.
+          if [[ -n "$SPARKLE_PUBLIC_ED_KEY" ]]; then
+            test -n "$SPARKLE_PRIVATE_ED_KEY"
+            python3 script/generate_sparkle_appcast.py "$RUNNER_TEMP/release" "$VERSION" "$GITHUB_REPOSITORY"
+          else
+            echo "::warning::Sparkle signing is not configured; in-app updates will be disabled."
+          fi
 
       - name: Verify release packages
         env:
@@ -348,3 +375,10 @@ jobs:
             ${{ runner.temp }}/release/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Sparkle appcast
+        if: steps.release.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release upload "$TAG" "$RUNNER_TEMP/release/appcast.xml" --repo "$GITHUB_REPOSITORY"

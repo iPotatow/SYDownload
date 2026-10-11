@@ -25,14 +25,16 @@ struct DownloadView: View {
     }
 
     private var composer: some View {
-        VStack(alignment: .leading, spacing: CoreSpacing.m) {
-            Text("下载链接")
-                .coreTypography(CoreTypography.sectionTitle)
-                .foregroundStyle(CoreColor.textPrimary)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
+                Text("添加下载链接")
+                    .coreTypography(CoreTypography.sectionTitle)
+                Spacer()
+                platformChip(.xiaohongshu)
+                platformChip(.douyin)
+            }
 
-            destinationRow
-
-            TextField("粘贴一个或多个链接 / 完整分享文本…", text: $model.input, axis: .vertical)
+            TextField("粘贴链接或完整分享文本…", text: $model.input, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(CoreTypography.bodyFont)
                 .lineLimit(8...12)
@@ -55,35 +57,23 @@ struct DownloadView: View {
 
                 if !model.input.isEmpty {
                     Button("清空", remixSystemImage: "xmark", action: model.clearInput)
-                        .buttonStyle(.borderless)
-                        .font(CoreTypography.controlFont)
-                        .frame(height: CoreMetrics.controlHeightCompact)
+                        .coreAction(.tertiary)
                         .foregroundStyle(CoreColor.textSecondary)
                 }
             }
 
-            HStack(spacing: CoreSpacing.s) {
-                platformChip(.xiaohongshu)
-                platformChip(.douyin)
-                Spacer(minLength: 0)
-            }
-
-            statusPanel
+            destinationRow
 
             HStack(spacing: CoreSpacing.m) {
-                Spacer(minLength: 0)
+                statusPanel
+                Spacer(minLength: 8)
 
                 Button("检查链接", remixSystemImage: "checkmark.circle", action: validate)
-                    .buttonStyle(.bordered)
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightDefault)
+                    .coreAction()
                     .disabled(actionsDisabled)
 
                 Button(downloadButtonTitle, remixSystemImage: "arrow.down", action: download)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightLarge)
+                    .coreAction(.primary)
                     .keyboardShortcut(.return, modifiers: [.command])
                     .disabled(actionsDisabled)
             }
@@ -91,89 +81,51 @@ struct DownloadView: View {
     }
 
     private var destinationRow: some View {
-        VStack(alignment: .leading, spacing: CoreSpacing.xs) {
-            HStack(spacing: CoreSpacing.s) {
-                Label(model.outputDirectory, remixSystemImage: "folder")
-                    .font(CoreTypography.captionFont.monospaced())
-                    .foregroundStyle(model.outputDirectoryIssue == nil ? CoreColor.textSecondary : CoreColor.danger)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .help(model.outputDirectory)
-
-                Spacer(minLength: CoreSpacing.m)
-
-                Button("在 Finder 中显示", remixSystemImage: "folder") {
-                    NSWorkspace.shared.open(
-                        URL(
-                            fileURLWithPath: NSString(string: model.outputDirectory).expandingTildeInPath,
-                            isDirectory: true
-                        )
-                    )
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: "folder").font(.system(size: 20, weight: .light))
+                    .foregroundStyle(CoreColor.textSecondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("保存位置").font(.system(size: 11, weight: .medium))
+                    Text(model.outputDirectory).font(.system(size: 11))
+                        .foregroundStyle(model.outputDirectoryIssue == nil ? CoreColor.textSecondary : CoreColor.danger)
+                        .lineLimit(1).truncationMode(.middle).help(model.outputDirectory)
                 }
-                .buttonStyle(.borderless)
-                .font(CoreTypography.controlFont)
+                Spacer(minLength: 8)
+                Button("在 Finder 中显示", systemImage: "arrow.up.forward.square") {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: NSString(string: model.outputDirectory).expandingTildeInPath, isDirectory: true))
+                }
+                .coreIconControl().help("在 Finder 中显示")
                 .disabled(!model.outputDirectoryExists)
-
-                Button("更改", remixSystemImage: "settings") {
-                    model.openSettings(.downloadDirectory)
-                }
-                .buttonStyle(.borderless)
-                .font(CoreTypography.controlFont)
-                .disabled(model.activeTaskCount > 0)
+                Button("更改") { model.openSettings(.downloadDirectory) }
+                    .coreAction(.tertiary)
+                    .disabled(model.activeTaskCount > 0)
             }
-
             if let issue = model.outputDirectoryIssue {
-                Text(issue)
-                    .coreTypography(CoreTypography.caption)
-                    .foregroundStyle(CoreColor.danger)
+                Text(issue).font(.system(size: 11)).foregroundStyle(CoreColor.danger)
             } else if model.activeTaskCount > 0 {
-                Text("有任务运行时暂不允许更改下载目录，避免不同任务写入位置发生竞争。")
-                    .coreTypography(CoreTypography.caption)
-                    .foregroundStyle(CoreColor.textTertiary)
+                Text("下载期间无法更改保存位置。")
+                    .font(.system(size: 11)).foregroundStyle(CoreColor.textSecondary)
             }
         }
+        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+        .background(CoreColor.panelBackground, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func platformChip(_ platform: DownloadPlatform) -> some View {
         let count = platformCount(for: platform)
-        let active = count > 0
-
-        return HStack(spacing: CoreSpacing.xs) {
-            PlatformBrandIcon(platform: platform, size: 16, cornerRadius: 4)
-
-            Text(platform.displayName)
-                .coreTypography(CoreTypography.groupLabel)
-
-            Text("\(count)")
-                .coreTypography(CoreTypography.groupLabel)
-                .monospacedDigit()
-                .foregroundStyle(active ? CoreColor.accent : CoreColor.textTertiary)
-                .padding(.horizontal, CoreSpacing.xs)
-                .background(
-                    active ? CoreColor.selectionBackground : CoreColor.panelBackground,
-                    in: Capsule()
-                )
+        return HStack(spacing: 5) {
+            PlatformBrandIcon(platform: platform, size: 14, cornerRadius: 3)
+            Text(platform.displayName).font(.system(size: 11))
+            if count > 0 { Text("\(count)").font(.system(size: 11, weight: .semibold)).monospacedDigit() }
         }
-        .foregroundStyle(active ? CoreColor.textPrimary : CoreColor.textSecondary)
-        .padding(.horizontal, CoreSpacing.s)
-        .frame(minHeight: CoreMetrics.controlHeightCompact)
-        .background(
-            active ? CoreColor.selectionBackground : CoreColor.controlBackground,
-            in: RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
-                .strokeBorder(
-                    active ? CoreColor.accent.opacity(0.18) : CoreColor.divider,
-                    lineWidth: CoreMetrics.dividerWidth
-                )
-        }
+        .foregroundStyle(count > 0 ? CoreColor.accent : CoreColor.textSecondary)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(platform.displayName) \(count) 个链接")
     }
 
     private var statusPanel: some View {
-        HStack(spacing: CoreSpacing.m) {
+        HStack(spacing: 8) {
             if model.isParsing || model.isWorking {
                 ProgressView()
                     .controlSize(.small)
@@ -205,17 +157,7 @@ struct DownloadView: View {
                     .monospacedDigit()
             }
         }
-        .padding(.horizontal, CoreSpacing.m)
-        .padding(.vertical, CoreSpacing.s)
-        .frame(maxWidth: .infinity, minHeight: RefinementLayout.downloadStatusMinHeight, alignment: .leading)
-        .background(
-            statusColor.opacity(model.statusIsError || model.supportedLinkCount > 0 ? 0.07 : 0.04),
-            in: RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous)
-                .strokeBorder(statusColor.opacity(0.14), lineWidth: CoreMetrics.dividerWidth)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 

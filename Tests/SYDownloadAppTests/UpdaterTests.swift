@@ -1,75 +1,65 @@
 #if canImport(AppKit)
+import AppKit
 import Foundation
 import XCTest
 @testable import SYDownloadApp
 
+@MainActor
 final class UpdaterTests: XCTestCase {
-    func testVersionComparisonHandlesPrefixAndMissingPatch() throws {
-        let old = try XCTUnwrap(SYDownloadVersion("v0.2"))
-        let current = try XCTUnwrap(SYDownloadVersion("0.3.0"))
-        let newer = try XCTUnwrap(SYDownloadVersion("v0.3.1-beta"))
-
-        XCTAssertLessThan(old, current)
-        XCTAssertLessThan(current, newer)
-        XCTAssertEqual(SYDownloadVersion("v0.3.0"), current)
+    func testRequiresHTTPSFeedAndRealEd25519Key() {
+        let key = Data(repeating: 1, count: 32).base64EncodedString()
+        XCTAssertNil(SYDownloadUpdater.configurationError(in: [
+            "SUFeedURL": "https://example.com/appcast.xml", "SUPublicEDKey": key,
+        ]))
+        XCTAssertNotNil(SYDownloadUpdater.configurationError(in: [
+            "SUFeedURL": "http://example.com/appcast.xml", "SUPublicEDKey": key,
+        ]))
+        XCTAssertNotNil(SYDownloadUpdater.configurationError(in: [
+            "SUFeedURL": "https://example.com/appcast.xml", "SUPublicEDKey": "placeholder",
+        ]))
     }
 
-    func testUpdateEndpointUsesGatePassMirrorRules() throws {
-        let original = try XCTUnwrap(URL(string: "https://api.github.com/repos/iPotatow/SYDownload/releases"))
-
-        XCTAssertEqual(SYDownloadUpdateEndpoint.resolve(originalURL: original, source: .github), original)
-        XCTAssertEqual(
-            SYDownloadUpdateEndpoint.resolve(originalURL: original, source: .ghProxy)?.absoluteString,
-            "https://gh-proxy.com/https://api.github.com/repos/iPotatow/SYDownload/releases"
-        )
-        XCTAssertEqual(
-            SYDownloadUpdateEndpoint.resolve(originalURL: original, source: .ghproxyNet)?.absoluteString,
-            "https://ghproxy.net/https://api.github.com/repos/iPotatow/SYDownload/releases"
-        )
+    func testQuitWithoutWindowOrModelTerminatesImmediately() {
+        XCTAssertEqual(SYDownloadAppDelegate().applicationShouldTerminate(NSApplication.shared), .terminateNow)
     }
 
-    func testInstallerScriptVerifiesBundleBeforeSwapAndKeepsRollback() throws {
-        let staged = URL(fileURLWithPath: "/tmp/Staged/SYDownload.app")
-        let destination = URL(fileURLWithPath: "/Applications/SYDownload.app")
-        let root = URL(fileURLWithPath: "/tmp/SYDownload/Updates/test")
-        let script = SYDownloadUpdateInstaller.installScript(
-            stagedApp: staged,
-            destination: destination,
-            updateRoot: root,
-            backupName: ".SYDownload-backup-test",
-            expectedBundleIdentifier: "com.sydownload.app",
-            expectedVersion: "0.3.5"
-        )
-
-        XCTAssertTrue(script.contains("verify_bundle \"$candidate\""))
-        XCTAssertTrue(script.contains("/bin/mv \"$old\" \"$backup\""))
-        XCTAssertTrue(script.contains("restore_backup"))
-        XCTAssertTrue(script.contains("write_status \"installed\""))
+    func testQuitWithCleanSettingsTerminatesImmediately() {
+        let suite = "SYDownload.QuitTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AppModel(userDefaults: defaults)
+        let delegate = SYDownloadAppDelegate()
+        delegate.model = model
+        XCTAssertEqual(delegate.applicationShouldTerminate(NSApplication.shared), .terminateNow)
+        XCTAssertFalse(model.pendingTermination)
+    }
+    func testCancelQuitPreservesUnsavedSettingsAndResetsPendingState() async {
+        let suite = "SYDownload.CancelQuitTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AppModel(userDefaults: defaults)
+        model.xhsSettingsDirty = true
+        let shouldQuit = await SYDownloadAppDelegate().resolveTerminationDecision(.alertThirdButtonReturn, model: model)
+        XCTAssertFalse(shouldQuit)
+        XCTAssertTrue(model.hasUnsavedSettings)
+        XCTAssertFalse(model.pendingTermination)
     }
 
-    func testInstallerScriptBoundsParentWaitAndEscalatesTermination() throws {
-        let staged = URL(fileURLWithPath: "/tmp/Staged/SYDownload.app")
-        let destination = URL(fileURLWithPath: "/Applications/SYDownload.app")
-        let root = URL(fileURLWithPath: "/tmp/SYDownload/Updates/test")
-        let script = SYDownloadUpdateInstaller.installScript(
-            stagedApp: staged,
-            destination: destination,
-            updateRoot: root,
-            backupName: ".SYDownload-backup-test",
-            expectedBundleIdentifier: "com.sydownload.app",
-            expectedVersion: "0.3.5",
-            parentProcessID: 4321
-        )
-
-        XCTAssertTrue(script.contains("wait_for_parent_exit 6"))
-        XCTAssertTrue(script.contains("/bin/kill -TERM \"$parent_pid\""))
-        XCTAssertTrue(script.contains("wait_for_parent_exit 3"))
-        XCTAssertTrue(script.contains("/bin/kill -KILL \"$parent_pid\""))
-        XCTAssertTrue(script.contains("write_status \"failed_parent_exit\""))
-        XCTAssertLessThan(
-            try XCTUnwrap(script.range(of: "failed_parent_exit")?.lowerBound),
-            try XCTUnwrap(script.range(of: "/usr/bin/ditto \"$new\" \"$candidate\"")?.lowerBound)
-        )
+    func testDiscardAllowsQuitWithoutReloadingEngineSettings() async {
+        let suite = "SYDownload.DiscardQuitTests.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AppModel(userDefaults: defaults, bridgeSend: { _ in
+            XCTFail("Discard during quit must not start a bridge request")
+            throw BridgeClient.BridgeError.bridgeNotFound
+        })
+        model.xhsSettingsDirty = true
+        model.douyinSettingsDirty = true
+        let shouldQuit = await SYDownloadAppDelegate().resolveTerminationDecision(.alertSecondButtonReturn, model: model)
+        XCTAssertTrue(shouldQuit)
+        XCTAssertFalse(model.hasUnsavedSettings)
+        XCTAssertFalse(model.pendingTermination)
     }
+
 }
 #endif

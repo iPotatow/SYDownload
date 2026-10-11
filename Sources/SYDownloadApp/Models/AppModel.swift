@@ -8,6 +8,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case tasks
     case history
     case photos
+    case exif
     case settings
 
     var id: String { rawValue }
@@ -207,6 +208,8 @@ private struct DownloadOutputContext: Sendable {
 
 @MainActor
 final class AppModel: ObservableObject {
+    let exifEditor = ExifEditorModel()
+    let photoWorkspace = PhotoWorkspaceState()
     typealias BridgeSender = @Sendable (BridgeRequest) async throws -> BridgeResponse
     typealias BridgeStreamingSender = @Sendable (
         BridgeRequest,
@@ -260,6 +263,8 @@ final class AppModel: ObservableObject {
     private let downloadTimeoutSeconds: Double = 15 * 60
     private let downloadLimiter = AsyncSemaphore(value: 3)
     private var activeBatchCount = 0
+    private var savedXHSSettings: XHSSettingsForm?
+    private var savedDouyinSettings: DouyinSettingsForm?
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -717,7 +722,8 @@ final class AppModel: ObservableObject {
                         url: preparedItem.validation.link.url,
                         outputDirectory: bridgeDirectory,
                         timeoutSeconds: timeoutSeconds,
-                        overwriteExisting: overwriteExisting
+                        overwriteExisting: overwriteExisting,
+                        folderName: outputContext.folderName
                     )
                     do {
                         let response = try await streamingSender(request) { event in
@@ -842,8 +848,6 @@ final class AppModel: ObservableObject {
                 settingsStatusIsError = true
                 return
             }
-            applyXHSSettings(xhs.details ?? [:])
-
             let douyin = try await sendBridge(.init(command: "settings_get", engine: "douyin"))
             guard douyin.ok else {
                 settingsStatusEngine = "douyin"
@@ -851,7 +855,10 @@ final class AppModel: ObservableObject {
                 settingsStatusIsError = true
                 return
             }
+            applyXHSSettings(xhs.details ?? [:])
             applyDouyinSettings(douyin.details ?? [:])
+            savedXHSSettings = xhsSettings
+            savedDouyinSettings = douyinSettings
 
             hasLoadedEngineSettings = true
             xhsSettingsDirty = false
@@ -882,7 +889,7 @@ final class AppModel: ObservableObject {
             "cookie": xhsSettings.cookie,
         ]
         await saveEngineSettings(engine: "xiaohongshu", values: values)
-        if !settingsStatusIsError { xhsSettingsDirty = false }
+        if !settingsStatusIsError { xhsSettingsDirty = false; savedXHSSettings = xhsSettings }
     }
 
     func saveDouyinSettings() async {
@@ -908,7 +915,7 @@ final class AppModel: ObservableObject {
             "cookie": douyinSettings.cookie,
         ]
         await saveEngineSettings(engine: "douyin", values: values)
-        if !settingsStatusIsError { douyinSettingsDirty = false }
+        if !settingsStatusIsError { douyinSettingsDirty = false; savedDouyinSettings = douyinSettings }
     }
 
     func importBrowserCookie(engine: String, browser: String) async {
@@ -937,11 +944,13 @@ final class AppModel: ObservableObject {
 
             if engine == "xiaohongshu" {
                 xhsSettings.cookie = cookie
+                savedXHSSettings?.cookie = cookie
                 if let path = response.details?["config_path"] {
                     xhsSettingsPath = path
                 }
             } else if engine == "douyin" {
                 douyinSettings.cookie = cookie
+                savedDouyinSettings?.cookie = cookie
                 if let path = response.details?["config_path"] {
                     douyinSettingsPath = path
                 }
@@ -1081,7 +1090,14 @@ final class AppModel: ObservableObject {
             pendingSectionAfterSettings = nil
             return
         }
-        await loadEngineSettings(force: true)
+        guard let savedXHSSettings, let savedDouyinSettings else {
+            settingsStatus = "尚未成功读取配置，无法放弃更改。请先重新读取。"
+            settingsStatusIsError = true
+            cancelUnsavedSettingsPrompt()
+            return
+        }
+        xhsSettings = savedXHSSettings
+        douyinSettings = savedDouyinSettings
         xhsSettingsDirty = false
         douyinSettingsDirty = false
         completePendingSettingsTransition()
@@ -1412,6 +1428,13 @@ final class AppModel: ObservableObject {
     private func updateTask(_ id: UUID, mutation: (inout DownloadTaskItem) -> Void) {
         guard let index = tasks.firstIndex(where: { $0.id == id }) else { return }
         mutation(&tasks[index])
+    }
+
+    func changeTaskDestination(_ id: UUID, to directory: String) {
+        updateTask(id) { task in
+            guard task.state == .failed || task.state == .cancelled else { return }
+            task.outputDirectory = directory
+        }
     }
 
     private func persistHistory() {

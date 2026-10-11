@@ -28,7 +28,7 @@ enum RefinementLayout {
     static let photoPreviewSpacing: CGFloat = 8
 }
 
-struct CenteredControl<Content: View>: View {
+struct LeadingControl<Content: View>: View {
     let width: CGFloat
     private let content: Content
 
@@ -38,13 +38,9 @@ struct CenteredControl<Content: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            Spacer(minLength: 0)
-            content
-                .frame(width: width)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity)
+        content
+            .frame(maxWidth: width)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -1,0 +1,661 @@
+{
+  "review_dates": [
+    "2026-10-10",
+    "2026-10-11"
+  ],
+  "scope": "Current first-party repository text. Complete EOF reads. Generated audit outputs excluded.",
+  "files": {
+    "Sources/SYDownloadApp/AppMain.swift": {
+      "sha256": "80915c16719e47013921fce3b03e3194fff0f1e63df2e7d393586f626bbb93ba",
+      "lines": 108,
+      "ranges": [
+        [
+          1,
+          108
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/SYDownloadAppDelegate.swift": {
+      "sha256": "000b779d2611c68a3c86c3d992766b31b7318b2f80ca707a3153bb9335af2e3d",
+      "lines": 48,
+      "ranges": [
+        [
+          1,
+          48
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/SYDownloadLayout.swift": {
+      "sha256": "9e50dcde0fee10339ac49d32a1b39a7d2de8b27d32fb8ba02321caf4887ea089",
+      "lines": 29,
+      "ranges": [
+        [
+          1,
+          29
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/ResourceBundle.swift": {
+      "sha256": "40a0186b93364cddcc0e6669f5ef528b5cd30558b05cff156b35170231394b0d",
+      "lines": 9,
+      "ranges": [
+        [
+          1,
+          9
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/ContentView.swift": {
+      "sha256": "ac361db84f00627896007a8399c690da84e2cf186ec2aed1d48237f6de31840e",
+      "lines": 100,
+      "ranges": [
+        [
+          1,
+          100
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/CoreUI/CoreFoundation.swift": {
+      "sha256": "e59c1864c704c056c54b6e0201b334be305ecc07db108c56f78d65bcc119b41e",
+      "lines": 173,
+      "ranges": [
+        [
+          1,
+          173
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/CoreUI/RemixIcon.swift": {
+      "sha256": "e2eb996077d73f005dfde60e72d4d745b7e459f93b887ea6f88f13da9ec1fab1",
+      "lines": 52,
+      "ranges": [
+        [
+          1,
+          52
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/SidebarView.swift": {
+      "sha256": "d971aa44001df39b430a424fc8978a74fa11d5b8d99a020b694e853416a0d4ba",
+      "lines": 118,
+      "ranges": [
+        [
+          1,
+          118
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/CoreUI/CoreControls.swift": {
+      "sha256": "7c08148ad128c29017ea508769596f54f30e5109a8691594565d36c71d6fecd3",
+      "lines": 267,
+      "ranges": [
+        [
+          1,
+          267
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/CoreUI/CorePatterns.swift": {
+      "sha256": "e2fef2491a5a8f9a9cd4fb257a54594fb8cfa59e1aa61abfb4a92fc24523d413",
+      "lines": 197,
+      "ranges": [
+        [
+          1,
+          197
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/DesignComponents.swift": {
+      "sha256": "7e08e87c95ac08e94ea9d223885cdd3363b328be2d33fccba32a66dbb9ab4c3c",
+      "lines": 168,
+      "ranges": [
+        [
+          1,
+          168
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/UIRefinementComponents.swift": {
+      "sha256": "60abf980f97adc33a21d454fab272c2959835a3c6a1c821e58762ca5b5ed00b9",
+      "lines": 79,
+      "ranges": [
+        [
+          1,
+          79
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/AboutView.swift": {
+      "sha256": "c3c9a7b68b4ccf1c0aa8f949873722c345b37d3c2dbd90b0def7ca7b5e92937c",
+      "lines": 122,
+      "ranges": [
+        [
+          1,
+          122
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/DownloadView.swift": {
+      "sha256": "4a95c517cfd8083d82d4f276615f2c1e038407cf6424b89ea4ac8fcabab37a92",
+      "lines": 269,
+      "ranges": [
+        [
+          1,
+          269
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/HistoryView.swift": {
+      "sha256": "a4f6c3dd5778f6ddb01861fabb33957b4eb606974436455de74361becb7a417c",
+      "lines": 299,
+      "ranges": [
+        [
+          1,
+          299
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/TasksView.swift": {
+      "sha256": "bbdef40034b2511c11ae004f8639fc412ae086826487d5611634c4cdfb285b81",
+      "lines": 538,
+      "ranges": [
+        [
+          1,
+          538
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/ExifEditorView.swift": {
+      "sha256": "ae401d838b4baa12e87458c0c1ee67331cd84bf62ad7054b4dba493978c6036e",
+      "lines": 124,
+      "ranges": [
+        [
+          1,
+          124
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/ExifFileTable.swift": {
+      "sha256": "a0c4f6787d1eed5b696bf84f81ded640a2e84d5b4a0f0c10955baa8d72327497",
+      "lines": 101,
+      "ranges": [
+        [
+          1,
+          101
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/ExifInspector.swift": {
+      "sha256": "e69df822721c86f4aef4f0516ef7e148e48e467d3881a0c90359e5c8a3bfc485",
+      "lines": 74,
+      "ranges": [
+        [
+          1,
+          74
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Models/ExifEditorModel.swift": {
+      "sha256": "72d3995cd4954b7ddb9173f0b7fa1aefea78547d63c79deecfe8da95fe7c427a",
+      "lines": 108,
+      "ranges": [
+        [
+          1,
+          108
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Models/ExifProcessingTypes.swift": {
+      "sha256": "dc0ccaf751602b2b04438e168b5cc6a3499205930690c95ec59ad3cdc09aefbb",
+      "lines": 63,
+      "ranges": [
+        [
+          1,
+          63
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Services/ExifProcessingService.swift": {
+      "sha256": "f065b7df690b4d2138c84e579ddbbed8160457a7bccca838d3db53b9b6535a31",
+      "lines": 218,
+      "ranges": [
+        [
+          1,
+          218
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/PhotosView.swift": {
+      "sha256": "5063647f7dc7efdf33fd0b5df8757d9c08762fd18b2d0796b354dd78ba3a7cc3",
+      "lines": 698,
+      "ranges": [
+        [
+          1,
+          698
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Services/PhotoLibraryService.swift": {
+      "sha256": "214c10b002395cc7b5a5e38296f2aabeba6525e3082effd054fca4072d8cff5b",
+      "lines": 189,
+      "ranges": [
+        [
+          1,
+          189
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Views/SettingsView.swift": {
+      "sha256": "a85224568eb48c224f00ff38d186c5385903e97f517b665a37aeb0c4e807e01a",
+      "lines": 1067,
+      "ranges": [
+        [
+          1,
+          1067
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Models/AppModel.swift": {
+      "sha256": "ee4f985b42ec81cca0b747c71d3eb2309c2644fbc4ea7c9f6970e8f244a7f837",
+      "lines": 1465,
+      "ranges": [
+        [
+          1,
+          1465
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Models/AppModel+HistoryUX.swift": {
+      "sha256": "9378c616465ba238091c50c9efb012d5459af1072a02d9bf33b63c21fae79ba3",
+      "lines": 14,
+      "ranges": [
+        [
+          1,
+          14
+        ]
+      ]
+    },
+    "Sources/SYDownloadCore/BridgeModels.swift": {
+      "sha256": "cfc27d97238951bd7b364d2c17e7cd54de345fa10571111e20a986318e0006c4",
+      "lines": 79,
+      "ranges": [
+        [
+          1,
+          79
+        ]
+      ]
+    },
+    "Sources/SYDownloadCore/PlatformDetector.swift": {
+      "sha256": "457c3d40d4f34b3a1ef719fe91244c1c29bfbd811cc6dc769da9b53a08e3ca6e",
+      "lines": 76,
+      "ranges": [
+        [
+          1,
+          76
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Services/BridgeClient.swift": {
+      "sha256": "3d42f4a0a009a5b7efbd063b05200233bf49822c01d0f40c2c678dd0f2180f37",
+      "lines": 317,
+      "ranges": [
+        [
+          1,
+          317
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Services/AsyncSemaphore.swift": {
+      "sha256": "f6977901ec331a2e7fc610664610d7ed029423eb3a2ad0d34aa3e0b44add3c84",
+      "lines": 31,
+      "ranges": [
+        [
+          1,
+          31
+        ]
+      ]
+    },
+    "Sources/SYDownloadApp/Services/SYDownloadUpdater.swift": {
+      "sha256": "007478bc44b810e6c97de5687389af8cb1c95158618dad0a58f47c1249517251",
+      "lines": 45,
+      "ranges": [
+        [
+          1,
+          45
+        ]
+      ]
+    },
+    "Tests/SYDownloadAppTests/AppModelDownloadTests.swift": {
+      "sha256": "626b314901ec5925a9c096039d3cb9bc45116c1624efa3f48b834399e51ff837",
+      "lines": 310,
+      "ranges": [
+        [
+          1,
+          310
+        ]
+      ]
+    },
+    "Tests/SYDownloadAppTests/UpdaterTests.swift": {
+      "sha256": "4e84d1867cb718a6dfe22895d6738a3d648c94771ed7239553297a400484b72e",
+      "lines": 65,
+      "ranges": [
+        [
+          1,
+          65
+        ]
+      ]
+    },
+    "Tests/SYDownloadCoreTests/PlatformDetectorTests.swift": {
+      "sha256": "3d326fba51215e37e013bc5f7cf5680446c9d2a7828e820ffacc9bf7b1835fd1",
+      "lines": 49,
+      "ranges": [
+        [
+          1,
+          49
+        ]
+      ]
+    },
+    "Tests/SYDownloadAppTests/DownloadRuntimeTests.swift": {
+      "sha256": "ab69926b80e0e5adaed74a8115f9f8f9df75bf3d48769599918b38fb0f6dd4d1",
+      "lines": 170,
+      "ranges": [
+        [
+          1,
+          170
+        ]
+      ]
+    },
+    "Bridge/download_runtime.py": {
+      "sha256": "8aa847233c52dba9de6106cd2f8609d6b3d29b45dd2ef08d25a79e71838dc019",
+      "lines": 356,
+      "ranges": [
+        [
+          1,
+          356
+        ]
+      ]
+    },
+    "Bridge/engine_bridge.py": {
+      "sha256": "5100fd508aaa4da0d40b72e1cdf468772ddb42080f9583f3df059c8cd059aef8",
+      "lines": 912,
+      "ranges": [
+        [
+          1,
+          912
+        ]
+      ]
+    },
+    "Bridge/tests/test_bridge.py": {
+      "sha256": "2254915e568c52ce7d4f78bfb34cb3367d74eb94217c7421f315170944680366",
+      "lines": 134,
+      "ranges": [
+        [
+          1,
+          134
+        ]
+      ]
+    },
+    "Bridge/tests/test_browser_cookie.py": {
+      "sha256": "0191e0fe6ea32f427280da7aad006ec5f34dd8d840492b56075fec170ef76efc",
+      "lines": 75,
+      "ranges": [
+        [
+          1,
+          75
+        ]
+      ]
+    },
+    "script/package_app.sh": {
+      "sha256": "5766af4136ea7c2d2c9d961538b6ae5d664d0163bea027fdec4df8f572b0093d",
+      "lines": 103,
+      "ranges": [
+        [
+          1,
+          103
+        ]
+      ]
+    },
+    "script/build_dmg.sh": {
+      "sha256": "c69d126f8c4d60490c1016c9fcd3d0e5f92c0bd9c48acc5079367c0e8c888bf7",
+      "lines": 59,
+      "ranges": [
+        [
+          1,
+          59
+        ]
+      ]
+    },
+    "script/build_and_run.sh": {
+      "sha256": "6b1e15f79ff97d9e0ffad1fdb55c27e3afacc4e149af7ef2f7b919574d7c53c0",
+      "lines": 24,
+      "ranges": [
+        [
+          1,
+          24
+        ]
+      ]
+    },
+    "script/create_dmg_background.swift": {
+      "sha256": "17ab2d0ef66addbd5a1dfa2a407ee20aff809508bc9b6e8ee4bbd64f008af1fc",
+      "lines": 121,
+      "ranges": [
+        [
+          1,
+          121
+        ]
+      ]
+    },
+    "script/generate_sparkle_appcast.py": {
+      "sha256": "69fffc272025523dcdab6147f989b5df0f97fa95bac6b276c01057b7e01e0b30",
+      "lines": 50,
+      "ranges": [
+        [
+          1,
+          50
+        ]
+      ]
+    },
+    "script/verify_bundle_links.py": {
+      "sha256": "807cd7cff0f9947e1a31aa2ef1c114925f9dd3ed871faac4de98d2c262c45859",
+      "lines": 17,
+      "ranges": [
+        [
+          1,
+          17
+        ]
+      ]
+    },
+    "script/bundle_runtime.sh": {
+      "sha256": "dbc987078952d550966dd0e741672fff3cbb0fe633242b3c2b393de438165326",
+      "lines": 278,
+      "ranges": [
+        [
+          1,
+          278
+        ]
+      ]
+    },
+    "script/fetch_engines.sh": {
+      "sha256": "caf7c4edf7002a89beda8a9bc4be04200d2b19c8c061013b3491e442fcf0643b",
+      "lines": 30,
+      "ranges": [
+        [
+          1,
+          30
+        ]
+      ]
+    },
+    "script/setup_python.sh": {
+      "sha256": "4b894337ce9828d83d718a71b878f09e1a7b2ce25f8b1633a43def94164f6c60",
+      "lines": 15,
+      "ranges": [
+        [
+          1,
+          15
+        ]
+      ]
+    },
+    "script/test_exif.sh": {
+      "sha256": "fbb629ec26da675d4e440ca005848adf66a323c181abaca7bec6718529685f59",
+      "lines": 11,
+      "ranges": [
+        [
+          1,
+          11
+        ]
+      ]
+    },
+    "script/test_exif.swift": {
+      "sha256": "c28505fdb1fe7a4616ae386a23203017422597294ee903936dfbae5479a7b5a2",
+      "lines": 107,
+      "ranges": [
+        [
+          1,
+          107
+        ]
+      ]
+    },
+    "script/test_release_tools.py": {
+      "sha256": "84f4792c23e8fee2ea08acc5852dbd497b85c79667b7355fcd9272352a8f8c40",
+      "lines": 41,
+      "ranges": [
+        [
+          1,
+          41
+        ]
+      ]
+    },
+    "Package.swift": {
+      "sha256": "7214c5351597f385fa4071bd0129f2127dea1ecd994451dd4df6403625a13b10",
+      "lines": 31,
+      "ranges": [
+        [
+          1,
+          31
+        ]
+      ]
+    },
+    "Package.resolved": {
+      "sha256": "bafbeb51ec7363950a15e3d6dc81233e647fe35bb22b32a7ee929c80bd13100e",
+      "lines": 15,
+      "ranges": [
+        [
+          1,
+          15
+        ]
+      ]
+    },
+    ".github/release-assets/Install.command": {
+      "sha256": "dcaee6f81b33ce16bf6693f43f0f0b06398d05c41977c4a41160c761d0af89f5",
+      "lines": 24,
+      "ranges": [
+        [
+          1,
+          24
+        ]
+      ]
+    },
+    ".codex/environments/environment.toml": {
+      "sha256": "01ca32d5bd29cdc842fdcdabc19d24813213ff3f9a83d05a7ffa35c76d3598b7",
+      "lines": 10,
+      "ranges": [
+        [
+          1,
+          10
+        ]
+      ]
+    },
+    "VERSION": {
+      "sha256": "19754aefd27e92de8c47211fbc5bb30d95e85a61128529c448e75c47e7c0db8d",
+      "lines": 1,
+      "ranges": [
+        [
+          1,
+          1
+        ]
+      ]
+    },
+    ".gitignore": {
+      "sha256": "cf2b4dd4130f9d088e8303689b64ef28a86c0b37c6c7e09ca1113c4f2d1295fc",
+      "lines": 7,
+      "ranges": [
+        [
+          1,
+          7
+        ]
+      ]
+    },
+    "sparkle-public-key.txt": {
+      "sha256": "0cfd669f050b62c76cdaab57e96f94078fabab7b391a6c86e921c426bfce75d3",
+      "lines": 1,
+      "ranges": [
+        [
+          1,
+          1
+        ]
+      ]
+    },
+    ".github/workflows/build-macos-app.yml": {
+      "sha256": "5414cefcc54a05aa445d05ffc347f3be3f1ff7b66716646fa15085ebe02c5a8a",
+      "lines": 384,
+      "ranges": [
+        [
+          1,
+          384
+        ]
+      ]
+    },
+    "README.md": {
+      "sha256": "487c3ca95180fcff08ddc77c5a07334ee1f6509ca2c3eb989ca6c7661d6d02a4",
+      "lines": 88,
+      "ranges": [
+        [
+          1,
+          88
+        ]
+      ]
+    },
+    "docs/photo-script-gui.md": {
+      "sha256": "98b4d678f0f657a9885be00571eb6cd80ae43c9be0f040fbad2e5509d1cf8143",
+      "lines": 56,
+      "ranges": [
+        [
+          1,
+          56
+        ]
+      ]
+    },
+    "docs/sparkle-updates.md": {
+      "sha256": "75b6a5a4528842de907179bf2411b94f2a006bf1fca11c2c422db7bb4528893f",
+      "lines": 30,
+      "ranges": [
+        [
+          1,
+          30
+        ]
+      ]
+    },
+    "docs/validation.md": {
+      "sha256": "69d9882dbae01adf2a6a5dd997638290436566202200420bc8946a78de66f183",
+      "lines": 40,
+      "ranges": [
+        [
+          1,
+          40
+        ]
+      ]
+    },
+    "docs/design-review.md": {
+      "sha256": "868ab14b525f0667999b5ed669f39effeeb7e30366edd22537cab01574eb355b",
+      "lines": 62,
+      "ranges": [
+        [
+          1,
+          62
+        ]
+      ]
+    }
+  },
+  "file_count": 65,
+  "line_count": 10921
+}

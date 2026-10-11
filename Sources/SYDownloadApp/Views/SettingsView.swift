@@ -49,44 +49,15 @@ private struct SettingsPopupSelector<Value: Hashable>: View {
     }
 
     var body: some View {
-        Menu {
+        Picker(title, selection: $selection) {
             ForEach(choices) { choice in
-                Button {
-                    selection = choice.value
-                } label: {
-                    if choice.value == selection {
-                        Label(choice.title, remixSystemImage: "checkmark")
-                    } else {
-                        Text(choice.title)
-                    }
-                }
+                Text(choice.title).tag(choice.value)
             }
-        } label: {
-            HStack(spacing: CoreSpacing.s) {
-                Text(selectedTitle)
-                    .coreTypography(CoreTypography.body)
-                    .foregroundStyle(CoreColor.textPrimary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer(minLength: CoreSpacing.s)
-                RemixIcon(systemName: "chevron.up.chevron.down", size: 12)
-                    .foregroundStyle(CoreColor.textSecondary)
-            }
-            .padding(.horizontal, CoreMetrics.controlHorizontalPadding)
-            .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault)
-            .background(
-                CoreColor.controlBackground,
-                in: RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: CoreRadius.row, style: .continuous)
-                    .strokeBorder(CoreColor.border, lineWidth: CoreMetrics.borderWidth)
-            }
-            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .frame(width: SYDownloadLayout.settingsFieldWidth, height: CoreMetrics.controlHeightDefault, alignment: .trailing)
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .font(CoreTypography.controlFont)
+        .frame(width: SYDownloadLayout.settingsFieldWidth)
         .accessibilityLabel(title)
         .accessibilityValue(selectedTitle)
     }
@@ -186,21 +157,11 @@ private struct NameFormatSelector: View {
         let selectedIndex = tokens.firstIndex(of: option.rawValue)
 
         return HStack(spacing: CoreSpacing.s) {
-            Button {
-                toggle(option.rawValue)
-            } label: {
-                HStack(spacing: CoreSpacing.s) {
-                    RemixIcon(systemName: selected ? "checkmark.square.fill" : "square")
-                        .foregroundStyle(selected ? CoreColor.accent : CoreColor.textSecondary)
-                    Text(option.title)
-                        .coreTypography(CoreTypography.body)
-                        .foregroundStyle(CoreColor.textPrimary)
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(selected && tokens.count == 1)
+            Toggle(option.title, isOn: Binding(get: { selected }, set: { _ in toggle(option.rawValue) }))
+                .toggleStyle(.checkbox)
+                .font(CoreTypography.bodyFont)
+                .disabled(selected && tokens.count == 1)
+            Spacer(minLength: 0)
 
             if let selectedIndex {
                 Button {
@@ -208,23 +169,21 @@ private struct NameFormatSelector: View {
                 } label: {
                     RemixIcon(systemName: "chevron.up")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(CoreColor.textSecondary)
+                .coreIconControl()
                 .disabled(selectedIndex == 0)
-                .help("向前移动")
+                .help("向前移动 \(option.title)").accessibilityLabel("向前移动 \(option.title)")
 
                 Button {
                     move(option.rawValue, offset: 1)
                 } label: {
                     RemixIcon(systemName: "chevron.down")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(CoreColor.textSecondary)
+                .coreIconControl()
                 .disabled(selectedIndex == tokens.count - 1)
-                .help("向后移动")
+                .help("向后移动 \(option.title)").accessibilityLabel("向后移动 \(option.title)")
             } else {
-                Color.clear.frame(width: 28, height: 20)
-                Color.clear.frame(width: 28, height: 20)
+                Color.clear.frame(width: 28, height: 28)
+                Color.clear.frame(width: 28, height: 28)
             }
         }
         .frame(minHeight: CoreMetrics.settingsRowMinHeight)
@@ -384,7 +343,7 @@ struct SettingsView: View {
     }
 
     private var settingsTabs: some View {
-        CenteredControl(width: RefinementLayout.settingsTabsWidth) {
+        LeadingControl(width: RefinementLayout.settingsTabsWidth) {
             Picker("设置分类", selection: $tab) {
                 ForEach(SettingsTab.allCases) { item in
                     Label(settingsTabTitle(item), remixSystemImage: item.systemImage)
@@ -423,9 +382,7 @@ struct SettingsView: View {
 
                 if model.settingsStatusIsError {
                     Button("重新读取") { reloadSettings() }
-                        .buttonStyle(.bordered)
-                        .font(CoreTypography.controlFont)
-                        .frame(height: CoreMetrics.controlHeightDefault)
+                        .coreAction()
                 }
             }
             .frame(maxWidth: .infinity, minHeight: CoreMetrics.controlRowMinHeight)
@@ -436,7 +393,9 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: CoreSpacing.l) {
                 switch tab {
-                case .general: generalSettings
+                case .general:
+                    generalSettings
+                    updateSettings
                 case .xhs: xhsSettings
                 case .douyin: douyinSettings
                 case .advanced: advancedSettings
@@ -462,8 +421,8 @@ struct SettingsView: View {
                         .frame(height: CoreMetrics.controlHeightDefault)
                         .disabled(model.activeTaskCount > 0)
                     Button("更改") { chooseFolder() }
-                        .font(CoreTypography.controlFont)
-                        .frame(height: CoreMetrics.controlHeightDefault)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .coreAction()
                         .disabled(model.activeTaskCount > 0)
                 }
             }
@@ -478,7 +437,7 @@ struct SettingsView: View {
                 Text(
                     model.activeTaskCount > 0
                         ? "有任务运行时暂不允许更改下载目录。"
-                        : "小红书与抖音都会直接保存到这个目录，不再额外创建 Download 文件夹。"
+                        : "小红书与抖音共用此保存目录。"
                 )
                     .coreTypography(CoreTypography.caption)
                     .foregroundStyle(CoreColor.textSecondary)
@@ -499,7 +458,7 @@ struct SettingsView: View {
                 .accessibilityLabel("同名文件处理")
             }
 
-            Text("这个选项独立于小红书的“引擎下载记录”。关闭下载记录后，如果磁盘上已有同名文件，上游仍会跳过；选择“覆盖重新下载”才会绕过记录和同名文件检查。")
+            Text("默认保留磁盘上的同名文件。选择“覆盖重新下载”会替换已有文件，并忽略引擎下载记录。")
                 .coreTypography(CoreTypography.caption)
                 .foregroundStyle(CoreColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -531,74 +490,16 @@ struct SettingsView: View {
                     .textSelection(.enabled)
             }
 
-            SettingsControlRow("更新源") {
-                SettingsPopupSelector(
-                    title: "更新源",
-                    selection: $updater.updateSource,
-                    choices: SYDownloadUpdateSource.allCases.map {
-                        SettingsChoice($0.rawValue, value: $0, title: $0.displayName)
-                    }
-                )
-            }
-
             CoreSettingsRow(showsDivider: false) {
                 HStack(spacing: CoreSpacing.s) {
-                    updateStatus
-                    Spacer(minLength: CoreSpacing.m)
-                    Button("检查更新") {
-                        updater.checkForUpdates()
-                    }
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightDefault)
-                    .disabled(updater.isChecking || updater.isUpdating)
-
-                    if updater.updateAvailable {
-                        Button("更新并重启") {
-                            updater.downloadUpdate()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .font(CoreTypography.controlFont)
-                        .frame(height: CoreMetrics.controlHeightDefault)
-                        .disabled(updater.isUpdating)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-
-            if updater.isUpdating {
-                VStack(alignment: .leading, spacing: CoreSpacing.xs) {
-                    ProgressView(value: updater.progressBar.1)
-                    Text(updater.progressBar.0)
-                        .coreTypography(CoreTypography.caption)
+                    Text(updater.configurationError ?? "由 Sparkle 自动检查并安全安装更新。")
                         .foregroundStyle(CoreColor.textSecondary)
+                    Spacer(minLength: CoreSpacing.m)
+                    Button("检查更新") { updater.checkForUpdates() }
+                        .coreAction()
+                        .disabled(!updater.canCheckForUpdates)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, CoreSpacing.s)
             }
-        }
-    }
-
-    @ViewBuilder
-    private var updateStatus: some View {
-        if updater.isChecking {
-            HStack(spacing: CoreSpacing.s) {
-                ProgressView().controlSize(.small)
-                Text("正在检查更新…")
-            }
-            .foregroundStyle(CoreColor.textSecondary)
-        } else if let error = updater.updateError {
-            Label(error, remixSystemImage: "exclamationmark.triangle")
-                .foregroundStyle(CoreColor.danger)
-                .fixedSize(horizontal: false, vertical: true)
-        } else if updater.updateAvailable, let release = updater.latestRelease {
-            Label("发现新版本 \(release.tagName)", remixSystemImage: "arrow.down.circle.fill")
-                .foregroundStyle(CoreColor.accent)
-        } else if let release = updater.latestRelease {
-            Label("已是最新版本（\(release.tagName)）", remixSystemImage: "checkmark.circle")
-                .foregroundStyle(CoreColor.textSecondary)
-        } else {
-            Text("每天自动检查一次，也可以手动检查。")
-                .foregroundStyle(CoreColor.textSecondary)
         }
     }
 
@@ -634,19 +535,15 @@ struct SettingsView: View {
                     Button("问题反馈") {
                         open("https://github.com/iPotatow/SYDownload/issues")
                     }
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightDefault)
+                    .coreAction()
                     Button("使用文档") {
                         open("https://github.com/iPotatow/SYDownload#readme")
                     }
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightDefault)
+                    .coreAction()
                     Button("打开 GitHub 仓库") {
                         open("https://github.com/iPotatow/SYDownload")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightDefault)
+                    .coreAction(.primary)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -745,7 +642,6 @@ struct SettingsView: View {
                     field: .xhsCookie,
                     isRevealed: $revealsXHSCookie
                 )
-                    .accessibilityLabel("小红书网页版 Cookie")
                 browserCookieHelp
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -841,7 +737,6 @@ struct SettingsView: View {
                     field: .douyinCookie,
                     isRevealed: $revealsDouyinCookie
                 )
-                    .accessibilityLabel("抖音网页版 Cookie")
                 browserCookieHelp
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -869,11 +764,9 @@ struct SettingsView: View {
             HStack(spacing: CoreSpacing.s) {
                 Spacer(minLength: 0)
                 Button("恢复小红书默认设置", role: .destructive) { resetTarget = "xiaohongshu" }
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightDefault)
+                    .coreAction()
                 Button("恢复抖音默认设置", role: .destructive) { resetTarget = "douyin" }
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightDefault)
+                    .coreAction()
             }
             .frame(maxWidth: .infinity)
             .padding(.top, CoreSpacing.s)
@@ -903,9 +796,7 @@ struct SettingsView: View {
                         )
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .font(CoreTypography.controlFont)
-                .frame(height: CoreMetrics.controlHeightDefault)
+                .coreAction(.primary)
                 .disabled(model.settingsLoading)
             }
         }
@@ -948,12 +839,10 @@ struct SettingsView: View {
                 Spacer(minLength: CoreSpacing.m)
 
                 Button("打开") { openConfig(path) }
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightCompact)
+                    .coreAction()
                     .disabled(path.isEmpty)
                 Button("在 Finder 中显示") { revealConfig(path) }
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightCompact)
+                    .coreAction()
                     .disabled(path.isEmpty)
             }
             .frame(maxWidth: .infinity)
@@ -979,7 +868,7 @@ struct SettingsView: View {
     ) -> some View {
         HStack(spacing: CoreSpacing.m) {
             Label(
-                isDirty ? "有未保存更改" : "当前配置已保存", remixSystemImage: isDirty ? "circle.fill" : "checkmark.circle"
+                !model.hasLoadedEngineSettings ? "尚未读取配置" : isDirty ? "有未保存更改" : "当前配置已保存", remixSystemImage: !model.hasLoadedEngineSettings ? "info.circle" : isDirty ? "circle.fill" : "checkmark.circle"
             )
             .font(CoreTypography.groupLabelFont)
             .foregroundStyle(isDirty ? CoreColor.accent : CoreColor.textSecondary)
@@ -987,9 +876,7 @@ struct SettingsView: View {
             Spacer(minLength: CoreSpacing.m)
 
             Button(title, action: action)
-                .buttonStyle(.borderedProminent)
-                .font(CoreTypography.controlFont)
-                .frame(height: CoreMetrics.controlHeightDefault)
+                .coreAction(.primary)
                 .disabled(model.settingsLoading || !isDirty)
         }
         .frame(maxWidth: .infinity)
@@ -1057,27 +944,25 @@ struct SettingsView: View {
                         .focused($focusedField, equals: field)
                 }
             }
+            .accessibilityLabel(field == .xhsCookie ? "小红书 Cookie" : "抖音 Cookie")
 
             HStack(spacing: CoreSpacing.s) {
                 Button(isRevealed.wrappedValue ? "隐藏" : "显示") {
                     isRevealed.wrappedValue.toggle()
                 }
-                .buttonStyle(.borderless)
-                .font(CoreTypography.controlFont)
+                .coreAction(.tertiary)
 
                 Button("复制") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text.wrappedValue, forType: .string)
                 }
-                .buttonStyle(.borderless)
-                .font(CoreTypography.controlFont)
+                .coreAction(.tertiary)
                 .disabled(text.wrappedValue.isEmpty)
 
                 Button("清除", role: .destructive) {
                     text.wrappedValue = ""
                 }
-                .buttonStyle(.borderless)
-                .font(CoreTypography.controlFont)
+                .coreAction(.tertiary)
                 .disabled(text.wrappedValue.isEmpty)
 
                 Spacer(minLength: 0)

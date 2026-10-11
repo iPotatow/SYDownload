@@ -14,7 +14,7 @@ pkill -x SYDownload 2>/dev/null || true
 
 # Dev runs remain fast and reuse local Engines + system Python. Set
 # BUNDLE_RUNTIME=1 to exercise the fully self-contained bundle locally.
-CONFIGURATION=debug APP_VERSION=0.2.0 BUNDLE_RUNTIME="${BUNDLE_RUNTIME:-0}" \
+CONFIGURATION=debug BUNDLE_RUNTIME="${BUNDLE_RUNTIME:-0}" \
   "$ROOT/script/package_app.sh" >/dev/null
 APP="$ROOT/dist/SYDownload.app"
 

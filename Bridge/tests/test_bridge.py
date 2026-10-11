@@ -5,7 +5,9 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE = ROOT / "engine_bridge.py"
@@ -23,6 +25,59 @@ runtime_spec.loader.exec_module(runtime)
 
 
 class BridgeTests(unittest.TestCase):
+    def test_other_output_folder_cannot_verify_this_task(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            selected = root / "selected"
+            selected.mkdir()
+
+            def unrelated_write(*args, **kwargs):
+                (root / "another-task.jpg").write_bytes(b"other task output")
+                return 0, "", False
+
+            with patch.object(mod, "run_streaming_subprocess", side_effect=unrelated_write):
+                ok, _, kind, details = mod.run_xhs(
+                    root, "https://xhslink.com/demo", root, None, 10,
+                    verification_root=selected,
+                )
+            self.assertFalse(ok)
+            self.assertEqual(kind, "verification")
+            self.assertEqual(details["verified_files"], 0)
+
+    def test_engine_lock_excludes_other_process_and_releases_on_cancel(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            env = {**os.environ, "SYDOWNLOAD_APP_SUPPORT": temp}
+            prefix = f"import sys,time; from pathlib import Path; sys.path.insert(0,{str(ROOT)!r}); from engine_bridge import engine_state_lock\n"
+            first_code = prefix + f"with engine_state_lock():\n Path({str(root / 'first')!r}).touch()\n time.sleep(60)\n"
+            second_code = prefix + f"with engine_state_lock('queued-task'):\n Path({str(root / 'second')!r}).touch()\n"
+            first = subprocess.Popen([sys.executable, "-c", first_code], env=env)
+            second = None
+            try:
+                deadline = time.monotonic() + 5
+                while not (root / "first").exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue((root / "first").exists())
+                with patch.dict(os.environ, {"SYDOWNLOAD_APP_SUPPORT": temp}):
+                    busy = mod.handle({"command": "settings_get", "engine": "xiaohongshu"})
+                self.assertFalse(busy["ok"])
+                self.assertEqual(busy["details"]["error_kind"], "busy")
+                second = subprocess.Popen([sys.executable, "-c", second_code], env=env, stdout=subprocess.PIPE, text=True)
+                time.sleep(0.2)
+                self.assertIsNone(second.poll())
+                self.assertFalse((root / "second").exists())
+                first.terminate()
+                first.wait(timeout=5)
+                output, _ = second.communicate(timeout=5)
+                self.assertEqual(second.returncode, 0)
+                self.assertEqual([json.loads(line)["phase"] for line in output.splitlines()], ["waiting", "running"])
+                self.assertTrue((root / "second").exists())
+            finally:
+                for process in (first, second):
+                    if process is not None and process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=5)
+
     def test_detector(self):
         self.assertEqual(mod.detect_platform("https://xhslink.com/a"), "xiaohongshu")
         self.assertEqual(mod.detect_platform("https://v.douyin.com/a"), "douyin")

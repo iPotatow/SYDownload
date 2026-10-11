@@ -9,6 +9,7 @@ public struct BridgeRequest: Codable, Sendable {
     public let settingsJSON: String?
     public let timeoutSeconds: Double?
     public let overwriteExisting: Bool?
+    public let folderName: String?
 
     public init(
         id: UUID = UUID(),
@@ -18,7 +19,8 @@ public struct BridgeRequest: Codable, Sendable {
         engine: String? = nil,
         settingsJSON: String? = nil,
         timeoutSeconds: Double? = nil,
-        overwriteExisting: Bool? = nil
+        overwriteExisting: Bool? = nil,
+        folderName: String? = nil
     ) {
         self.id = id
         self.command = command
@@ -28,6 +30,7 @@ public struct BridgeRequest: Codable, Sendable {
         self.settingsJSON = settingsJSON
         self.timeoutSeconds = timeoutSeconds
         self.overwriteExisting = overwriteExisting
+        self.folderName = folderName
     }
 }
 
@@ -38,6 +41,7 @@ public struct BridgeProgressEvent: Codable, Sendable {
     public let progress: Double?
     public let bytesWritten: Int64?
     public let fileCount: Int?
+    public let phase: String?
 
     public init(
         id: UUID? = nil,
@@ -45,7 +49,8 @@ public struct BridgeProgressEvent: Codable, Sendable {
         message: String,
         progress: Double? = nil,
         bytesWritten: Int64? = nil,
-        fileCount: Int? = nil
+        fileCount: Int? = nil,
+        phase: String? = nil
     ) {
         self.id = id
         self.event = event
@@ -53,6 +58,7 @@ public struct BridgeProgressEvent: Codable, Sendable {
         self.progress = progress
         self.bytesWritten = bytesWritten
         self.fileCount = fileCount
+        self.phase = phase
     }
 }
 

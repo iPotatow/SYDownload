@@ -26,10 +26,10 @@ struct CoreTextStyle {
 }
 
 enum CoreTypography {
-    static let pageTitle = CoreTextStyle(size: 24, weight: .semibold, nsWeight: .semibold, lineHeight: 30, tracking: -0.4)
-    static let sectionTitle = CoreTextStyle(size: 16, weight: .semibold, nsWeight: .semibold, lineHeight: 22, tracking: -0.1)
-    static let body = CoreTextStyle(size: 14, weight: .regular, nsWeight: .regular, lineHeight: 20, tracking: 0)
-    static let control = CoreTextStyle(size: 14, weight: .medium, nsWeight: .medium, lineHeight: 18, tracking: 0)
+    static let pageTitle = CoreTextStyle(size: 20, weight: .semibold, nsWeight: .semibold, lineHeight: 26, tracking: -0.3)
+    static let sectionTitle = CoreTextStyle(size: 14, weight: .semibold, nsWeight: .semibold, lineHeight: 20, tracking: -0.1)
+    static let body = CoreTextStyle(size: 13, weight: .regular, nsWeight: .regular, lineHeight: 19, tracking: 0)
+    static let control = CoreTextStyle(size: 13, weight: .medium, nsWeight: .medium, lineHeight: 18, tracking: 0)
     static let caption = CoreTextStyle(size: 12, weight: .regular, nsWeight: .regular, lineHeight: 16, tracking: 0)
     static let groupLabel = CoreTextStyle(size: 12, weight: .medium, nsWeight: .medium, lineHeight: 16, tracking: 0.2)
     static let brand = CoreTextStyle(size: 16, weight: .semibold, nsWeight: .semibold, lineHeight: 20, tracking: -0.1)
@@ -79,7 +79,7 @@ enum CoreMetrics {
     static let panelPadding = CoreSpacing.l
 
     static let pageHeaderPaddingX = CoreSpacing.xl
-    static let pageHeaderPaddingTop: CGFloat = 36
+    static let pageHeaderPaddingTop: CGFloat = 40
     static let pageHeaderPaddingBottom = CoreSpacing.l
     static let pageHeaderTitleActionGap = CoreSpacing.l
     static let pageHeaderActionGap = CoreSpacing.s
@@ -91,7 +91,7 @@ enum CoreMetrics {
     static let controlHorizontalPadding: CGFloat = 12
     static let controlIconSize: CGFloat = 16
     static let controlRowMinHeight: CGFloat = 40
-    static let settingsRowMinHeight: CGFloat = 44
+    static let settingsRowMinHeight: CGFloat = 38
 
     static let dividerWidth: CGFloat = 0.5
     static let borderWidth: CGFloat = 1
@@ -100,14 +100,15 @@ enum CoreMetrics {
 // MARK: - Color
 
 enum CoreColor {
-    // SYDownload brand accent: Light #AF52DE / Dark #BF5AF2.
-    static let accent = adaptiveColor(light: (175, 82, 222), dark: (191, 90, 242))
+    // StarBox src/styles.css violet palette, converted from OKLCH to sRGB.
+    // Keep neutral surfaces; use its paired light/dark action and selection colors.
+    static let accent = adaptiveColor(light: (118, 78, 199), dark: (177, 153, 244))
     static let onAccent = adaptiveColor(light: (255, 255, 255), dark: (255, 255, 255))
 
     static let windowBackground = adaptiveColor(light: (244, 244, 245), dark: (28, 28, 30))
     static let sidebarBackground = adaptiveColor(light: (242, 242, 243), dark: (32, 32, 34))
     static let contentBackground = adaptiveColor(light: (255, 255, 255), dark: (36, 36, 38))
-    static let panelBackground = adaptiveColor(light: (247, 247, 248), dark: (43, 43, 46))
+    static let panelBackground = adaptiveColor(light: (246, 247, 249), dark: (42, 43, 46))
 
     static let controlBackground = adaptiveColor(light: (255, 255, 255), dark: (50, 50, 53))
     static let controlHoverBackground = adaptiveColor(light: (243, 243, 244), dark: (58, 58, 61))
@@ -123,7 +124,7 @@ enum CoreColor {
 
     static let hoverOverlay = adaptiveColor(light: (0, 0, 0), dark: (255, 255, 255), lightAlpha: 0.05, darkAlpha: 0.06)
     static let pressedOverlay = adaptiveColor(light: (0, 0, 0), dark: (255, 255, 255), lightAlpha: 0.09, darkAlpha: 0.10)
-    static let selectionBackground = adaptiveColor(light: (175, 82, 222), dark: (191, 90, 242), lightAlpha: 0.14, darkAlpha: 0.20)
+    static let selectionBackground = adaptiveColor(light: (239, 236, 254), dark: (35, 30, 49))
 
     static let success = adaptiveColor(light: (36, 138, 61), dark: (48, 209, 88))
     static let warning = adaptiveColor(light: (255, 149, 0), dark: (255, 159, 10))

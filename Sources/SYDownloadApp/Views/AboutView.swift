@@ -22,9 +22,7 @@ struct AboutView: View {
 
             VStack(alignment: .leading, spacing: CoreSpacing.m) {
                 Button("打开 GitHub 仓库", remixSystemImage: "arrow.up.right", action: openRepository)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .font(CoreTypography.controlFont)
+                    .coreAction(.primary)
 
                 HStack(spacing: CoreSpacing.l) {
                     linkButton("问题反馈", symbol: "bubble.left.and.exclamationmark.bubble.right", url: "https://github.com/iPotatow/SYdownload/issues")
@@ -67,9 +65,7 @@ struct AboutView: View {
             }
             Spacer(minLength: CoreSpacing.l)
             Button("关闭", remixSystemImage: "xmark", action: dismiss.callAsFunction)
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .foregroundStyle(CoreColor.textSecondary)
+                .coreIconControl()
                 .help("关闭")
         }
     }
@@ -111,9 +107,7 @@ struct AboutView: View {
         Button(title, remixSystemImage: symbol) {
             open(url)
         }
-        .buttonStyle(.plain)
-        .font(CoreTypography.controlFont)
-        .foregroundStyle(CoreColor.textPrimary)
+        .coreAction(.tertiary)
     }
 
     private func openRepository() {

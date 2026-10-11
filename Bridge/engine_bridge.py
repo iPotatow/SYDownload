@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import contextmanager
+import fcntl
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 import traceback
 from typing import Any
 
@@ -216,6 +219,38 @@ def app_support_dir() -> Path:
     )
     target.mkdir(parents=True, exist_ok=True)
     return target
+
+
+@contextmanager
+def engine_state_lock(request_id: str | None = None, *, wait: bool = True):
+    """Upstream engines share mutable settings and output verification state.
+
+    Keep the lock file permanently: unlinking it would allow two lock inodes.
+    The OS releases the lock if cancellation terminates the bridge process.
+    """
+    with (app_support_dir() / "engine-state.lock").open("a") as lock:
+        announced = False
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if not wait:
+                    raise
+                if request_id and not announced:
+                    print(json.dumps({"id": request_id, "event": "progress",
+                                      "phase": "waiting",
+                                      "message": "等待前一下载任务释放引擎..."},
+                                     ensure_ascii=False), flush=True)
+                    announced = True
+                time.sleep(0.1)
+        try:
+            if request_id and announced:
+                print(json.dumps({"id": request_id, "event": "progress", "phase": "running",
+                                  "message": "正在启动下载任务..."}, ensure_ascii=False), flush=True)
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def cache_dir() -> Path:
@@ -604,9 +639,11 @@ def run_xhs(
     request_id: str | None,
     timeout_seconds: float,
     overwrite_existing: bool = False,
+    verification_root: Path | None = None,
 ) -> tuple[bool, str, str, dict[str, Any]]:
-    baseline = snapshot_artifacts(output)
-    reporter = ProgressReporter(request_id, output, baseline)
+    verification_root = verification_root or output
+    baseline = snapshot_artifacts(verification_root)
+    reporter = ProgressReporter(request_id, verification_root, baseline)
     reporter.emit("正在启动小红书下载引擎…", force=True)
     cmd = [
         sys.executable,
@@ -646,7 +683,7 @@ def run_xhs(
             "verified_bytes": 0,
         }
 
-    verified, message, details = verify_output(baseline, output, log=log)
+    verified, message, details = verify_output(baseline, verification_root, log=log)
     if not verified:
         return False, message, "verification", details
     reporter.emit("下载文件已完成校验。", progress=1.0, force=True)
@@ -660,9 +697,11 @@ async def run_douk_in_process(
     request_id: str | None,
     timeout_seconds: float,
     overwrite_existing: bool = False,
+    verification_root: Path | None = None,
 ) -> tuple[bool, str, str, dict[str, Any]]:
-    baseline = snapshot_artifacts(output)
-    reporter = ProgressReporter(request_id, output, baseline)
+    verification_root = verification_root or output
+    baseline = snapshot_artifacts(verification_root)
+    reporter = ProgressReporter(request_id, verification_root, baseline)
     reporter.emit("正在解析抖音作品…", force=True)
     sys.path.insert(0, str(engine))
     old_cwd = Path.cwd()
@@ -736,7 +775,7 @@ async def run_douk_in_process(
     log = f"DouK 已处理作品 ID：{identifiers}"
     verified, message, details = verify_output(
         baseline,
-        output,
+        verification_root,
         log=log,
         identifiers=identifiers,
     )
@@ -792,7 +831,15 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
 
     name = ENGINE_NAMES[platform]
     path_key = "work_path" if platform == "xiaohongshu" else "root"
-    update_engine_settings(name, engine, {path_key: str(output)})
+    folder_name = req.get("folderName")
+    changes = {path_key: str(output)}
+    if folder_name is not None:
+        if not isinstance(folder_name, str) or not folder_name or Path(folder_name).name != folder_name or folder_name in (".", ".."):
+            return response(req.get("id"), False, platform, "Invalid output folder name", error_kind="disk")
+        changes["folder_name"] = folder_name
+    update_engine_settings(name, engine, changes)
+    saved = read_json(stable_settings_path(name)) or {}
+    verification_root = output / (folder_name or saved.get("folder_name") or "Download")
 
     try:
         if platform == "xiaohongshu":
@@ -803,6 +850,7 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
                 req.get("id"),
                 timeout_seconds,
                 overwrite_existing,
+                verification_root,
             )
         else:
             ok, log, error_kind, verification = asyncio.run(
@@ -813,6 +861,7 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
                     req.get("id"),
                     timeout_seconds,
                     overwrite_existing,
+                    verification_root,
                 )
             )
         capture_engine_settings(name, engine)
@@ -847,6 +896,17 @@ def download(req: dict[str, Any]) -> dict[str, Any]:
 
 
 def handle(req: dict[str, Any]) -> dict[str, Any]:
+    if req.get("command") in {"validate", "download", "settings_get", "settings_update", "settings_reset", "settings_path", "browser_cookie"}:
+        is_download = req.get("command") == "download"
+        try:
+            with engine_state_lock(req.get("id") if is_download else None, wait=is_download):
+                return dispatch(req)
+        except BlockingIOError:
+            return response(req.get("id"), False, None, "引擎正在下载，请在当前任务完成后重试此操作。", error_kind="busy")
+    return dispatch(req)
+
+
+def dispatch(req: dict[str, Any]) -> dict[str, Any]:
     command = req.get("command")
     if command == "ping":
         return response(

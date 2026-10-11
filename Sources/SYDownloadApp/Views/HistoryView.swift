@@ -68,8 +68,7 @@ struct HistoryView: View {
                 Label("历史记录操作", remixSystemImage: "ellipsis")
                     .labelStyle(.iconOnly)
             }
-            .menuStyle(.borderlessButton)
-            .frame(width: CoreMetrics.controlHeightSmall, height: CoreMetrics.controlHeightSmall)
+            .coreIconMenu()
             .help("历史记录操作")
         }
     }
@@ -90,9 +89,7 @@ struct HistoryView: View {
                     model.historySearch = ""
                     searchFocused = true
                 }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .foregroundStyle(CoreColor.textTertiary)
+                .coreIconControl()
                 .help("清除搜索")
             }
         }
@@ -163,10 +160,11 @@ struct HistoryView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(
-            CoreColor.panelBackground,
+            CoreColor.contentBackground,
             in: RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous)
         )
         .clipShape(RoundedRectangle(cornerRadius: CoreRadius.panel, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: CoreRadius.panel).strokeBorder(CoreColor.divider, lineWidth: 0.5) }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -268,9 +266,7 @@ private struct HistoryRow: View {
             Button("在 Finder 中显示", remixSystemImage: "folder") {
                 NSWorkspace.shared.open(URL(fileURLWithPath: item.outputDirectory))
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
-            .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
+            .coreIconControl()
             .help("在 Finder 中显示")
 
             Menu {
@@ -293,8 +289,8 @@ private struct HistoryRow: View {
                 Label("更多操作", remixSystemImage: "ellipsis")
                     .labelStyle(.iconOnly)
             }
-            .menuStyle(.borderlessButton)
-            .frame(width: CoreMetrics.controlHeightCompact, height: CoreMetrics.controlHeightCompact)
+            .coreIconMenu()
+            .help("更多操作")
         }
     }
 }

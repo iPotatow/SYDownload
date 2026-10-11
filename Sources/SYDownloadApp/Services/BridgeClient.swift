@@ -95,7 +95,9 @@ struct BridgeClient: Sendable {
                 )
             }
             group.addTask {
-                try await Task.sleep(for: .seconds(timeoutSeconds))
+                while managed.timeoutClock.elapsed() < timeoutSeconds {
+                    try await Task.sleep(for: .seconds(min(0.25, timeoutSeconds)))
+                }
                 try Task.checkCancellation()
                 throw BridgeError.timedOut
             }
@@ -180,6 +182,9 @@ struct BridgeClient: Sendable {
             guard !lineData.isEmpty else { return }
             if let event = try? decoder.decode(BridgeProgressEvent.self, from: lineData),
                event.event == "progress" {
+                if let phase = event.phase {
+                    managed.timeoutClock.setWaiting(phase == "waiting")
+                }
                 onProgress(event)
                 return
             }
@@ -265,7 +270,32 @@ private struct PythonLaunch: Sendable {
     let argumentsPrefix: [String]
 }
 
+/// Count startup/execution time, excluding an explicit engine-queue wait.
+final class BridgeTimeoutClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiting = false
+    private var active: TimeInterval = 0
+    private var lastChange: TimeInterval
+
+    init(startTime: TimeInterval = ProcessInfo.processInfo.systemUptime) { lastChange = startTime }
+
+    func setWaiting(_ value: Bool, at now: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        lock.lock()
+        defer { lock.unlock() }
+        if !waiting { active += max(0, now - lastChange) }
+        lastChange = now
+        waiting = value
+    }
+
+    func elapsed(at now: TimeInterval = ProcessInfo.processInfo.systemUptime) -> TimeInterval {
+        lock.lock()
+        defer { lock.unlock() }
+        return active + (waiting ? 0 : max(0, now - lastChange))
+    }
+}
+
 private final class ManagedBridgeProcess: @unchecked Sendable {
+    let timeoutClock = BridgeTimeoutClock()
     private let lock = NSLock()
     private var process: Process?
     private var cancelled = false

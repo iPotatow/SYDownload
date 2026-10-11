@@ -4,7 +4,7 @@
 
 ## 当前能力
 
-- SwiftUI 原生界面（macOS 14+）
+- SwiftUI 原生界面（macOS 15+）
 - 自动识别小红书 / 抖音链接；TikTok 链接明确视为不支持
 - 小红书、抖音平台标识使用对应 App Store 应用的真实图标，并作为本地资源随 App 打包
 - Swift ↔ Python JSON Lines IPC
@@ -76,3 +76,13 @@ BUNDLE_RUNTIME=1 CONFIGURATION=release ./script/package_app.sh
 3. Artifact 目前使用 ad-hoc 签名，仅用于开发和真机验证；尚未做 Developer ID、Hardened Runtime 与 notarization。
 4. DouK 仍通过内部类完成单链接处理；正式版应继续收敛成稳定 adapter。
 5. 下载执行已支持最多 3 个并发任务、流式真实写入进度、取消、任务超时、错误分类与落盘验证；暂停/恢复仍待完善。
+
+## Sparkle 更新与退出修复
+
+应用菜单和“设置 → 通用”使用 Sparkle 检查更新。首次启用需要配置更新签名公钥、私钥与 appcast 发布，详见 [Sparkle 更新发布](docs/sparkle-updates.md)。未配置公钥的开发包会显示原因并禁用检查更新。
+
+退出处理由应用代理负责，关闭所有窗口后仍可退出；未保存引擎设置会提示保存、放弃或取消。不会依赖窗口内的通知订阅来完成退出。
+
+独立“EXIF 编辑”页支持从文件名写入日期、可选相机信息、PNG 转 JPEG、改动预览、保留原图输出或备份替换。采用原生 ImageIO，无需安装 ExifTool。默认保留原图；详见 [照片脚本 GUI 实现](docs/photo-script-gui.md)。
+
+原生处理回归测试：`bash script/test_exif.sh`；可用 `SWIFT_SDK` 指定 SDK。

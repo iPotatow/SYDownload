@@ -42,7 +42,7 @@ struct PhotoDeleteResult: Sendable {
 }
 
 enum PhotoLibraryService {
-    static func scan(folder: URL) throws -> PhotoScanResult {
+    static func scan(folder: URL, includesSubfolders: Bool = false) throws -> PhotoScanResult {
         let resourceValues = try folder.resourceValues(forKeys: [.isDirectoryKey])
         guard resourceValues.isDirectory == true else {
             throw CocoaError(.fileReadUnsupportedScheme)
@@ -53,7 +53,9 @@ enum PhotoLibraryService {
         guard let enumerator = FileManager.default.enumerator(
             at: folder,
             includingPropertiesForKeys: Array(keys),
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            options: includesSubfolders
+                ? [.skipsHiddenFiles, .skipsPackageDescendants]
+                : [.skipsHiddenFiles, .skipsPackageDescendants, .skipsSubdirectoryDescendants]
         ) else {
             throw CocoaError(.fileReadUnknown)
         }

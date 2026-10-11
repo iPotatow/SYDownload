@@ -5,14 +5,19 @@ import SwiftUI
 /// Apple's native SF Symbols throughout the app.
 struct RemixIcon: View {
     let systemName: String
-    var size: CGFloat = CoreMetrics.controlIconSize
+    var size: CGFloat? = nil
 
     var body: some View {
-        Image(systemName: appleSystemName)
+        if let size {
+            Image(systemName: appleSystemName)
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
             .accessibilityHidden(true)
+        } else {
+            Image(systemName: appleSystemName)
+                .accessibilityHidden(true)
+        }
     }
 
     private var appleSystemName: String {

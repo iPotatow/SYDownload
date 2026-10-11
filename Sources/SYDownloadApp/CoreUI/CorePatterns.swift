@@ -97,8 +97,8 @@ struct CorePageContainer<Actions: View, Content: View>: View {
             }
 
             content
-                .padding(.horizontal, CoreSpacing.l)
-                .padding(.bottom, CoreSpacing.l)
+                .padding(.horizontal, CoreSpacing.xl)
+                .padding(.bottom, CoreSpacing.xl)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: maxWidth, maxHeight: .infinity, alignment: .topLeading)

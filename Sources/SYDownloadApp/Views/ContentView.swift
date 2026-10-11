@@ -20,7 +20,7 @@ struct ContentView: View {
                 maxHeight: .infinity,
                 alignment: .topLeading
             )
-            .background(CoreColor.sidebarBackground)
+            .background(.regularMaterial)
             .clipped()
             .layoutPriority(1)
 
@@ -31,13 +31,8 @@ struct ContentView: View {
                     maxHeight: .infinity,
                     alignment: .topLeading
                 )
-                .background(
-                    CoreColor.contentBackground,
-                    in: RoundedRectangle(cornerRadius: CoreRadius.content, style: .continuous)
-                )
-                .clipShape(
-                    RoundedRectangle(cornerRadius: CoreRadius.content, style: .continuous)
-                )
+                .background(CoreColor.contentBackground, in: RoundedRectangle(cornerRadius: CoreRadius.content, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: CoreRadius.content, style: .continuous))
                 .coreContentSurfaceShadow()
                 .padding(SYDownloadLayout.contentSurfaceInsets)
         }
@@ -66,42 +61,15 @@ struct ContentView: View {
             model.openSettings(.general)
             focusedSection = .settings
         }
-        .onReceive(NotificationCenter.default.publisher(for: .syDownloadRequestTermination)) { _ in
-            if model.requestTermination() {
-                NSApp.reply(toApplicationShouldTerminate: true)
-            }
-        }
         .alert("保存设置更改？", isPresented: $model.showsUnsavedSettingsPrompt) {
             Button("保存") {
-                let shouldTerminate = model.pendingTermination
-                Task {
-                    if await model.saveUnsavedSettingsAndContinue() {
-                        if shouldTerminate {
-                            model.pendingTermination = false
-                            NSApp.reply(toApplicationShouldTerminate: true)
-                        }
-                    } else if shouldTerminate {
-                        model.pendingTermination = false
-                        NSApp.reply(toApplicationShouldTerminate: false)
-                    }
-                }
+                Task { _ = await model.saveUnsavedSettingsAndContinue() }
             }
             Button("放弃更改", role: .destructive) {
-                let shouldTerminate = model.pendingTermination
-                Task {
-                    await model.discardUnsavedSettingsAndContinue()
-                    if shouldTerminate {
-                        model.pendingTermination = false
-                        NSApp.reply(toApplicationShouldTerminate: true)
-                    }
-                }
+                Task { await model.discardUnsavedSettingsAndContinue() }
             }
             Button("取消", role: .cancel) {
-                let shouldTerminate = model.pendingTermination
                 model.cancelUnsavedSettingsPrompt()
-                if shouldTerminate {
-                    NSApp.reply(toApplicationShouldTerminate: false)
-                }
             }
         } message: {
             Text("小红书或抖音设置还有未保存的更改。")
@@ -121,7 +89,9 @@ struct ContentView: View {
         case .history:
             HistoryView(model: model)
         case .photos:
-            PhotosView()
+            PhotosView(state: model.photoWorkspace)
+        case .exif:
+            ExifEditorView(model: model.exifEditor)
         case .settings:
             SettingsView(model: model)
         }

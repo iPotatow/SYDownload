@@ -1,0 +1,74 @@
+Window: "SYDownload", App: SYDownload.
+0 standard window SYDownload, ID: main-AppWindow-1, Secondary Actions: Raise
+	1 container
+		2 image SYDownload
+		3 text SYDownload 设置 下载管理
+		4 设置分类, 设置分类
+			5 radio button Description: 通用, Value: 0, ID: gearshape
+			6 radio button Description: 小红书, Value: 1, ID: book.pages
+			7 radio button Description: 抖音, Value: 0, ID: music.note
+			8 radio button Description: 高级, Value: 0, ID: wrench.and.screwdriver
+		9 button 下载
+		10 button 任务
+		11 text 找不到对应下载引擎。
+		12 button 重新读取
+		13 button 历史记录
+		14 text 照片工具
+		15 button 照片整理
+		16 button EXIF 编辑
+		17 scroll area Secondary Actions: Scroll Up, Scroll Down
+			18 text 下载内容 下载图片
+			19 toggle button Description: 下载图片, Value: on
+			20 text 下载视频
+			21 toggle button Description: 下载视频, Value: on
+			22 text 下载动图
+			23 toggle button Description: 下载动图, Value: off
+			24 text 格式 图片格式
+			25 pop up button Description: 图片格式, 图片格式, Value: JPEG
+			26 text 视频偏好
+			27 pop up button Description: 视频偏好, 视频偏好, Value: 分辨率优先
+			28 text 作品信息格式
+			29 pop up button Description: 作品信息格式, 作品信息格式, Value: 不保存
+			30 text 文件管理 文件命名格式
+			31 button Description: 小红书文件命名格式, Value: 发布时间 · 作者昵称 · 作品标题
+			32 text 每个作品使用独立文件夹
+			33 toggle button Description: 每个作品使用独立文件夹, Value: on
+			34 text 按作者归档
+			35 toggle button Description: 按作者归档, Value: off
+			36 text 记录小红书引擎下载记录
+			37 toggle button Description: 记录小红书引擎下载记录, Value: on
+			38 text 仅控制上游按作品 ID 的下载记录去重，不控制磁盘同名文件检查；重复文件策略在“通用”中设置。 将文件修改时间写为作品发布时间
+			39 toggle button Description: 将文件修改时间写为作品发布时间, Value: off
+			40 text 记录作品数据
+			41 toggle button Description: 记录作品数据, Value: off
+			42 text Cookie 从浏览器读取
+			43 pop up button Description: 浏览器, 浏览器, Value: Brave
+			44 button 读取并保存
+			45 text 小红书网页版 Cookie
+			46 secure text field (settable) Description: 小红书网页版 Cookie, Placeholder: Cookie 已隐藏
+			47 button 小红书网页版 Cookie
+			48 button (disabled) 小红书网页版 Cookie
+			49 button (disabled) 小红书网页版 Cookie
+			50 text 读取成功后会直接保存到对应引擎配置。首次读取 Chrome、Arc、Edge、Brave 等 Chromium 浏览器时，macOS 可能请求钥匙串授权。
+			51 scroll bar (settable, float) 9.927850020559211e-05
+				52 value indicator (settable, float) 9.927850020559211e-05
+				53 increment arrow button
+				54 decrement arrow button
+				55 increment page button
+				56 decrement page button
+		57 text 当前配置已保存
+		58 button (disabled) 保存小红书设置
+		59 button (selected) 设置
+	60 close button
+	61 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	62 minimize button
+63 menu bar
+	64 SYDownload
+	65 File
+	66 Edit
+	67 View
+	68 导航
+	69 Window
+	70 Help
+
+The focused UI element is 0 standard window SYDownload, ID: main-AppWindow-1, Secondary Actions: Raise

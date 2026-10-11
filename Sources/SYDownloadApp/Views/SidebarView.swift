@@ -9,32 +9,35 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             brand
 
-            VStack(spacing: CoreSpacing.xs) {
-                sidebarButton(.download, title: "下载", systemImage: "arrow.down.circle.fill")
-                sidebarButton(.tasks, title: "任务", systemImage: "tray.full.fill")
-                sidebarButton(.history, title: "历史记录", systemImage: "clock.arrow.circlepath")
+            VStack(spacing: 2) {
+                navigationLabel("下载管理")
+                sidebarButton(.download, title: "下载", systemImage: "arrow.down")
+                sidebarButton(.tasks, title: "任务", systemImage: "tray")
+                sidebarButton(.history, title: "历史记录", systemImage: "clock")
 
-                Divider()
-                    .overlay(CoreColor.divider)
-                    .padding(.horizontal, CoreSpacing.m)
-                    .padding(.vertical, CoreSpacing.s)
-
+                navigationLabel("照片工具").padding(.top, 16)
                 sidebarButton(.photos, title: "照片整理", systemImage: "photo.on.rectangle.angled")
+                sidebarButton(.exif, title: "EXIF 编辑", systemImage: "camera.aperture")
 
-                Divider()
-                    .overlay(CoreColor.divider)
-                    .padding(.horizontal, CoreSpacing.m)
-                    .padding(.vertical, CoreSpacing.s)
 
-                sidebarButton(.settings, title: "设置", systemImage: "slider.horizontal.3")
             }
             .padding(.top, CoreSpacing.s)
 
             Spacer(minLength: CoreSpacing.xl)
+            sidebarButton(.settings, title: "设置", systemImage: "gearshape")
         }
         .padding(.top, SYDownloadLayout.sidebarTitlebarClearance)
         .padding(.horizontal, SYDownloadLayout.sidebarPadding)
         .padding(.bottom, SYDownloadLayout.sidebarPadding)
+    }
+
+    private func navigationLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(CoreColor.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
     }
 
     private var brand: some View {

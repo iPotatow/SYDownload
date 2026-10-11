@@ -6,19 +6,50 @@ import QuickLookThumbnailing
 import QuickLookUI
 
 struct PhotosView: View {
-    @State private var folderURL: URL?
-    @State private var scanResult = PhotoScanResult.empty
-    @State private var selectedDates: Set<String> = []
+    @ObservedObject var state: PhotoWorkspaceState
+    private var folderURL: URL? {
+        get { state.folderURL }
+        nonmutating set { state.folderURL = newValue }
+    }
+    private var scanResult: PhotoScanResult {
+        get { state.scanResult }
+        nonmutating set { state.scanResult = newValue }
+    }
+    private var selectedDates: Set<String> {
+        get { state.selectedDates }
+        nonmutating set { state.selectedDates = newValue }
+    }
+    private var isScanning: Bool {
+        get { state.isScanning }
+        nonmutating set { state.isScanning = newValue }
+    }
+    private var isDeleting: Bool {
+        get { state.isDeleting }
+        nonmutating set { state.isDeleting = newValue }
+    }
+    private var statusIsError: Bool {
+        get { state.statusIsError }
+        nonmutating set { state.statusIsError = newValue }
+    }
+    private var statusMessage: String {
+        get { state.statusMessage }
+        nonmutating set { state.statusMessage = newValue }
+    }
+    private var scanTask: Task<PhotoScanOutcome, Never>? {
+        get { state.scanTask }
+        nonmutating set { state.scanTask = newValue }
+    }
+    private var scanID: UUID {
+        get { state.scanID }
+        nonmutating set { state.scanID = newValue }
+    }
+    private var failedDeleteURLs: [URL] {
+        get { state.failedDeleteURLs }
+        nonmutating set { state.failedDeleteURLs = newValue }
+    }
     @State private var showsFolderImporter = false
     @State private var showsDeleteConfirmation = false
     @State private var isDropTargeted = false
-    @State private var isScanning = false
-    @State private var isDeleting = false
-    @State private var statusIsError = false
-    @State private var statusMessage = ""
-    @State private var scanTask: Task<PhotoScanOutcome, Never>?
-    @State private var scanID = UUID()
-    @State private var failedDeleteURLs: [URL] = []
 
     var body: some View {
         CorePageContainer(title: "照片整理", maxWidth: SYDownloadLayout.contentMaxWidth) {
@@ -64,7 +95,7 @@ struct PhotosView: View {
                 deleteSelectedPhotos()
             }
         } message: {
-            Text("将把 \(selectedPhotoURLs.count) 张照片从当前文件夹移到废纸篓。")
+            Text("将把 \(selectedPhotoURLs.count) 张照片移到废纸篓。扫描范围：\(state.resultIncludesSubfolders ? "当前文件夹及子文件夹" : "当前文件夹")。")
         }
         .tint(CoreColor.accent)
     }
@@ -89,6 +120,7 @@ struct PhotosView: View {
 
     private var initialDropZone: some View {
         VStack(spacing: CoreSpacing.m) {
+            scanScopeControl
             RemixIcon(systemName: isDropTargeted ? "folder.fill.badge.plus" : "folder", size: CoreMetrics.controlHeightLarge)
                 .foregroundStyle(isDropTargeted ? CoreColor.accent : CoreColor.textSecondary)
 
@@ -100,9 +132,7 @@ struct PhotosView: View {
                 .foregroundStyle(CoreColor.textSecondary)
 
             Button("选择文件夹…", remixSystemImage: "folder", action: chooseFolder)
-                .buttonStyle(.borderedProminent)
-                .font(CoreTypography.controlFont)
-                .frame(height: CoreMetrics.controlHeightDefault)
+                .coreAction(.primary)
 
             Text("支持 JPG、PNG、HEIC 等常见图片格式")
                 .font(CoreTypography.captionFont)
@@ -151,13 +181,13 @@ struct PhotosView: View {
                 Button("取消扫描", role: .cancel) {
                     cancelScan()
                 }
-                .font(CoreTypography.controlFont)
+                .coreAction()
 
                 Button("更换文件夹…", remixSystemImage: "folder") {
                     cancelScan()
                     chooseFolder()
                 }
-                .font(CoreTypography.controlFont)
+                .coreAction()
             }
         }
         .frame(maxWidth: .infinity, minHeight: 360)
@@ -208,6 +238,7 @@ struct PhotosView: View {
 
     private var summaryBar: some View {
         VStack(alignment: .leading, spacing: CoreSpacing.s) {
+            scanScopeControl
             HStack(spacing: CoreSpacing.s) {
                 if let folderURL {
                     Label(folderURL.path, remixSystemImage: "folder")
@@ -220,15 +251,11 @@ struct PhotosView: View {
                 Spacer(minLength: CoreSpacing.m)
 
                 Button("重新扫描", remixSystemImage: "arrow.clockwise", action: rescan)
-                    .buttonStyle(.borderless)
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightCompact)
+                    .coreAction(.tertiary)
                     .disabled(isDeleting || isScanning)
 
                 Button("更换文件夹…", remixSystemImage: "folder", action: chooseFolder)
-                    .buttonStyle(.bordered)
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightCompact)
+                    .coreAction()
                     .disabled(isDeleting || isScanning)
             }
 
@@ -253,9 +280,7 @@ struct PhotosView: View {
                         allDatesSelected ? "取消全选" : "全选日期", remixSystemImage: allDatesSelected ? "minus.square" : "checkmark.square",
                         action: toggleAllDates
                     )
-                    .buttonStyle(.borderless)
-                    .font(CoreTypography.controlFont)
-                    .frame(height: CoreMetrics.controlHeightCompact)
+                    .coreAction(.tertiary)
                     .disabled(isDeleting)
                 }
             }
@@ -280,6 +305,7 @@ struct PhotosView: View {
             )
             .labelsHidden()
             .toggleStyle(.checkbox)
+            .disabled(isDeleting || isScanning)
 
             VStack(alignment: .leading, spacing: CoreSpacing.xs) {
                 Text(group.dateKey)
@@ -422,8 +448,7 @@ struct PhotosView: View {
             Button("取消选择") {
                 selectedDates.removeAll()
             }
-            .font(CoreTypography.controlFont)
-            .frame(height: CoreMetrics.controlHeightDefault)
+            .coreAction()
             .disabled(isDeleting)
 
             Button(role: .destructive) {
@@ -436,8 +461,7 @@ struct PhotosView: View {
                     Label("移到废纸篓", remixSystemImage: "trash")
                 }
             }
-            .font(CoreTypography.controlFont)
-            .frame(height: CoreMetrics.controlHeightDefault)
+            .coreAction()
             .disabled(isDeleting || selectedPhotoURLs.isEmpty)
         }
         .padding(.horizontal, CoreMetrics.panelPadding)
@@ -454,6 +478,14 @@ struct PhotosView: View {
         scanResult.groups
             .filter { selectedDates.contains($0.id) }
             .flatMap { $0.photos.map(\.url) }
+    }
+
+    private var scanScopeControl: some View {
+        Toggle("包含子文件夹", isOn: Binding(get: { state.includesSubfolders }, set: { state.includesSubfolders = $0; rescan() }))
+            .toggleStyle(.checkbox)
+            .font(CoreTypography.controlFont)
+            .disabled(isScanning || isDeleting)
+            .help("默认只读取当前文件夹；启用后也会包含输出和备份子文件夹。")
     }
 
     private var allDatesSelected: Bool {
@@ -502,14 +534,12 @@ struct PhotosView: View {
                 Button("在 Finder 中显示", remixSystemImage: "folder") {
                     NSWorkspace.shared.activateFileViewerSelecting(failedDeleteURLs)
                 }
-                .buttonStyle(.borderless)
-                .font(CoreTypography.controlFont)
+                .coreAction(.tertiary)
 
                 Button("重试失败项", remixSystemImage: "arrow.clockwise") {
                     deletePhotos(failedDeleteURLs)
                 }
-                .buttonStyle(.borderless)
-                .font(CoreTypography.controlFont)
+                .coreAction(.tertiary)
                 .disabled(isDeleting)
             }
         }
@@ -522,6 +552,7 @@ struct PhotosView: View {
         scanTask = nil
         scanID = UUID()
         isScanning = false
+        if folderURL != nil { state.includesSubfolders = state.resultIncludesSubfolders }
         statusIsError = false
         statusMessage = folderURL == nil ? "" : "已取消扫描。"
     }
@@ -531,16 +562,14 @@ struct PhotosView: View {
         scanTask?.cancel()
         let currentID = UUID()
         scanID = currentID
-        folderURL = url
-        selectedDates.removeAll()
-        failedDeleteURLs.removeAll()
         isScanning = true
         statusIsError = false
         statusMessage = "正在扫描 \(url.lastPathComponent)…"
 
+        let recursive = state.includesSubfolders
         let worker = Task.detached(priority: .userInitiated) { () -> PhotoScanOutcome in
             do {
-                return PhotoScanOutcome.success(try PhotoLibraryService.scan(folder: url))
+                return PhotoScanOutcome.success(try PhotoLibraryService.scan(folder: url, includesSubfolders: recursive))
             } catch is CancellationError {
                 return PhotoScanOutcome.failure("__cancelled__")
             } catch {
@@ -557,16 +586,20 @@ struct PhotosView: View {
 
             switch outcome {
             case .success(let result):
+                folderURL = url
                 scanResult = result
+                state.resultIncludesSubfolders = recursive
+                selectedDates.removeAll()
+                failedDeleteURLs.removeAll()
                 statusIsError = false
                 statusMessage = statusPrefix ?? ""
             case .failure(let message):
+                if folderURL != nil { state.includesSubfolders = state.resultIncludesSubfolders }
                 if message == "__cancelled__" {
                     statusMessage = "已取消扫描。"
                     statusIsError = false
                     return
                 }
-                scanResult = .empty
                 statusMessage = "无法读取照片：\(message)"
                 statusIsError = true
             }
@@ -648,7 +681,7 @@ private struct LocalPhotoThumbnail: View {
         .task(id: url) {
             await loadThumbnail()
         }
-        .help("点按使用快速查看预览 \(url.lastPathComponent)")
+        .help(url.path)
         .accessibilityLabel("预览 \(url.lastPathComponent)")
     }
 
