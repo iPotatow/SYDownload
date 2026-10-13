@@ -9,6 +9,9 @@ import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+# Exercise the real packaging script with the system Bash before signing tests.
+subprocess.run(['python3', 'script/test_package_app.py'], check=True)
+
 def module(name):
     spec = importlib.util.spec_from_file_location(name, Path('script') / (name + '.py'))
     mod = importlib.util.module_from_spec(spec)

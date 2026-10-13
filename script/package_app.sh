@@ -16,12 +16,14 @@ BUNDLE_RUNTIME="${BUNDLE_RUNTIME:-1}"
 SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://github.com/iPotatow/SYDownload/releases/latest/download/appcast.xml}"
 SPARKLE_PUBLIC_ED_KEY="${SPARKLE_PUBLIC_ED_KEY:-$(tr -d '[:space:]' < "$ROOT/sparkle-public-key.txt")}"
 
-SWIFT_OPTIONS=()
+# Keep the command array non-empty: macOS Bash 3.2 treats an empty array as
+# unset when expanding it under `set -u`.
+SWIFT_BUILD=(swift build -c "$CONFIGURATION")
 if [[ -n "${SWIFT_SDK:-}" ]]; then
-  SWIFT_OPTIONS+=(--sdk "$SWIFT_SDK")
+  SWIFT_BUILD+=(--sdk "$SWIFT_SDK")
 fi
-swift build "${SWIFT_OPTIONS[@]}" -c "$CONFIGURATION" --product SYDownload
-BIN_DIR="$(swift build "${SWIFT_OPTIONS[@]}" -c "$CONFIGURATION" --show-bin-path)"
+"${SWIFT_BUILD[@]}" --product SYDownload
+BIN_DIR="$("${SWIFT_BUILD[@]}" --show-bin-path)"
 BIN="$BIN_DIR/SYDownload"
 APP="$ROOT/dist/SYDownload.app"
 RESOURCE_DIR="$ROOT/Sources/SYDownloadApp/Resources"
